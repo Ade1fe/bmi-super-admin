@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import {
   Archive,
@@ -8,7 +9,6 @@ import {
   Download,
   FilePenLine,
   Filter,
-  GraduationCap,
   PenSquare,
   Plus,
   Search,
@@ -20,6 +20,7 @@ type CourseTab = "all" | "published" | "drafts" | "archived";
 
 type CourseRow = {
   id: number;
+  slug: string;
   title: string;
   code: string;
   category: string;
@@ -38,12 +39,13 @@ type CourseRow = {
 const courseRows: CourseRow[] = [
   {
     id: 1,
-    title: "Introduction to UI Design",
-    code: "CRS-10293",
-    category: "DESIGN",
+    slug: "advanced-react-nodejs",
+    title: "Advanced React & Node.js",
+    code: "CRS-20432",
+    category: "DEVELOPMENT",
     categoryClassName: "bg-[#deebff] text-[#2463e7]",
-    lessons: "12 Lessons",
-    students: "1,240",
+    lessons: "14 Lessons",
+    students: "980",
     instructor: "Amara Okafor",
     instructorInitials: "AO",
     instructorAvatarClassName: "from-[#2b2ad4] via-[#bf39dc] to-[#18c0ff]",
@@ -54,6 +56,7 @@ const courseRows: CourseRow[] = [
   },
   {
     id: 2,
+    slug: "introduction-to-ui-design",
     title: "Introduction to UI Design",
     code: "CRS-10293",
     category: "DATA SCIENCE",
@@ -70,6 +73,7 @@ const courseRows: CourseRow[] = [
   },
   {
     id: 3,
+    slug: "introduction-to-ui-design",
     title: "Introduction to UI Design",
     code: "CRS-10293",
     category: "BUSINESS",
@@ -86,6 +90,7 @@ const courseRows: CourseRow[] = [
   },
   {
     id: 4,
+    slug: "introduction-to-ui-design",
     title: "Introduction to UI Design",
     code: "CRS-10293",
     category: "DEVELOPMENT",
@@ -102,7 +107,8 @@ const courseRows: CourseRow[] = [
   },
   {
     id: 5,
-    title: "Advanced UX Design: User Research Deep Dive",
+    slug: "advanced-ux-research",
+    title: "Advanced UX Research: User Research Deep Dive",
     code: "CRS-20411",
     category: "DESIGN",
     categoryClassName: "bg-[#deebff] text-[#2463e7]",
@@ -118,6 +124,7 @@ const courseRows: CourseRow[] = [
   },
   {
     id: 6,
+    slug: "introduction-to-ui-design",
     title: "Introduction to UI Design",
     code: "CRS-10293",
     category: "DESIGN",
@@ -134,6 +141,7 @@ const courseRows: CourseRow[] = [
   },
   {
     id: 7,
+    slug: "introduction-to-ui-design",
     title: "Introduction to UI Design",
     code: "CRS-10293",
     category: "DESIGN",
@@ -150,6 +158,7 @@ const courseRows: CourseRow[] = [
   },
   {
     id: 8,
+    slug: "introduction-to-ui-design",
     title: "Introduction to UI Design",
     code: "CRS-10293",
     category: "DESIGN",
@@ -290,13 +299,13 @@ export default function CoursesPage() {
   return (
     <AppShell title="Course Management" activeSection="courses">
       <section className="flex justify-stretch sm:justify-end">
-        <button
-          type="button"
+        <Link
+          href="/courses/create"
           className="button-primary inline-flex h-14 w-full items-center justify-center gap-3 rounded-[10px] bg-[#4b8a60] px-6 text-[15px] font-semibold text-white shadow-[0_20px_38px_rgba(75,138,96,0.18)] sm:w-auto"
         >
           <Plus className="h-5 w-5" strokeWidth={2.4} />
           Create New Course
-        </button>
+        </Link>
       </section>
 
       <section className="mt-8 border-b border-[#e4e8f4]">
@@ -368,9 +377,12 @@ export default function CoursesPage() {
                     <p className="mt-1 text-[14px] text-[#7f8cab]">ID: {row.code}</p>
                   </div>
                 </div>
-                <button type="button" className="text-[15px] font-bold text-[#0f8751]">
+                <Link
+                  href={`/courses/${row.slug}/edit`}
+                  className="text-[15px] font-bold text-[#0f8751]"
+                >
                   Edit
-                </button>
+                </Link>
               </div>
 
               <div className="mt-5 grid gap-3 rounded-[12px] bg-white p-4 text-[14px] text-[#61708b]">
@@ -495,9 +507,12 @@ export default function CoursesPage() {
                       </span>
                     </td>
                     <td className="border-b border-[#edf0f7] px-6 py-7">
-                      <button type="button" className="text-[15px] font-bold text-[#0f8751]">
+                      <Link
+                        href={`/courses/${row.slug}/edit`}
+                        className="text-[15px] font-bold text-[#0f8751]"
+                      >
                         Edit
-                      </button>
+                      </Link>
                     </td>
                   </tr>
                 ))}
@@ -562,9 +577,12 @@ export default function CoursesPage() {
                       </span>
                     </td>
                     <td className="border-b border-[#edf0f7] px-6 py-7">
-                      <button type="button" className="text-[15px] font-bold text-[#0f8751]">
+                      <Link
+                        href={`/courses/${row.slug}/edit`}
+                        className="text-[15px] font-bold text-[#0f8751]"
+                      >
                         Edit
-                      </button>
+                      </Link>
                     </td>
                   </tr>
                 ))}
@@ -620,9 +638,12 @@ export default function CoursesPage() {
                       </span>
                     </td>
                     <td className="border-b border-[#edf0f7] px-6 py-7">
-                      <button type="button" className="text-[15px] font-bold text-[#0f8751]">
+                      <Link
+                        href={`/courses/${row.slug}/edit`}
+                        className="text-[15px] font-bold text-[#0f8751]"
+                      >
                         Edit
-                      </button>
+                      </Link>
                     </td>
                   </tr>
                 ))}
@@ -675,9 +696,12 @@ export default function CoursesPage() {
                       </span>
                     </td>
                     <td className="border-b border-[#edf0f7] px-6 py-7">
-                      <button type="button" className="text-[15px] font-bold text-[#0f8751]">
+                      <Link
+                        href={`/courses/${row.slug}/edit`}
+                        className="text-[15px] font-bold text-[#0f8751]"
+                      >
                         Edit
-                      </button>
+                      </Link>
                     </td>
                   </tr>
                 ))}
