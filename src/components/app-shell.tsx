@@ -56,10 +56,10 @@ type AppShellProps = {
 };
 
 const primaryNav: NavItem[] = [
-  { key: "dashboard", label: "Dashboard", icon: House, href: "/" },
+  { key: "dashboard", label: "Dashboard", icon: House, href: "/dashboard" },
   { key: "schools", label: "Schools", icon: Building2, href: "/schools" },
-  { key: "student", label: "Student", icon: Users },
-  { key: "courses", label: "Courses", icon: BookOpen },
+  { key: "student", label: "Student", icon: Users, href: "/students" },
+  { key: "courses", label: "Courses", icon: BookOpen, href: "/courses" },
   { key: "catalog", label: "Catalog", icon: Grid2x2 },
   { key: "analytics", label: "Analytics", icon: ChartBar },
   { key: "subscriptions", label: "Subscriptions", icon: TicketCheck },
@@ -154,7 +154,7 @@ export function AppShell({
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
   return (
-    <main className="min-h-screen bg-[#fafbff] text-[#173257] lg:h-screen lg:overflow-hidden">
+    <main className="min-h-screen overflow-x-hidden bg-[#fafbff] text-[#173257] lg:h-screen lg:overflow-hidden">
       {isMobileNavOpen ? (
         <button
           type="button"
@@ -222,7 +222,7 @@ export function AppShell({
           </div>
         </aside>
 
-        <section className="flex min-w-0 flex-1 flex-col lg:h-screen lg:overflow-hidden">
+        <section className="flex min-w-0 flex-1 flex-col overflow-x-hidden lg:h-screen lg:overflow-hidden">
           <header className="sticky top-0 z-20 border-b border-[#e7ebf7] bg-white px-4 sm:px-6 lg:px-9">
             <div className="flex min-h-[84px] flex-col justify-center gap-4 py-4 lg:min-h-[101px] lg:gap-5 lg:py-0 xl:flex-row xl:items-center xl:justify-between">
               <div className="flex items-center justify-between gap-4">
@@ -235,7 +235,7 @@ export function AppShell({
                   >
                     <Menu className="h-5 w-5" strokeWidth={2.2} />
                   </button>
-                  <div className="text-[26px] font-extrabold tracking-[-0.04em] text-[#16345d] sm:text-[32px]">
+                  <div className="text-[22px] font-extrabold tracking-[-0.04em] text-[#16345d] sm:text-[28px] lg:text-[32px]">
                     {title}
                   </div>
                 </div>
@@ -251,7 +251,7 @@ export function AppShell({
               </div>
 
               <div className="flex flex-1 flex-col gap-4 xl:max-w-[980px] xl:flex-row xl:items-center xl:justify-end">
-                <label className="flex h-[52px] w-full max-w-[610px] items-center gap-3 rounded-2xl bg-[#f3f6fb] px-5 sm:px-7 text-[#95a0b4]">
+                <label className="flex h-[52px] w-full max-w-full items-center gap-3 rounded-2xl bg-[#f3f6fb] px-5 sm:px-7 text-[#95a0b4] xl:max-w-[610px]">
                   <Search className="h-5 w-5" strokeWidth={2} />
                   <input
                     className="w-full bg-transparent text-[15px] font-medium text-[#274267] outline-none placeholder:text-[#98a2b6]"
@@ -269,7 +269,7 @@ export function AppShell({
                     <span className="absolute right-[6px] top-[6px] h-2.5 w-2.5 rounded-full bg-[#f17272]" />
                   </button>
 
-                  <button type="button" className="flex items-center gap-3 text-left">
+                  <button type="button" className="flex shrink-0 items-center gap-3 text-left">
                     <div className="min-w-0 hidden sm:block">
                       <p className="text-[15px] font-bold text-[#16345d]">Naomi Tan</p>
                       <p className="text-[13px] font-medium text-[#787f90]">Super Admin</p>
@@ -284,7 +284,7 @@ export function AppShell({
 
           <div
             className={[
-              "flex-1 bg-[#f8f9ff] px-4 py-5 sm:px-6 lg:overflow-y-auto lg:px-11 lg:py-8",
+              "flex-1 min-w-0 bg-[#f8f9ff] px-4 py-5 sm:px-6 lg:overflow-y-auto lg:px-11 lg:py-8",
               contentClassName ?? "",
             ].join(" ")}
           >

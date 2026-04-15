@@ -1,8 +1,10 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useState } from "react";
 import {
+  ArrowLeft,
   ArrowRight,
   Check,
   CircleCheckBig,
@@ -126,56 +128,60 @@ function UpgradeModal({
     <>
       <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px]" />
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <button
-          type="button"
-          onClick={onClose}
-          className="absolute top-[17%] flex h-14 w-14 items-center justify-center rounded-full bg-white/20 text-white"
-          aria-label="Close subscription modal"
-        >
-          <X className="h-7 w-7" strokeWidth={2.4} />
-        </button>
+        <div className="relative max-h-[calc(100vh-2rem)] w-full max-w-[720px] overflow-y-auto rounded-[16px] bg-white p-5 shadow-[0_40px_120px_rgba(27,43,77,0.22)] sm:p-10">
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute right-5 top-5 flex h-11 w-11 items-center justify-center rounded-full bg-[#f3f6fb] text-[#7e8ba5] transition-colors hover:bg-[#e8edf5]"
+            aria-label="Close subscription modal"
+          >
+            <X className="h-5 w-5" strokeWidth={2.4} />
+          </button>
 
-        <div className="w-full max-w-[720px] rounded-[34px] bg-white p-7 shadow-[0_40px_120px_rgba(27,43,77,0.22)] sm:p-10">
-          <h2 className="text-[28px] font-extrabold tracking-[-0.04em] text-[#172f54]">
+          <h2 className="text-[24px] font-extrabold tracking-[-0.04em] text-[#172f54] sm:text-[28px]">
             Upgrade Subscription
           </h2>
           <p className="mt-2 text-[15px] text-[#6b7c97]">
             Select a new plan for Greenfield Academy
           </p>
 
-          <div className="mt-8 grid grid-cols-2 gap-2 rounded-[18px] bg-[#f4f6f8] p-3 sm:grid-cols-4">
-            {modalPlans.map((tab) => (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => onSelectPlan(tab.key)}
-                className={[
-                  "h-[52px] rounded-[14px] text-[15px] font-medium transition-colors",
-                  selectedPlan === tab.key
-                    ? "bg-white text-[#4a8a60] shadow-[0_8px_18px_rgba(182,192,227,0.16)]"
-                    : "text-[#5e708e]",
-                ].join(" ")}
-              >
-                {tab.label}
-              </button>
-            ))}
+          <div className="mt-8 rounded-[12px] bg-[#f4f6f8] p-3">
+            <div className="-mx-1 overflow-x-auto px-1">
+              <div className="flex min-w-max gap-2 sm:min-w-0 sm:grid sm:grid-cols-4">
+                {modalPlans.map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => onSelectPlan(tab.key)}
+                    className={[
+                      "h-[52px] min-w-[158px] rounded-[10px] px-4 text-[15px] font-medium transition-colors sm:min-w-0",
+                      selectedPlan === tab.key
+                        ? "button-primary bg-[#4b8a60] text-white shadow-[0_8px_18px_rgba(75,138,96,0.18)]"
+                        : "text-[#5e708e]",
+                    ].join(" ")}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
-          <div className="mt-8 rounded-[24px] bg-[#fbfcff] p-7 shadow-[0_12px_32px_rgba(171,185,223,0.12)]">
-            <div className="flex items-start justify-between gap-6">
+          <div className="mt-8 rounded-[14px] bg-[#fbfcff] p-7 shadow-[0_12px_32px_rgba(171,185,223,0.12)]">
+            <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <h3 className="text-[22px] font-extrabold tracking-[-0.04em] text-[#182f53]">
                   {plan.title}
                 </h3>
                 <div className="mt-4 flex items-end gap-2">
-                  <span className="text-[56px] font-extrabold leading-none tracking-[-0.07em] text-[#121f33]">
+                  <span className="text-[44px] font-extrabold leading-none tracking-[-0.07em] text-[#121f33] sm:text-[56px]">
                     {plan.price}
                   </span>
                   <span className="pb-2 text-[18px] text-[#51627f]">{plan.suffix}</span>
                 </div>
               </div>
 
-              <div className="rounded-[20px] bg-[#4859d8] p-5 text-white shadow-[0_20px_34px_rgba(72,89,216,0.24)]">
+              <div className="rounded-[12px] bg-[#4859d8] p-5 text-white shadow-[0_20px_34px_rgba(72,89,216,0.24)]">
                 <Rocket className="h-8 w-8" strokeWidth={2} />
               </div>
             </div>
@@ -196,10 +202,10 @@ function UpgradeModal({
             </div>
           </div>
 
-          <div className="mt-6 rounded-[20px] bg-[#f5f7ff] px-6 py-5">
-            <div className="flex items-center justify-between gap-4">
+          <div className="mt-6 rounded-[12px] bg-[#f5f7ff] px-6 py-5">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-4">
-                <div className="rounded-2xl bg-white p-4 text-[#0f8751]">
+                <div className="rounded-[12px] bg-white p-4 text-[#0f8751]">
                   <Star className="h-6 w-6" strokeWidth={2} />
                 </div>
                 <div>
@@ -212,7 +218,7 @@ function UpgradeModal({
 
               <span
                 className={[
-                  "rounded-xl px-4 py-2 text-[14px] font-bold",
+                  "rounded-[10px] px-4 py-2 text-[14px] font-bold",
                   isCurrentPlan ? "bg-[#dff6eb] text-[#0f8a4f]" : "bg-[#ffe7eb] text-[#ff5e76]",
                 ].join(" ")}
               >
@@ -226,14 +232,14 @@ function UpgradeModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="flex h-[64px] items-center justify-center rounded-2xl border border-[#cadfd5] bg-[#edf5f1] text-[16px] font-semibold text-[#4a8a60]"
+                className="flex h-[64px] items-center justify-center rounded-[10px] border border-[#cadfd5] bg-[#edf5f1] text-[16px] font-semibold text-[#4a8a60]"
               >
                 Cancel
               </button>
               <Link
                 href="/schools/create-school/activation"
                 onClick={onContinue}
-                className="flex h-[64px] items-center justify-center gap-3 rounded-2xl bg-[#4b8a60] text-[16px] font-semibold text-white"
+                className="button-primary flex h-[64px] items-center justify-center gap-3 rounded-[10px] bg-[#4b8a60] text-[16px] font-semibold text-white"
               >
                 View Student Directory
                 <ArrowRight className="h-5 w-5" strokeWidth={2.2} />
@@ -251,16 +257,16 @@ function SubscriptionSuccessModal({ onClose }: { onClose: () => void }) {
     <>
       <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px]" />
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <button
-          type="button"
-          onClick={onClose}
-          className="absolute top-[17%] flex h-14 w-14 items-center justify-center rounded-full bg-white/20 text-white"
-          aria-label="Close upgrade success modal"
-        >
-          <X className="h-7 w-7" strokeWidth={2.4} />
-        </button>
+        <div className="relative max-h-[calc(100vh-2rem)] w-full max-w-[610px] overflow-y-auto rounded-[16px] bg-white px-5 py-8 shadow-[0_40px_120px_rgba(27,43,77,0.22)] sm:px-8 sm:py-10">
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute right-5 top-5 flex h-11 w-11 items-center justify-center rounded-full bg-[#f3f6fb] text-[#7e8ba5] transition-colors hover:bg-[#e8edf5]"
+            aria-label="Close upgrade success modal"
+          >
+            <X className="h-5 w-5" strokeWidth={2.4} />
+          </button>
 
-        <div className="w-full max-w-[610px] rounded-[34px] bg-white px-8 py-10 shadow-[0_40px_120px_rgba(27,43,77,0.22)]">
           <div className="mx-auto flex w-fit flex-col items-center">
             <div className="relative mb-8 h-28 w-28">
               <div className="absolute left-0 top-1 h-5 w-5 rounded-full bg-[#eef4f2]" />
@@ -273,7 +279,7 @@ function SubscriptionSuccessModal({ onClose }: { onClose: () => void }) {
               </div>
             </div>
 
-            <h2 className="text-center text-[26px] font-extrabold tracking-[-0.04em] text-[#152f56]">
+            <h2 className="text-center text-[22px] font-extrabold tracking-[-0.04em] text-[#152f56] sm:text-[26px]">
               Subscription Upgraded Successfully!
             </h2>
             <p className="mt-3 max-w-[460px] text-center text-[16px] leading-7 text-[#667792]">
@@ -282,7 +288,7 @@ function SubscriptionSuccessModal({ onClose }: { onClose: () => void }) {
             </p>
           </div>
 
-          <div className="mt-8 rounded-[22px] bg-[#eef2ff] px-7 py-6">
+          <div className="mt-8 rounded-[14px] bg-[#eef2ff] px-7 py-6">
             <p className="text-[14px] font-bold uppercase tracking-[0.14em] text-[#4659d8]">
               Plan Summary
             </p>
@@ -307,13 +313,13 @@ function SubscriptionSuccessModal({ onClose }: { onClose: () => void }) {
             <button
               type="button"
               onClick={onClose}
-              className="flex h-[62px] w-full items-center justify-center rounded-2xl bg-[#4b8a60] text-[16px] font-semibold text-white"
+              className="button-primary flex h-[62px] w-full items-center justify-center rounded-[10px] bg-[#4b8a60] text-[16px] font-semibold text-white"
             >
               Back to Subscriptions
             </button>
             <Link
               href="/schools/create-school/invoice"
-              className="flex h-[62px] items-center justify-center rounded-2xl border border-[#cadfd5] bg-[#edf5f1] text-[16px] font-semibold text-[#4a8a60]"
+              className="flex h-[62px] w-full items-center justify-center rounded-[10px] border border-[#cadfd5] bg-[#edf5f1] text-[16px] font-semibold text-[#4a8a60]"
             >
               View Invoice Details
             </Link>
@@ -325,51 +331,51 @@ function SubscriptionSuccessModal({ onClose }: { onClose: () => void }) {
 }
 
 export default function CreateSchoolSubscriptionPage() {
-  const [selectedPlan, setSelectedPlan] = useState<PlanKey>("premium");
-  const [modalState, setModalState] = useState<"upgrade" | "success" | null>(null);
+  const router = useRouter();
+  const [selectedPlan, setSelectedPlan] = useState<PlanKey | null>(null);
 
   return (
-    <AppShell title="Create New School" activeSection="schools">
-      {modalState === "upgrade" ? (
-        <UpgradeModal
-          selectedPlan={selectedPlan}
-          onSelectPlan={setSelectedPlan}
-          onClose={() => setModalState(null)}
-          onContinue={() => setModalState("success")}
-        />
-      ) : null}
-      {modalState === "success" ? <SubscriptionSuccessModal onClose={() => setModalState(null)} /> : null}
-
-      <div className="mx-auto max-w-[1260px]">
+    <AppShell
+      title={
+        <div className="flex items-center gap-2 sm:gap-3">
+          <Link href="/schools/create-school" className="text-[#223b61]">
+            <ArrowLeft className="h-6 w-6" strokeWidth={2.2} />
+          </Link>
+          <span>Create New School</span>
+        </div>
+      }
+      activeSection="schools"
+    >
+      <div className="mx-auto ">
         <CreateSchoolStepper currentStep={2} />
 
-        <section className="mt-14 text-center">
-          <h1 className="text-[42px] font-extrabold tracking-[-0.05em] text-[#162f54]">
+        <section className="mt-10 text-center sm:mt-14">
+          <h1 className="text-[32px] font-extrabold tracking-[-0.05em] text-[#162f54] sm:text-[42px]">
             Step 2: Subscription Plan
           </h1>
-          <p className="mx-auto mt-4 max-w-[980px] text-[18px] leading-8 text-[#667792]">
+          <p className="mx-auto mt-4 max-w-[980px] text-[16px] leading-7 text-[#667792] sm:text-[18px] sm:leading-8">
             Assign a subscription plan to Greenfield International Academy to define their student limits and feature access. You can upgrade or change this plan at any time.
           </p>
         </section>
 
-        <section className="mt-16 grid gap-6 xl:grid-cols-4">
+        <section className="mt-12 grid gap-6 xl:grid-cols-4">
           {pricingCards.map((card) => {
             const selected = selectedPlan === card.key;
 
             return (
               <article
                 key={card.key}
-                className="relative rounded-[28px] bg-white p-8 shadow-[0_18px_42px_rgba(182,192,227,0.12)]"
+                className="relative rounded-[14px] bg-white p-8 shadow-[0_18px_42px_rgba(182,192,227,0.12)]"
               >
                 {card.recommended ? (
-                  <div className="absolute inset-x-14 -top-5 rounded-full bg-[#eef1ff] py-2 text-center text-[16px] font-semibold text-[#4659d8]">
+                  <div className="absolute inset-x-14 -top-5 rounded-[10px] bg-[#eef1ff] py-2 text-center text-[16px] font-semibold text-[#4659d8]">
                     Recommended
                   </div>
                 ) : null}
 
                 <h2 className="text-[22px] font-extrabold tracking-[-0.04em] text-[#183155]">{card.title}</h2>
                 <div className="mt-4 flex items-end gap-2">
-                  <span className="text-[62px] font-extrabold leading-none tracking-[-0.08em] text-[#111d31]">
+                  <span className="text-[48px] font-extrabold leading-none tracking-[-0.08em] text-[#111d31] sm:text-[62px]">
                     {card.price}
                   </span>
                   <span className="pb-2 text-[18px] text-[#627492]">{card.suffix}</span>
@@ -393,14 +399,12 @@ export default function CreateSchoolSubscriptionPage() {
                   type="button"
                   onClick={() => {
                     setSelectedPlan(card.key);
-                    if (card.key === "premium") {
-                      setModalState("upgrade");
-                    }
+                    router.push(`/schools/create-school/activation?plan=${card.key}`);
                   }}
                   className={[
-                    "mt-10 flex h-[60px] w-full items-center justify-center rounded-2xl text-[16px] font-semibold",
+                    "mt-10 flex h-[60px] w-full items-center justify-center rounded-[10px] text-[16px] font-semibold",
                     selected
-                      ? "bg-[#0f8751] text-white"
+                      ? "button-primary bg-[#0f8751] text-white"
                       : "border border-[#0f8751] bg-white text-[#0f8751]",
                   ].join(" ")}
                 >
@@ -415,7 +419,7 @@ export default function CreateSchoolSubscriptionPage() {
           {infoCards.map((card) => (
             <article
               key={card.title}
-              className="rounded-[22px] border border-[#dfe4f4] bg-[#f8f9ff] px-6 py-6 shadow-[0_12px_28px_rgba(182,192,227,0.08)]"
+              className="rounded-[14px] border border-[#dfe4f4] bg-[#f8f9ff] px-6 py-6 shadow-[0_12px_28px_rgba(182,192,227,0.08)]"
             >
               <h3 className="text-[18px] font-extrabold tracking-[-0.03em] text-[#4659d8]">
                 {card.title}

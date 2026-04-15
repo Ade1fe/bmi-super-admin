@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {
+  ArrowLeft,
   ArrowRight,
   BadgeInfo,
   Cylinder,
@@ -51,21 +52,31 @@ function InputField({
 
 export default function CreateSchoolPage() {
   return (
-    <AppShell title="Create New School" activeSection="schools">
+    <AppShell
+      title={
+        <div className="flex items-center gap-2 sm:gap-3">
+          <Link href="/schools" className="text-[#223b61]">
+            <ArrowLeft className="h-6 w-6" strokeWidth={2.2} />
+          </Link>
+          <span>Create New School</span>
+        </div>
+      }
+      activeSection="schools"
+    >
       <div className="mx-auto max-w-[1120px]">
         <CreateSchoolStepper currentStep={1} />
 
-        <section className="mt-14 text-center">
-          <h1 className="text-[42px] font-extrabold tracking-[-0.05em] text-[#162f54]">
+        <section className="mt-10 text-center sm:mt-14">
+          <h1 className="text-[32px] font-extrabold tracking-[-0.05em] text-[#162f54] sm:text-[42px]">
             New Institution Setup
           </h1>
-          <p className="mx-auto mt-4 max-w-[760px] text-[18px] leading-8 text-[#667792]">
+          <p className="mx-auto mt-4 max-w-[760px] text-[16px] leading-7 text-[#667792] sm:text-[18px] sm:leading-8">
             Onboarding Process for new institution
           </p>
         </section>
 
-        <section className="mx-auto mt-10 max-w-[960px] rounded-[24px] bg-white p-8 shadow-[0_18px_42px_rgba(182,192,227,0.12)] sm:p-10">
-          <h2 className="text-[22px] font-extrabold tracking-[-0.04em] text-[#182f53]">
+        <section className="mx-auto mt-10 max-w-[960px] rounded-[24px] bg-white p-6 shadow-[0_18px_42px_rgba(182,192,227,0.12)] sm:p-10">
+          <h2 className="text-[20px] font-extrabold tracking-[-0.04em] text-[#182f53] sm:text-[22px]">
             Step 1: School Details
           </h2>
           <p className="mt-2 text-[16px] text-[#71819d]">
@@ -83,13 +94,13 @@ export default function CreateSchoolPage() {
           <div className="mt-12 flex flex-col justify-end gap-4 sm:flex-row">
             <button
               type="button"
-              className="inline-flex h-[62px] items-center justify-center rounded-2xl border border-[#cadfd5] bg-[#edf5f1] px-10 text-[16px] font-semibold text-[#4a8a60]"
+              className="inline-flex h-[62px] w-full items-center justify-center rounded-2xl border border-[#cadfd5] bg-[#edf5f1] px-10 text-[16px] font-semibold text-[#4a8a60] sm:w-auto"
             >
               Cancel
             </button>
             <Link
               href="/schools/create-school/subscription"
-              className="inline-flex h-[62px] items-center justify-center gap-3 rounded-2xl bg-[#4b8a60] px-10 text-[16px] font-semibold text-white"
+              className="button-primary inline-flex h-[62px] w-full items-center justify-center gap-3 rounded-2xl bg-[#4b8a60] px-10 text-[16px] font-semibold text-white sm:w-auto"
             >
               Continue to Step 2
               <ArrowRight className="h-5 w-5" strokeWidth={2.2} />

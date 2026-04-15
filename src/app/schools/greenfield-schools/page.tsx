@@ -88,7 +88,7 @@ function OverviewCard({
   progress: number;
 }) {
   return (
-    <article className="rounded-[18px] border border-[#e5e9f7] bg-white p-7 shadow-[0_16px_34px_rgba(171,185,223,0.06)]">
+    <article className="rounded-[14px] border border-[#e5e9f7] bg-white p-7 shadow-[0_16px_34px_rgba(171,185,223,0.06)]">
       <p className="text-[15px] font-medium uppercase text-[#243c63]">{label}</p>
       <div className="mt-6 flex items-end gap-4">
         <p className="text-[36px] font-extrabold tracking-[-0.05em] text-[#17345d]">{value}</p>
@@ -108,7 +108,7 @@ export default function SchoolDetailPage() {
   return (
     <AppShell
       title={
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <Link href="/schools" className="text-[#223b61]">
             <ArrowLeft className="h-6 w-6" strokeWidth={2.2} />
           </Link>
@@ -129,10 +129,10 @@ export default function SchoolDetailPage() {
         ))}
       </section>
 
-      <section className="mt-8 rounded-[22px] bg-white p-6 shadow-[0_18px_42px_rgba(182,192,227,0.12)] sm:p-10">
+      <section className="mt-8 rounded-[14px] bg-white p-6 shadow-[0_18px_42px_rgba(182,192,227,0.12)] sm:p-10">
         <div className="flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-            <div className="flex h-28 w-28 items-center justify-center rounded-full bg-[#5a7b35] text-center text-white shadow-[inset_0_0_0_4px_rgba(255,255,255,0.1)]">
+            <div className="flex h-24 w-24 items-center justify-center rounded-full bg-[#5a7b35] text-center text-white shadow-[inset_0_0_0_4px_rgba(255,255,255,0.1)] sm:h-28 sm:w-28">
               <div>
                 <p className="text-[12px] font-semibold tracking-[0.18em]">GREENFIELD</p>
                 <p className="text-[9px] opacity-80">School Hub</p>
@@ -163,14 +163,14 @@ export default function SchoolDetailPage() {
           <div className="flex flex-col gap-3 sm:flex-row">
             <Link
               href="/schools/greenfield-schools/edit-profile"
-              className="inline-flex h-14 items-center justify-center gap-3 rounded-xl bg-[#edf5f1] px-9 text-[15px] font-semibold text-[#4b8a60]"
+              className="inline-flex h-14 w-full items-center justify-center gap-3 rounded-[10px] bg-[#edf5f1] px-9 text-[15px] font-semibold text-[#4b8a60] sm:w-auto"
             >
               <Pencil className="h-4 w-4" strokeWidth={2.2} />
               Edit Profile
             </Link>
             <Link
               href="/schools/greenfield-schools/add-students"
-              className="inline-flex h-14 items-center justify-center gap-3 rounded-xl bg-[#4b8a60] px-9 text-[15px] font-semibold text-white"
+              className="button-primary inline-flex h-14 w-full items-center justify-center gap-3 rounded-[10px] bg-[#4b8a60] px-9 text-[15px] font-semibold text-white sm:w-auto"
             >
               <Plus className="h-5 w-5" strokeWidth={2.4} />
               Add New Students
@@ -180,7 +180,7 @@ export default function SchoolDetailPage() {
       </section>
 
       <section className="mt-8 grid gap-8 xl:grid-cols-[1.7fr_0.95fr]">
-        <article className="rounded-[22px] bg-white p-6 shadow-[0_18px_42px_rgba(182,192,227,0.12)] sm:p-8">
+        <article className="rounded-[14px] bg-white p-6 shadow-[0_18px_42px_rgba(182,192,227,0.12)] sm:p-8">
           <div className="flex items-center justify-between gap-4">
             <h3 className="text-[22px] font-extrabold tracking-[-0.04em] text-[#19355d]">
               Assigned Courses
@@ -192,7 +192,7 @@ export default function SchoolDetailPage() {
 
           <div className="mt-8 space-y-7">
             {assignedCourses.map((course) => (
-              <div key={course.name} className="flex items-center gap-4">
+              <div key={course.name} className="flex flex-wrap items-center gap-4">
                 <div className={`rounded-full p-4 ${course.iconClassName}`}>{course.icon}</div>
                 <div className="min-w-0 flex-1">
                   <p className="text-[17px] font-bold text-[#18345c]">{course.name}</p>
@@ -206,12 +206,12 @@ export default function SchoolDetailPage() {
           </div>
         </article>
 
-        <article className="rounded-[22px] bg-[#0f6f38] p-7 text-white shadow-[0_18px_42px_rgba(17,101,58,0.22)] sm:p-8">
+        <article className="rounded-[14px] bg-[#0f6f38] p-7 text-white shadow-[0_18px_42px_rgba(17,101,58,0.22)] sm:p-8">
           <div className="flex items-start justify-between gap-4">
             <p className="text-[16px] font-semibold uppercase tracking-[0.14em] text-white/80">
               Current Plan
             </p>
-            <div className="rounded-2xl bg-white/14 p-4">
+            <div className="rounded-[12px] bg-white/14 p-4">
               <BadgeCheck className="h-6 w-6" strokeWidth={2} />
             </div>
           </div>
@@ -220,7 +220,7 @@ export default function SchoolDetailPage() {
             Premium Enterprise
           </h3>
 
-          <dl className="mt-14 space-y-6 text-[19px]">
+          <dl className="mt-10 space-y-6 text-[17px] sm:mt-14 sm:text-[19px]">
             <div className="flex items-center justify-between gap-4">
               <dt className="text-white/78">Status:</dt>
               <dd className="font-bold">● Active</dd>
@@ -237,7 +237,7 @@ export default function SchoolDetailPage() {
 
           <button
             type="button"
-            className="mt-12 flex h-16 w-full items-center justify-center rounded-2xl bg-white text-[18px] font-bold text-[#0f7d49]"
+            className="mt-12 flex h-16 w-full items-center justify-center rounded-[12px] bg-white text-[18px] font-bold text-[#0f7d49]"
           >
             Manage Subscription
           </button>
@@ -245,7 +245,7 @@ export default function SchoolDetailPage() {
       </section>
 
       <section className="mt-8 grid gap-8 xl:grid-cols-[1.3fr_1.1fr]">
-        <article className="rounded-[22px] bg-white p-6 shadow-[0_18px_42px_rgba(182,192,227,0.12)] sm:p-8">
+        <article className="rounded-[14px] bg-white p-6 shadow-[0_18px_42px_rgba(182,192,227,0.12)] sm:p-8">
           <div className="flex items-center justify-between gap-4">
             <h3 className="text-[22px] font-extrabold tracking-[-0.04em] text-[#19355d]">
               Top Students
@@ -289,7 +289,7 @@ export default function SchoolDetailPage() {
           </div>
         </article>
 
-        <article className="rounded-[22px] bg-white p-6 shadow-[0_18px_42px_rgba(182,192,227,0.12)] sm:p-8">
+        <article className="rounded-[14px] bg-white p-6 shadow-[0_18px_42px_rgba(182,192,227,0.12)] sm:p-8">
           <div className="flex items-center justify-between gap-4">
             <h3 className="text-[22px] font-extrabold tracking-[-0.04em] text-[#19355d]">
               Learning Activity
