@@ -47,6 +47,7 @@ type CourseSelectFieldProps = {
 
 type CourseModalProps = {
   closeHref: string;
+  onClose?: () => void;
   maxWidthClassName?: string;
   children: ReactNode;
 };
@@ -76,7 +77,7 @@ export function CourseFlowStepper({ currentStep }: CourseFlowStepperProps) {
               key={step.label}
               href={step.href}
               className={[
-                "flex min-h-[62px] items-center justify-center rounded-2xl px-5 text-center text-[16px] font-semibold transition-colors",
+                "flex min-h-[60px] items-center justify-center rounded-2xl px-5 text-center text-[15px] font-semibold transition-colors",
                 isActive
                   ? "bg-white text-[#4b8a60] shadow-[0_18px_35px_rgba(140,154,193,0.16)]"
                   : isPast
@@ -110,7 +111,7 @@ export function CourseActionLink({
     <Link
       href={href}
       className={[
-        "inline-flex h-14 items-center justify-center gap-3 rounded-[12px] px-6 text-[16px] font-semibold",
+        "inline-flex h-12 items-center justify-center gap-3 rounded-[12px] px-5 text-[15px] font-semibold",
         variantClassName,
         className,
       ]
@@ -196,24 +197,36 @@ export function CourseTextArea({
 
 export function CourseModal({
   closeHref,
+  onClose,
   maxWidthClassName = "max-w-[860px]",
   children,
 }: CourseModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0d1730]/45 px-4 py-8 backdrop-blur-[2px]">
-      <Link
-        href={closeHref}
-        aria-label="Close modal"
-        className="absolute right-6 top-6 flex h-12 w-12 items-center justify-center rounded-full border border-white/30 bg-white/15 text-white transition-colors hover:bg-white/25 lg:right-16 lg:top-16"
-      >
-        <X className="h-6 w-6" strokeWidth={2.2} />
-      </Link>
       <div
         className={[
           "relative max-h-[calc(100vh-4rem)] w-full overflow-y-auto rounded-[28px] bg-white shadow-[0_34px_80px_rgba(17,24,39,0.28)]",
           maxWidthClassName,
         ].join(" ")}
       >
+        {onClose ? (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close modal"
+            className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-[#dfe6f7] bg-white text-[#304360] shadow-[0_10px_24px_rgba(17,24,39,0.10)] transition-colors hover:bg-[#f4f7fb]"
+          >
+            <X className="h-5 w-5" strokeWidth={2.2} />
+          </button>
+        ) : (
+          <Link
+            href={closeHref}
+            aria-label="Close modal"
+            className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-[#dfe6f7] bg-white text-[#304360] shadow-[0_10px_24px_rgba(17,24,39,0.10)] transition-colors hover:bg-[#f4f7fb]"
+          >
+            <X className="h-5 w-5" strokeWidth={2.2} />
+          </Link>
+        )}
         {children}
       </div>
     </div>

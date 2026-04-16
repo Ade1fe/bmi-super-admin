@@ -60,7 +60,7 @@ const primaryNav: NavItem[] = [
   { key: "schools", label: "Schools", icon: Building2, href: "/schools" },
   { key: "student", label: "Student", icon: Users, href: "/students" },
   { key: "courses", label: "Courses", icon: BookOpen, href: "/courses" },
-  { key: "catalog", label: "Catalog", icon: Grid2x2 },
+  { key: "catalog", label: "Catalog", icon: Grid2x2, href: "/catalog" },
   { key: "analytics", label: "Analytics", icon: ChartBar },
   { key: "subscriptions", label: "Subscriptions", icon: TicketCheck },
   { key: "payments", label: "Payments", icon: CreditCard },
