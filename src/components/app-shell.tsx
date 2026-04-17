@@ -61,9 +61,9 @@ const primaryNav: NavItem[] = [
   { key: "student", label: "Student", icon: Users, href: "/students" },
   { key: "courses", label: "Courses", icon: BookOpen, href: "/courses" },
   { key: "catalog", label: "Catalog", icon: Grid2x2, href: "/catalog" },
-  { key: "analytics", label: "Analytics", icon: ChartBar },
-  { key: "subscriptions", label: "Subscriptions", icon: TicketCheck },
-  { key: "payments", label: "Payments", icon: CreditCard },
+  { key: "analytics", label: "Analytics", icon: ChartBar, href: "/analytics" },
+  { key: "subscriptions", label: "Subscriptions", icon: TicketCheck, href: "/subscriptions" },
+  { key: "payments", label: "Payments", icon: CreditCard, href: "/payments" },
 ];
 
 const adminNav: NavItem[] = [

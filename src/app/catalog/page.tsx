@@ -186,7 +186,7 @@ export default function CatalogManagementPage() {
 
   return (
     <AppShell title="Catalog Management" activeSection="catalog">
-      <div className="mx-auto max-w-[1320px]">
+      <div className="mx-auto ">
         <section className="mt-12">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div>
