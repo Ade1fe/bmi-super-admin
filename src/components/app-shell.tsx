@@ -67,7 +67,7 @@ const primaryNav: NavItem[] = [
 ];
 
 const adminNav: NavItem[] = [
-  { key: "notification", label: "Notification", icon: Bell },
+  { key: "notification", label: "Notification", icon: Bell, href: "/notification" },
   { key: "certificate", label: "Certificate", icon: ShieldCheck },
   { key: "reports", label: "Reports", icon: FileCheck2 },
   { key: "teams", label: "Teams", icon: BriefcaseBusiness },
