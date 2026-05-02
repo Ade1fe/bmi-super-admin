@@ -68,11 +68,11 @@ const primaryNav: NavItem[] = [
 
 const adminNav: NavItem[] = [
   { key: "notification", label: "Notification", icon: Bell, href: "/notification" },
-  { key: "certificate", label: "Certificate", icon: ShieldCheck },
-  { key: "reports", label: "Reports", icon: FileCheck2 },
-  { key: "teams", label: "Teams", icon: BriefcaseBusiness },
+  { key: "certificate", label: "Certificate", icon: ShieldCheck, href: "/certificate" },
+  { key: "reports", label: "Reports", icon: FileCheck2, href: "/reports" },
+  { key: "teams", label: "Teams", icon: BriefcaseBusiness, href: "/teams" },
   { key: "support", label: "Support", icon: CircleHelp },
-  { key: "settings", label: "Settings", icon: Settings },
+  { key: "settings", label: "Settings", icon: Settings, href: "/settings" },
 ];
 
 function AvatarIllustration() {
