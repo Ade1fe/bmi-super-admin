@@ -368,8 +368,8 @@ function SchoolUsageView() {
               </button>
             </div>
             <div className="mt-6 grid grid-cols-7 gap-2 text-center text-[13px] font-bold uppercase tracking-[0.08em] text-[#97a4b8]">
-              {["S", "M", "T", "W", "T", "F", "S"].map((day) => (
-                <span key={day}>{day}</span>
+              {["S", "M", "T", "W", "T", "F", "S"].map((day, index) => (
+                <span key={`${day}-${index}`}>{day}</span>
               ))}
             </div>
             <div className="mt-4 grid grid-cols-7 gap-2">
