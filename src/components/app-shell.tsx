@@ -53,6 +53,10 @@ type AppShellProps = {
   activeSection: AppSection;
   children: ReactNode;
   contentClassName?: string;
+  searchPlaceholder?: string;
+  profileName?: string;
+  profileRole?: string;
+  showHeaderHelp?: boolean;
 };
 
 const primaryNav: NavItem[] = [
@@ -71,7 +75,7 @@ const adminNav: NavItem[] = [
   { key: "certificate", label: "Certificate", icon: ShieldCheck, href: "/certificate" },
   { key: "reports", label: "Reports", icon: FileCheck2, href: "/reports" },
   { key: "teams", label: "Teams", icon: BriefcaseBusiness, href: "/teams" },
-  { key: "support", label: "Support", icon: CircleHelp },
+  { key: "support", label: "Support", icon: CircleHelp, href: "/support" },
   { key: "settings", label: "Settings", icon: Settings, href: "/settings" },
 ];
 
@@ -150,6 +154,10 @@ export function AppShell({
   activeSection,
   children,
   contentClassName,
+  searchPlaceholder = "Search students, courses or reports...",
+  profileName = "Naomi Tan",
+  profileRole = "Super Admin",
+  showHeaderHelp = false,
 }: AppShellProps) {
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
@@ -255,7 +263,7 @@ export function AppShell({
                   <Search className="h-5 w-5" strokeWidth={2} />
                   <input
                     className="w-full bg-transparent text-[15px] font-medium text-[#274267] outline-none placeholder:text-[#98a2b6]"
-                    placeholder="Search students, courses or reports..."
+                    placeholder={searchPlaceholder}
                   />
                 </label>
 
@@ -269,10 +277,20 @@ export function AppShell({
                     <span className="absolute right-[6px] top-[6px] h-2.5 w-2.5 rounded-full bg-[#f17272]" />
                   </button>
 
+                  {showHeaderHelp ? (
+                    <button
+                      type="button"
+                      className="hidden h-10 w-10 items-center justify-center rounded-full border border-[#e7ebf7] text-[#7c8295] xl:flex"
+                      aria-label="Help"
+                    >
+                      <CircleHelp className="h-5 w-5" strokeWidth={1.9} />
+                    </button>
+                  ) : null}
+
                   <button type="button" className="flex shrink-0 items-center gap-3 text-left">
                     <div className="min-w-0 hidden sm:block">
-                      <p className="text-[15px] font-bold text-[#16345d]">Naomi Tan</p>
-                      <p className="text-[13px] font-medium text-[#787f90]">Super Admin</p>
+                      <p className="text-[15px] font-bold text-[#16345d]">{profileName}</p>
+                      <p className="text-[13px] font-medium text-[#787f90]">{profileRole}</p>
                     </div>
                     <AvatarIllustration />
                     <ChevronDown className="h-4 w-4 text-[#5f6676]" strokeWidth={2.2} />

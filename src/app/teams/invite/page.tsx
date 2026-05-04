@@ -1,11 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Check, ShieldCheck } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import {
+  buildTeamsHref,
+  defaultPermissions,
+  getInitials,
+  getRoleLabel,
+  initialTeamMembers,
+  loadStoredTeamMembers,
+  persistTeamMembers,
+  roleMeta,
+  type PermissionSet,
+  type TeamMember,
+  type TeamRoleKey,
+} from "@/app/teams/team-flow";
 
-type RoleOption = "super-admin" | "content-manager" | "support" | "finance";
+type RoleOption = TeamRoleKey;
 
 function TopTabLink({
   href,
@@ -65,41 +79,127 @@ function PermissionToggle({
   );
 }
 
-export default function InviteTeamMemberPage() {
+function InviteTeamMemberPageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const memberParam = searchParams.get("member");
+  const memberId = memberParam ? Number(memberParam) : null;
+  const isEditing = Boolean(memberId && Number.isFinite(memberId));
+
+  const [members, setMembers] = useState<TeamMember[]>(initialTeamMembers);
   const [selectedRole, setSelectedRole] = useState<RoleOption>("super-admin");
-  const [permissions, setPermissions] = useState({
-    auditLogs: true,
-    systemConfigurations: false,
-    accessKeys: false,
-  });
+  const [permissions, setPermissions] = useState<PermissionSet>(defaultPermissions);
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+
+  useEffect(() => {
+    const storedMembers = loadStoredTeamMembers();
+    const hydrateForm = window.setTimeout(() => {
+      setMembers(storedMembers);
+
+      if (!isEditing || !memberId) {
+        return;
+      }
+
+      const member = storedMembers.find((entry) => entry.id === memberId);
+
+      if (!member) {
+        return;
+      }
+
+      setFullName(member.name);
+      setEmail(member.email);
+      setSelectedRole(member.roleKey);
+      setPermissions(member.permissions);
+    }, 0);
+
+    return () => window.clearTimeout(hydrateForm);
+  }, [isEditing, memberId]);
+
+  const submitDisabled = fullName.trim().length === 0 || email.trim().length === 0;
+  const latestMembers = [...members].slice(-3).reverse();
+  const seatLimit = 20;
+  const seatUsage = Math.min(100, Math.round((members.length / seatLimit) * 100));
+  const seatsRemaining = Math.max(0, seatLimit - members.length);
+
+  const handleSave = () => {
+    const trimmedName = fullName.trim();
+    const trimmedEmail = email.trim().toLowerCase();
+
+    if (!trimmedName || !trimmedEmail) {
+      return;
+    }
+
+    const baseMember = {
+      initials: getInitials(trimmedName),
+      name: trimmedName,
+      email: trimmedEmail,
+      roleKey: selectedRole,
+      permissions,
+      department: roleMeta[selectedRole].department,
+      clearanceLevel: selectedRole === "super-admin" ? "Level 3 - Elevated Access" : "Level 2 - Standard Access",
+    } as const;
+
+    const nextMembers = isEditing && memberId
+      ? members.map((member) =>
+          member.id === memberId
+            ? {
+                ...member,
+                ...baseMember,
+              }
+            : member,
+        )
+      : [
+          ...members,
+          {
+            id: members.reduce((largestId, member) => Math.max(largestId, member.id), 0) + 1,
+            ...baseMember,
+            lastLogin: "Just invited",
+            status: "Active" as const,
+          },
+        ];
+
+    persistTeamMembers(nextMembers);
+    router.push(buildTeamsHref("administrative"));
+  };
 
   return (
-    <AppShell title="Management Team" activeSection="teams" contentClassName="px-4 py-5 sm:px-6 lg:px-9 lg:py-8">
+    <AppShell
+      title="Management Team"
+      activeSection="teams"
+      contentClassName="px-4 py-5 sm:px-6 lg:px-9 lg:py-8"
+    >
       <div className="mx-auto">
         <div className="flex flex-wrap items-center gap-4 bg-[#f5f6fd] px-4 py-2">
-          <TopTabLink href="/teams" label="Administrative Team" active />
-          <TopTabLink href="/teams" label="Audit Logs" />
+          <TopTabLink href={buildTeamsHref("administrative")} label="Administrative Team" active />
+          <TopTabLink href={buildTeamsHref("audit")} label="Audit Logs" />
         </div>
 
         <section className="mt-8 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h2 className="text-[26px] font-extrabold tracking-[-0.05em] text-[#172f54]">Invite New Personnel</h2>
+            <h2 className="text-[26px] font-extrabold tracking-[-0.05em] text-[#172f54]">
+              {isEditing ? "Edit Team Permissions" : "Invite New Personnel"}
+            </h2>
             <p className="mt-2 max-w-[760px] text-[18px] leading-8 text-[#4f627e]">
-              Assign specific roles and granular permissions to maintain the institutional integrity of the Emerald Portal ledger.
+              Assign specific roles and granular permissions to maintain the institutional integrity of
+              the Emerald Portal ledger.
             </p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row">
             <button
               type="button"
+              onClick={() => router.push(buildTeamsHref("administrative"))}
               className="inline-flex h-12 items-center justify-center rounded-[14px] border border-[#cadfd5] bg-[#eef7f1] px-6 text-[18px] font-semibold text-[#4b8a60]"
             >
               Discard Entry
             </button>
             <button
               type="button"
-              className="button-primary inline-flex h-12 items-center justify-center rounded-[14px] bg-[#4b8a60] px-6 text-[18px] font-semibold text-white"
+              onClick={handleSave}
+              disabled={submitDisabled}
+              className="button-primary inline-flex h-12 items-center justify-center rounded-[14px] bg-[#4b8a60] px-6 text-[18px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Add Member
+              {isEditing ? "Save Changes" : "Add Member"}
             </button>
           </div>
         </section>
@@ -111,15 +211,19 @@ export default function InviteTeamMemberPage() {
               <label className="block">
                 <span className="text-[17px] font-semibold text-[#172f54]">Full Legal Name</span>
                 <input
-                  defaultValue="e.g. Alistair Vance"
-                  className="mt-3 h-14 w-full rounded-[14px] border border-[#dbe3f1] bg-white px-4 text-[16px] text-[#274267] outline-none"
+                  value={fullName}
+                  onChange={(event) => setFullName(event.target.value)}
+                  placeholder="e.g. Alistair Vance"
+                  className="mt-3 h-14 w-full rounded-[14px] border border-[#dbe3f1] bg-white px-4 text-[16px] text-[#274267] outline-none placeholder:text-[#9ba8bc]"
                 />
               </label>
               <label className="block">
                 <span className="text-[17px] font-semibold text-[#172f54]">Corporate Email</span>
                 <input
-                  defaultValue="vance@emerald-portal.com"
-                  className="mt-3 h-14 w-full rounded-[14px] border border-[#dbe3f1] bg-white px-4 text-[16px] text-[#274267] outline-none"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="vance@emerald-portal.com"
+                  className="mt-3 h-14 w-full rounded-[14px] border border-[#dbe3f1] bg-white px-4 text-[16px] text-[#274267] outline-none placeholder:text-[#9ba8bc]"
                 />
               </label>
             </div>
@@ -127,42 +231,22 @@ export default function InviteTeamMemberPage() {
             <div className="mt-10">
               <h3 className="text-[18px] font-extrabold tracking-[-0.03em] text-[#172f54]">Institutional Role</h3>
               <div className="mt-5 grid gap-4 lg:grid-cols-2">
-                {[
-                  {
-                    key: "super-admin" as const,
-                    title: "Super Admin",
-                    copy: "Full system access & management",
-                  },
-                  {
-                    key: "content-manager" as const,
-                    title: "Content Manager",
-                    copy: "Editorial and portal updates",
-                  },
-                  {
-                    key: "support" as const,
-                    title: "Support",
-                    copy: "Ticket management & resolution",
-                  },
-                  {
-                    key: "finance" as const,
-                    title: "Finance",
-                    copy: "Ledger auditing & billing access",
-                  },
-                ].map((role) => {
-                  const active = selectedRole === role.key;
+                {(Object.keys(roleMeta) as RoleOption[]).map((roleKey) => {
+                  const role = roleMeta[roleKey];
+                  const active = selectedRole === roleKey;
 
                   return (
                     <button
-                      key={role.key}
+                      key={roleKey}
                       type="button"
-                      onClick={() => setSelectedRole(role.key)}
+                      onClick={() => setSelectedRole(roleKey)}
                       className={`flex items-start justify-between rounded-[18px] border px-5 py-5 text-left ${
                         active ? "border-[#5b55ff] bg-[#f6f5ff]" : "border-[#dfe6f7] bg-white"
                       }`}
                     >
                       <div>
-                        <p className="text-[17px] font-extrabold text-[#172f54]">{role.title}</p>
-                        <p className="mt-2 text-[14px] text-[#8fa0ba]">{role.copy}</p>
+                        <p className="text-[17px] font-extrabold text-[#172f54]">{role.label}</p>
+                        <p className="mt-2 text-[14px] text-[#8fa0ba]">{role.formCopy}</p>
                       </div>
                       {active ? (
                         <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#5b55ff] text-[#5b55ff]">
@@ -181,9 +265,7 @@ export default function InviteTeamMemberPage() {
                 <PermissionToggle
                   label="VIEW AUDIT LOGS"
                   enabled={permissions.auditLogs}
-                  onToggle={() =>
-                    setPermissions((current) => ({ ...current, auditLogs: !current.auditLogs }))
-                  }
+                  onToggle={() => setPermissions((current) => ({ ...current, auditLogs: !current.auditLogs }))}
                 />
                 <PermissionToggle
                   label="EDIT SYSTEM CONFIGURATIONS"
@@ -198,9 +280,7 @@ export default function InviteTeamMemberPage() {
                 <PermissionToggle
                   label="MANAGE ACCESS KEYS"
                   enabled={permissions.accessKeys}
-                  onToggle={() =>
-                    setPermissions((current) => ({ ...current, accessKeys: !current.accessKeys }))
-                  }
+                  onToggle={() => setPermissions((current) => ({ ...current, accessKeys: !current.accessKeys }))}
                 />
               </div>
             </div>
@@ -210,24 +290,24 @@ export default function InviteTeamMemberPage() {
             <article className="rounded-[24px] bg-white p-5 shadow-[0_18px_42px_rgba(182,192,227,0.08)]">
               <h3 className="text-[18px] font-extrabold uppercase tracking-[0.08em] text-[#172f54]">Recent Personnel</h3>
               <div className="mt-6 space-y-6">
-                {[
-                  { name: "Sarah Miller", meta: "Support · 2H ago" },
-                  { name: "Julian Thorne", meta: "Finance · 5H ago" },
-                  { name: "Elena Rossi", meta: "Manager · Yesterday" },
-                ].map((person, index) => (
-                  <div key={person.name} className="flex items-center gap-4">
+                {latestMembers.map((member, index) => (
+                  <div key={member.id} className="flex items-center gap-4">
                     <div
-                      className={`h-12 w-12 rounded-full ${
+                      className={`flex h-12 w-12 items-center justify-center rounded-full text-[14px] font-extrabold text-white ${
                         index === 0
                           ? "bg-[radial-gradient(circle_at_top,#f8d8b9_10%,#e0a16d_42%,#d08a59_100%)]"
                           : index === 1
                             ? "bg-[radial-gradient(circle_at_top,#f6e0bf_10%,#5c4a39_42%,#1b1818_100%)]"
                             : "bg-[radial-gradient(circle_at_top,#f3d4c8_10%,#7a3b3b_42%,#2a1212_100%)]"
                       }`}
-                    />
+                    >
+                      {member.initials}
+                    </div>
                     <div>
-                      <p className="text-[16px] font-extrabold text-[#172f54]">{person.name}</p>
-                      <p className="mt-1 text-[14px] uppercase tracking-[0.06em] text-[#8fa0ba]">{person.meta}</p>
+                      <p className="text-[16px] font-extrabold text-[#172f54]">{member.name}</p>
+                      <p className="mt-1 text-[14px] uppercase tracking-[0.06em] text-[#8fa0ba]">
+                        {getRoleLabel(member.roleKey)} · {member.lastLogin}
+                      </p>
                     </div>
                   </div>
                 ))}
@@ -237,18 +317,28 @@ export default function InviteTeamMemberPage() {
             <article className="rounded-[24px] bg-[#f5f6ff] p-5 shadow-[0_18px_42px_rgba(182,192,227,0.08)]">
               <div className="flex items-center justify-between gap-4">
                 <p className="text-[18px] font-extrabold text-[#4f63dc]">Seat Capacity</p>
-                <p className="text-[18px] font-extrabold text-[#4f63dc]">12 / 20</p>
+                <p className="text-[18px] font-extrabold text-[#4f63dc]">
+                  {members.length} / {seatLimit}
+                </p>
               </div>
               <div className="mt-4 h-2 rounded-full bg-[#dfe3ff]">
-                <div className="h-full w-[58%] rounded-full bg-[#4f63dc]" />
+                <div className="h-full rounded-full bg-[#4f63dc]" style={{ width: `${seatUsage}%` }} />
               </div>
               <p className="mt-5 text-[15px] leading-7 text-[#8190b6]">
-                You have 8 institutional seats remaining in your current Enterprise tier.
+                You have {seatsRemaining} institutional seats remaining in your current Enterprise tier.
               </p>
             </article>
           </div>
         </section>
       </div>
     </AppShell>
+  );
+}
+
+export default function InviteTeamMemberPage() {
+  return (
+    <Suspense fallback={<AppShell title="Management Team" activeSection="teams"><div /></AppShell>}>
+      <InviteTeamMemberPageContent />
+    </Suspense>
   );
 }
