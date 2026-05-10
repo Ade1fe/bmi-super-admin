@@ -58,7 +58,8 @@ export default function StudentEditPage() {
           </h2>
 
           <div className="mt-10 grid gap-x-12 gap-y-7 md:grid-cols-2">
-            <InputField label="Full Name" value="Alexander Thompson" />
+            <InputField label="First Name" value="Alexander" />
+            <InputField label="Last Name" value="Thompson" />
             <InputField label="Email Address" value="alex.thompson@example.com" />
             <InputField label="Student ID" value="STU-88291" />
 

@@ -18,6 +18,7 @@ import {
   type TeamMember,
   type TeamRoleKey,
 } from "@/app/teams/team-flow";
+import { combineNameParts, splitFullName } from "@/lib/endpoints";
 
 type RoleOption = TeamRoleKey;
 
@@ -89,7 +90,8 @@ function InviteTeamMemberPageContent() {
   const [members, setMembers] = useState<TeamMember[]>(initialTeamMembers);
   const [selectedRole, setSelectedRole] = useState<RoleOption>("super-admin");
   const [permissions, setPermissions] = useState<PermissionSet>(defaultPermissions);
-  const [fullName, setFullName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
 
   useEffect(() => {
@@ -107,7 +109,10 @@ function InviteTeamMemberPageContent() {
         return;
       }
 
-      setFullName(member.name);
+      const nameParts = splitFullName(member.name);
+
+      setFirstName(nameParts.firstName);
+      setLastName(nameParts.lastName);
       setEmail(member.email);
       setSelectedRole(member.roleKey);
       setPermissions(member.permissions);
@@ -116,14 +121,15 @@ function InviteTeamMemberPageContent() {
     return () => window.clearTimeout(hydrateForm);
   }, [isEditing, memberId]);
 
-  const submitDisabled = fullName.trim().length === 0 || email.trim().length === 0;
+  const submitDisabled =
+    firstName.trim().length === 0 || lastName.trim().length === 0 || email.trim().length === 0;
   const latestMembers = [...members].slice(-3).reverse();
   const seatLimit = 20;
   const seatUsage = Math.min(100, Math.round((members.length / seatLimit) * 100));
   const seatsRemaining = Math.max(0, seatLimit - members.length);
 
   const handleSave = () => {
-    const trimmedName = fullName.trim();
+    const trimmedName = combineNameParts(firstName, lastName);
     const trimmedEmail = email.trim().toLowerCase();
 
     if (!trimmedName || !trimmedEmail) {
@@ -209,15 +215,24 @@ function InviteTeamMemberPageContent() {
             <h3 className="text-[18px] font-extrabold tracking-[-0.03em] text-[#172f54]">Personality Identity</h3>
             <div className="mt-8 grid gap-5 lg:grid-cols-2">
               <label className="block">
-                <span className="text-[17px] font-semibold text-[#172f54]">Full Legal Name</span>
+                <span className="text-[17px] font-semibold text-[#172f54]">First Name</span>
                 <input
-                  value={fullName}
-                  onChange={(event) => setFullName(event.target.value)}
-                  placeholder="e.g. Alistair Vance"
+                  value={firstName}
+                  onChange={(event) => setFirstName(event.target.value)}
+                  placeholder="e.g. Alistair"
                   className="mt-3 h-14 w-full rounded-[14px] border border-[#dbe3f1] bg-white px-4 text-[16px] text-[#274267] outline-none placeholder:text-[#9ba8bc]"
                 />
               </label>
               <label className="block">
+                <span className="text-[17px] font-semibold text-[#172f54]">Last Name</span>
+                <input
+                  value={lastName}
+                  onChange={(event) => setLastName(event.target.value)}
+                  placeholder="e.g. Vance"
+                  className="mt-3 h-14 w-full rounded-[14px] border border-[#dbe3f1] bg-white px-4 text-[16px] text-[#274267] outline-none placeholder:text-[#9ba8bc]"
+                />
+              </label>
+              <label className="block lg:col-span-2">
                 <span className="text-[17px] font-semibold text-[#172f54]">Corporate Email</span>
                 <input
                   value={email}

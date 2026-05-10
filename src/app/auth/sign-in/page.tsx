@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import {
   AuthField,
   AuthFooterText,
@@ -8,8 +11,38 @@ import {
   RememberCheckLabel,
   RememberRow,
 } from "@/components/onboarding-shell";
+import { apiRequest, endpoints } from "@/lib/endpoints";
 
 export default function SignInPage() {
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const submitDisabled = !email.trim() || !password.trim() || isSubmitting;
+
+  const handleSubmit = async () => {
+    setIsSubmitting(true);
+    setErrorMessage("");
+
+    try {
+      await apiRequest(endpoints.admin.login, {
+        method: "POST",
+        body: {
+          email: email.trim().toLowerCase(),
+          password,
+        },
+      });
+
+      router.push("/auth/login-success");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Unable to sign in.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <OnboardingShell
       heroTitle={
@@ -23,8 +56,22 @@ export default function SignInPage() {
     >
       <div className="space-y-8">
         <div className="space-y-7">
-          <AuthField label="Super Admin Email" type="email" defaultValue="admin@school.com" />
-          <AuthField label="Password" type="password" defaultValue="************" />
+          <AuthField
+            label="Super Admin Email"
+            type="email"
+            placeholder="admin@school.com"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            autoComplete="email"
+          />
+          <AuthField
+            label="Password"
+            type="password"
+            placeholder="Enter your password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            autoComplete="current-password"
+          />
         </div>
 
         <RememberRow
@@ -36,9 +83,11 @@ export default function SignInPage() {
           }
         />
 
-        <Link href="/auth/login-success">
-          <PrimaryButton>Sing in</PrimaryButton>
-        </Link>
+        {errorMessage ? <p className="text-[14px] font-medium text-[#cf3f4f]">{errorMessage}</p> : null}
+
+        <PrimaryButton onClick={handleSubmit} disabled={submitDisabled}>
+          {isSubmitting ? "Signing in..." : "Sign in"}
+        </PrimaryButton>
 
         <AuthFooterText
           text="Don't have an account?"

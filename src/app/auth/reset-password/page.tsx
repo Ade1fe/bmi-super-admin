@@ -18,7 +18,7 @@ export default function ResetPasswordCodePage() {
       panelTitle="Reset Password"
       panelDescription={
         <>
-          Enter 4 digits verification code has been sent to
+          Enter the 6-digit verification code sent to
           <span className="font-medium text-[#173257]"> okoro@mail.com</span>
         </>
       }

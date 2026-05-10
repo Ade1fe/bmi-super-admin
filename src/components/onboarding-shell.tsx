@@ -1,6 +1,6 @@
 
 import Image from "next/image";
-import type { ReactNode } from "react";
+import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
 import { Check, EyeOff } from "lucide-react";
 
 type OnboardingShellProps = {
@@ -15,11 +15,8 @@ type OnboardingShellProps = {
 
 type FieldProps = {
   label: string;
-  type?: "text" | "email" | "password";
-  defaultValue?: string;
-  placeholder?: string;
   trailingIcon?: ReactNode;
-};
+} & Omit<InputHTMLAttributes<HTMLInputElement>, "className">;
 
 type OtpInputRowProps = {
   values?: string[];
@@ -145,6 +142,11 @@ export function AuthField({
   defaultValue,
   placeholder,
   trailingIcon,
+  value,
+  onChange,
+  name,
+  autoComplete,
+  readOnly,
 }: FieldProps) {
   return (
     <label className="block">
@@ -157,6 +159,11 @@ export function AuthField({
           type={type}
           defaultValue={defaultValue}
           placeholder={placeholder}
+          value={value}
+          onChange={onChange}
+          name={name}
+          autoComplete={autoComplete}
+          readOnly={readOnly}
           className="w-full bg-transparent text-[15px] outline-none placeholder:text-[#95a4bc] sm:text-[16px]"
         />
         {trailingIcon ??
@@ -168,9 +175,9 @@ export function AuthField({
   );
 }
 
-export function OtpInputRow({ values = ["", "", "", ""] }: OtpInputRowProps) {
+export function OtpInputRow({ values = ["", "", "", "", "", ""] }: OtpInputRowProps) {
   return (
-    <div className="grid grid-cols-4 gap-3 sm:gap-5">
+    <div className="grid grid-cols-6 gap-3 sm:gap-5">
       {values.map((value, index) => (
         <div
           key={`${value}-${index}`}
@@ -184,11 +191,18 @@ export function OtpInputRow({ values = ["", "", "", ""] }: OtpInputRowProps) {
   );
 }
 
-export function PrimaryButton({ children }: { children: ReactNode }) {
+export function PrimaryButton({
+  children,
+  type = "button",
+  disabled,
+  ...props
+}: { children: ReactNode } & ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <button
-      type="button"
-      className="button-primary flex h-[56px] w-full items-center justify-center rounded-[12px] bg-[#4d8d63] px-6 text-[15px] font-semibold text-white shadow-[0_18px_34px_rgba(77,141,99,0.18)] sm:h-[66px] sm:text-[17px]"
+      type={type}
+      disabled={disabled}
+      className="button-primary flex h-[56px] w-full items-center justify-center rounded-[12px] bg-[#4d8d63] px-6 text-[15px] font-semibold text-white shadow-[0_18px_34px_rgba(77,141,99,0.18)] disabled:cursor-not-allowed disabled:opacity-60 sm:h-[66px] sm:text-[17px]"
+      {...props}
     >
       {children}
     </button>

@@ -18,7 +18,7 @@ export default function VerifyEmailPage() {
       panelTitle="Verify Your Email"
       panelDescription={
         <>
-          We&apos;ve sent a 4-digit verification code to your email address
+          We&apos;ve sent a 6-digit verification code to your email address
           <span className="font-medium text-[#173257]"> admin@school.com</span>
         </>
       }

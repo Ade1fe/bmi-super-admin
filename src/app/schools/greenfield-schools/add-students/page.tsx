@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useState } from "react";
 import {
   BadgeCheck,
-  CheckCheck,
   FileSpreadsheet,
   Link as LinkIcon,
   LockKeyhole,
@@ -19,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { apiRequest, endpoints } from "@/lib/endpoints";
 
 type StudentTab = "manual" | "csv" | "invite";
 
@@ -103,7 +103,7 @@ function StudentSuccessModal({ onClose }: { onClose: () => void }) {
               Student Added Successfully
             </h2>
             <p className="mx-auto mt-3 max-w-[440px] text-[15px] leading-7 text-[#667792]">
-              15 new students have been added to your database
+              The student record has been added to your database and is ready for onboarding.
             </p>
           </div>
 
@@ -116,7 +116,7 @@ function StudentSuccessModal({ onClose }: { onClose: () => void }) {
                 <div>
                   <h3 className="text-[15px] font-extrabold text-[#19355d]">Welcome Emails Sent</h3>
                   <p className="mt-1 text-[15px] leading-6 text-[#92a2bd]">
-                    Login instructions and temporary credentials have been dispatched to all 15 students.
+                    Login instructions and onboarding details have been dispatched to the student.
                   </p>
                   <p className="mt-3 inline-flex items-center gap-2 text-[15px] font-bold text-[#0f8751]">
                     <BadgeCheck className="h-4 w-4" strokeWidth={2.3} />
@@ -134,7 +134,7 @@ function StudentSuccessModal({ onClose }: { onClose: () => void }) {
                 <div>
                   <h3 className="text-[15px] font-extrabold text-[#19355d]">Profile Setup Complete</h3>
                   <p className="mt-1 text-[15px] leading-6 text-[#92a2bd]">
-                    All personal records, course enrollments, and ID numbers have been generated.
+                    The student profile is now available for enrollment and access assignment.
                   </p>
                   <p className="mt-3 inline-flex items-center gap-2 text-[15px] font-bold text-[#0f8751]">
                     <BadgeCheck className="h-4 w-4" strokeWidth={2.3} />
@@ -171,6 +171,40 @@ function StudentSuccessModal({ onClose }: { onClose: () => void }) {
 export default function AddStudentsPage() {
   const [activeTab, setActiveTab] = useState<StudentTab>("manual");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [studentId, setStudentId] = useState("");
+  const [email, setEmail] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const submitDisabled = !firstName.trim() || !lastName.trim() || !email.trim() || isSubmitting;
+
+  const handleAddStudent = async () => {
+    setIsSubmitting(true);
+    setErrorMessage("");
+
+    try {
+      await apiRequest(endpoints.schools.registerStudent, {
+        method: "POST",
+        body: {
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          email: email.trim().toLowerCase(),
+        },
+      });
+
+      setStudentId("");
+      setFirstName("");
+      setLastName("");
+      setEmail("");
+      setShowSuccessModal(true);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Unable to add student.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <AppShell title="Schools Management" activeSection="schools">
@@ -208,11 +242,25 @@ export default function AddStudentsPage() {
               <div className="grid gap-x-8 gap-y-7 md:grid-cols-2">
                 <label>
                   <span className="mb-3 block text-[18px] font-bold tracking-[-0.02em] text-[#19355d]">
-                    Full Name
+                    First Name
                   </span>
                   <input
-                    defaultValue="e.g. Jane Doe"
-                    className="h-[60px] w-full rounded-[10px] border border-[#d9e0ef] px-5 text-[15px] text-[#264267] outline-none"
+                    value={firstName}
+                    onChange={(event) => setFirstName(event.target.value)}
+                    placeholder="e.g. Jane"
+                    className="h-[60px] w-full rounded-[10px] border border-[#d9e0ef] px-5 text-[15px] text-[#264267] outline-none placeholder:text-[#91a0b8]"
+                  />
+                </label>
+
+                <label>
+                  <span className="mb-3 block text-[18px] font-bold tracking-[-0.02em] text-[#19355d]">
+                    Last Name
+                  </span>
+                  <input
+                    value={lastName}
+                    onChange={(event) => setLastName(event.target.value)}
+                    placeholder="e.g. Doe"
+                    className="h-[60px] w-full rounded-[10px] border border-[#d9e0ef] px-5 text-[15px] text-[#264267] outline-none placeholder:text-[#91a0b8]"
                   />
                 </label>
 
@@ -221,8 +269,10 @@ export default function AddStudentsPage() {
                     Student ID
                   </span>
                   <input
-                    defaultValue="e.g. STU-2024-001"
-                    className="h-[60px] w-full rounded-[10px] border border-[#d9e0ef] px-5 text-[15px] text-[#264267] outline-none"
+                    value={studentId}
+                    onChange={(event) => setStudentId(event.target.value)}
+                    placeholder="e.g. STU-2024-001"
+                    className="h-[60px] w-full rounded-[10px] border border-[#d9e0ef] px-5 text-[15px] text-[#264267] outline-none placeholder:text-[#91a0b8]"
                   />
                 </label>
 
@@ -230,21 +280,27 @@ export default function AddStudentsPage() {
                   <span className="mb-3 block text-[18px] font-bold tracking-[-0.02em] text-[#19355d]">
                     Email Address
                   </span>
-                  <textarea
-                    defaultValue="student@greenwood.edu"
-                    className="min-h-[142px] w-full rounded-[10px] border border-[#d9e0ef] px-5 py-4 text-[15px] text-[#264267] outline-none"
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    placeholder="student@greenwood.edu"
+                    className="h-[60px] w-full rounded-[10px] border border-[#d9e0ef] px-5 text-[15px] text-[#264267] outline-none placeholder:text-[#91a0b8]"
                   />
                 </label>
               </div>
 
+              {errorMessage ? <p className="mt-6 text-[14px] font-medium text-[#cf3f4f]">{errorMessage}</p> : null}
+
               <div className="mt-10 flex justify-stretch sm:justify-end">
                 <button
                   type="button"
-                  onClick={() => setShowSuccessModal(true)}
-                  className="button-primary inline-flex h-[64px] w-full items-center justify-center gap-3 rounded-[10px] bg-[#4b8a60] px-9 text-[16px] font-semibold text-white shadow-[0_20px_38px_rgba(75,138,96,0.18)] sm:w-auto"
+                  onClick={handleAddStudent}
+                  disabled={submitDisabled}
+                  className="button-primary inline-flex h-[64px] w-full items-center justify-center gap-3 rounded-[10px] bg-[#4b8a60] px-9 text-[16px] font-semibold text-white shadow-[0_20px_38px_rgba(75,138,96,0.18)] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                 >
                   <UserRoundPlus className="h-5 w-5" strokeWidth={2.2} />
-                  Add Student
+                  {isSubmitting ? "Adding Student..." : "Add Student"}
                 </button>
               </div>
             </div>

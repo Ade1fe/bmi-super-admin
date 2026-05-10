@@ -1,13 +1,13 @@
+"use client";
+
 import Link from "next/link";
-import {
-  ArrowLeft,
-  ArrowRight,
-  BadgeInfo,
-  Cylinder,
-  ShieldCheck,
-} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { ArrowLeft, ArrowRight, BadgeInfo, Cylinder, ShieldCheck } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { CreateSchoolStepper } from "@/components/create-school-stepper";
+import { apiRequest, endpoints } from "@/lib/endpoints";
+import { persistSchoolOnboardingDraft } from "@/lib/school-onboarding";
 
 const infoCards = [
   {
@@ -31,10 +31,16 @@ const infoCards = [
 function InputField({
   label,
   placeholder,
+  value,
+  onChange,
+  type = "text",
   fullWidth,
 }: {
   label: string;
   placeholder: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: "text" | "email" | "password";
   fullWidth?: boolean;
 }) {
   return (
@@ -43,14 +49,69 @@ function InputField({
         {label}
       </span>
       <input
-        defaultValue={placeholder}
-        className="h-[62px] w-full rounded-2xl border border-[#d7deee] bg-white px-5 text-[15px] text-[#264267] outline-none"
+        type={type}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="h-[62px] w-full rounded-2xl border border-[#d7deee] bg-white px-5 text-[15px] text-[#264267] outline-none placeholder:text-[#91a0b8]"
       />
     </label>
   );
 }
 
 export default function CreateSchoolPage() {
+  const router = useRouter();
+  const [schoolName, setSchoolName] = useState("");
+  const [country, setCountry] = useState("");
+  const [adminFirstName, setAdminFirstName] = useState("");
+  const [adminLastName, setAdminLastName] = useState("");
+  const [adminEmail, setAdminEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const submitDisabled =
+    !schoolName.trim() ||
+    !country.trim() ||
+    !adminFirstName.trim() ||
+    !adminLastName.trim() ||
+    !adminEmail.trim() ||
+    !password.trim() ||
+    isSubmitting;
+
+  const handleContinue = async () => {
+    setIsSubmitting(true);
+    setErrorMessage("");
+
+    try {
+      await apiRequest(endpoints.schools.register, {
+        method: "POST",
+        body: {
+          school_name: schoolName.trim(),
+          country: country.trim(),
+          admin_first_name: adminFirstName.trim(),
+          admin_last_name: adminLastName.trim(),
+          admin_email: adminEmail.trim().toLowerCase(),
+          password,
+        },
+      });
+
+      persistSchoolOnboardingDraft({
+        schoolName: schoolName.trim(),
+        country: country.trim(),
+        adminFirstName: adminFirstName.trim(),
+        adminLastName: adminLastName.trim(),
+        adminEmail: adminEmail.trim().toLowerCase(),
+      });
+
+      router.push("/schools/create-school/subscription");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Unable to create school.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <AppShell
       title={
@@ -84,12 +145,49 @@ export default function CreateSchoolPage() {
           </p>
 
           <div className="mt-10 grid gap-x-8 gap-y-8 md:grid-cols-2">
-            <InputField label="School Name" placeholder="e.g. St. Andrews Academy" fullWidth />
-            <InputField label="Admin Name" placeholder="e.g. Jane Doe" />
-            <InputField label="Admin Email" placeholder="e.g. STU-2024-001" />
-            <InputField label="Admin Email" placeholder="e.g. Jane Doe" />
-            <InputField label="Student Limit" placeholder="e.g. STU-2024-001" />
+            <InputField
+              label="School Name"
+              placeholder="e.g. St. Andrews Academy"
+              value={schoolName}
+              onChange={setSchoolName}
+              fullWidth
+            />
+            <InputField
+              label="Country"
+              placeholder="e.g. Nigeria"
+              value={country}
+              onChange={setCountry}
+            />
+            <InputField
+              label="Admin Email"
+              placeholder="e.g. admin@school.com"
+              value={adminEmail}
+              onChange={setAdminEmail}
+              type="email"
+            />
+            <InputField
+              label="Admin First Name"
+              placeholder="e.g. Jane"
+              value={adminFirstName}
+              onChange={setAdminFirstName}
+            />
+            <InputField
+              label="Admin Last Name"
+              placeholder="e.g. Doe"
+              value={adminLastName}
+              onChange={setAdminLastName}
+            />
+            <InputField
+              label="Temporary Password"
+              placeholder="Create a secure password"
+              value={password}
+              onChange={setPassword}
+              type="password"
+              fullWidth
+            />
           </div>
+
+          {errorMessage ? <p className="mt-6 text-[14px] font-medium text-[#cf3f4f]">{errorMessage}</p> : null}
 
           <div className="mt-12 flex flex-col justify-end gap-4 sm:flex-row">
             <button
@@ -98,13 +196,15 @@ export default function CreateSchoolPage() {
             >
               Cancel
             </button>
-            <Link
-              href="/schools/create-school/subscription"
-              className="button-primary inline-flex h-[62px] w-full items-center justify-center gap-3 rounded-2xl bg-[#4b8a60] px-10 text-[16px] font-semibold text-white sm:w-auto"
+            <button
+              type="button"
+              onClick={handleContinue}
+              disabled={submitDisabled}
+              className="button-primary inline-flex h-[62px] w-full items-center justify-center gap-3 rounded-2xl bg-[#4b8a60] px-10 text-[16px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
             >
-              Continue to Step 2
+              {isSubmitting ? "Submitting..." : "Continue to Step 2"}
               <ArrowRight className="h-5 w-5" strokeWidth={2.2} />
-            </Link>
+            </button>
           </div>
         </section>
 

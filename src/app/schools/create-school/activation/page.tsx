@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   ArrowLeft,
   Check,
@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { CreateSchoolStepper } from "@/components/create-school-stepper";
+import { loadSchoolOnboardingDraft } from "@/lib/school-onboarding";
 
 function ActivationCard({
   icon: Icon,
@@ -128,20 +129,23 @@ function WorkspaceActiveModal({ onClose }: { onClose: () => void }) {
 
 export default function CreateSchoolActivationPage() {
   const [showSuccessModal, setShowSuccessModal] = useState(true);
-  const [selectedPlanLabel, setSelectedPlanLabel] = useState("School Premium");
+  const [selectedPlanLabel] = useState(() => {
+    const plan =
+      typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("plan");
 
-  useEffect(() => {
-    const plan = new URLSearchParams(window.location.search).get("plan");
-    const nextPlanLabel =
+    return (
       {
         basic: "School Basic",
         premium: "School Premium",
         monthly: "Individual Monthly",
         annual: "Individual Annual",
-      }[plan ?? ""] ?? "School Premium";
-
-    setSelectedPlanLabel(nextPlanLabel);
-  }, []);
+      }[plan ?? ""]
+    ) ?? "School Premium";
+  });
+  const [schoolName] = useState(
+    () => loadSchoolOnboardingDraft()?.schoolName ?? "Greenwood International Academy",
+  );
+  const [adminEmail] = useState(() => loadSchoolOnboardingDraft()?.adminEmail ?? "admin@greenwood.edu");
 
   return (
     <AppShell
@@ -177,15 +181,11 @@ export default function CreateSchoolActivationPage() {
             <div className="grid gap-8 p-6 md:grid-cols-2 sm:p-8">
               <div>
                 <p className="text-[14px] font-semibold uppercase text-[#6f7f99]">School Name</p>
-                <p className="mt-2 text-[18px] font-extrabold leading-7 text-[#182f53]">
-                  Greenwood International
-                  <br />
-                  Academy
-                </p>
+                <p className="mt-2 text-[18px] font-extrabold leading-7 text-[#182f53]">{schoolName}</p>
               </div>
               <div>
                 <p className="text-[14px] font-semibold uppercase text-[#6f7f99]">Administrator Email</p>
-                <p className="mt-2 text-[18px] font-extrabold text-[#182f53]">admin@greenwood.edu</p>
+                <p className="mt-2 text-[18px] font-extrabold text-[#182f53]">{adminEmail}</p>
               </div>
               <div>
                 <p className="text-[14px] font-semibold uppercase text-[#6f7f99]">Selected Plan</p>

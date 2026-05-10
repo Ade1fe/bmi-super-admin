@@ -6,7 +6,6 @@ import { useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
-  Check,
   CircleCheckBig,
   Rocket,
   Star,
@@ -14,6 +13,7 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { CreateSchoolStepper } from "@/components/create-school-stepper";
+import { loadSchoolOnboardingDraft } from "@/lib/school-onboarding";
 
 type PlanKey = "basic" | "premium" | "monthly" | "annual";
 
@@ -115,11 +115,13 @@ function UpgradeModal({
   onSelectPlan,
   onClose,
   onContinue,
+  schoolName,
 }: {
   selectedPlan: PlanKey;
   onSelectPlan: (plan: PlanKey) => void;
   onClose: () => void;
   onContinue: () => void;
+  schoolName: string;
 }) {
   const plan = modalPlans.find((item) => item.key === selectedPlan)!;
   const isCurrentPlan = selectedPlan === "basic";
@@ -142,7 +144,7 @@ function UpgradeModal({
             Upgrade Subscription
           </h2>
           <p className="mt-2 text-[15px] text-[#6b7c97]">
-            Select a new plan for Greenfield Academy
+            Select a new plan for {schoolName}
           </p>
 
           <div className="mt-8 rounded-[12px] bg-[#f4f6f8] p-3">
@@ -252,87 +254,10 @@ function UpgradeModal({
   );
 }
 
-function SubscriptionSuccessModal({ onClose }: { onClose: () => void }) {
-  return (
-    <>
-      <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px]" />
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="relative max-h-[calc(100vh-2rem)] w-full max-w-[610px] overflow-y-auto rounded-[16px] bg-white px-5 py-8 shadow-[0_40px_120px_rgba(27,43,77,0.22)] sm:px-8 sm:py-10">
-          <button
-            type="button"
-            onClick={onClose}
-            className="absolute right-5 top-5 flex h-11 w-11 items-center justify-center rounded-full bg-[#f3f6fb] text-[#7e8ba5] transition-colors hover:bg-[#e8edf5]"
-            aria-label="Close upgrade success modal"
-          >
-            <X className="h-5 w-5" strokeWidth={2.4} />
-          </button>
-
-          <div className="mx-auto flex w-fit flex-col items-center">
-            <div className="relative mb-8 h-28 w-28">
-              <div className="absolute left-0 top-1 h-5 w-5 rounded-full bg-[#eef4f2]" />
-              <div className="absolute right-0 top-8 h-6 w-6 rounded-full bg-[#aad7cc]" />
-              <div className="absolute left-9 top-7 text-[#0a0a0a]">
-                <Check className="h-16 w-16" strokeWidth={2.2} />
-              </div>
-              <div className="absolute right-7 top-2 rounded-full border-[6px] border-[#46c7cf] bg-white p-1">
-                <CircleCheckBig className="h-5 w-5 text-[#46c7cf]" strokeWidth={2.6} />
-              </div>
-            </div>
-
-            <h2 className="text-center text-[22px] font-extrabold tracking-[-0.04em] text-[#152f56] sm:text-[26px]">
-              Subscription Upgraded Successfully!
-            </h2>
-            <p className="mt-3 max-w-[460px] text-center text-[16px] leading-7 text-[#667792]">
-              Greenfield Academy has been upgraded to the <span className="text-[#4659d8]">Premium Plan</span>.
-              All features are now active and ready for use.
-            </p>
-          </div>
-
-          <div className="mt-8 rounded-[14px] bg-[#eef2ff] px-7 py-6">
-            <p className="text-[14px] font-bold uppercase tracking-[0.14em] text-[#4659d8]">
-              Plan Summary
-            </p>
-
-            <div className="mt-5 space-y-4 text-[16px] text-[#566881]">
-              <div className="flex items-center justify-between gap-4 border-b border-[#dfe6fb] pb-4">
-                <span>New Plan</span>
-                <span className="font-extrabold text-[#172f54]">Premium Plan</span>
-              </div>
-              <div className="flex items-center justify-between gap-4 border-b border-[#dfe6fb] pb-4">
-                <span>Monthly Billing</span>
-                <span className="font-extrabold text-[#172f54]">$249.00 / month</span>
-              </div>
-              <div className="flex items-center justify-between gap-4">
-                <span>Next Billing Date</span>
-                <span className="font-extrabold text-[#172f54]">October 24, 2023</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-8 space-y-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="button-primary flex h-[62px] w-full items-center justify-center rounded-[10px] bg-[#4b8a60] text-[16px] font-semibold text-white"
-            >
-              Back to Subscriptions
-            </button>
-            <Link
-              href="/schools/create-school/invoice"
-              className="flex h-[62px] w-full items-center justify-center rounded-[10px] border border-[#cadfd5] bg-[#edf5f1] text-[16px] font-semibold text-[#4a8a60]"
-            >
-              View Invoice Details
-            </Link>
-          </div>
-        </div>
-      </div>
-    </>
-  );
-}
-
 export default function CreateSchoolSubscriptionPage() {
   const router = useRouter();
   const [selectedPlan, setSelectedPlan] = useState<PlanKey | null>(null);
+  const [schoolName] = useState(() => loadSchoolOnboardingDraft()?.schoolName ?? "Greenfield International Academy");
 
   return (
     <AppShell
@@ -354,7 +279,8 @@ export default function CreateSchoolSubscriptionPage() {
             Step 2: Subscription Plan
           </h1>
           <p className="mx-auto mt-4 max-w-[980px] text-[16px] leading-7 text-[#667792] sm:text-[18px] sm:leading-8">
-            Assign a subscription plan to Greenfield International Academy to define their student limits and feature access. You can upgrade or change this plan at any time.
+            Assign a subscription plan to {schoolName} to define student limits and feature access.
+            You can upgrade or change this plan at any time.
           </p>
         </section>
 
@@ -397,10 +323,7 @@ export default function CreateSchoolSubscriptionPage() {
 
                 <button
                   type="button"
-                  onClick={() => {
-                    setSelectedPlan(card.key);
-                    router.push(`/schools/create-school/activation?plan=${card.key}`);
-                  }}
+                  onClick={() => setSelectedPlan(card.key)}
                   className={[
                     "mt-10 flex h-[60px] w-full items-center justify-center rounded-[10px] text-[16px] font-semibold",
                     selected
@@ -428,6 +351,16 @@ export default function CreateSchoolSubscriptionPage() {
             </article>
           ))}
         </section>
+
+        {selectedPlan ? (
+          <UpgradeModal
+            selectedPlan={selectedPlan}
+            onSelectPlan={setSelectedPlan}
+            onClose={() => setSelectedPlan(null)}
+            onContinue={() => router.push(`/schools/create-school/activation?plan=${selectedPlan}`)}
+            schoolName={schoolName}
+          />
+        ) : null}
       </div>
     </AppShell>
   );
