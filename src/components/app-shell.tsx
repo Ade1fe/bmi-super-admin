@@ -24,6 +24,11 @@ import {
   Users,
   X,
 } from "lucide-react";
+import {
+  getSessionProfileName,
+  getSessionProfileRole,
+  useAuthSession,
+} from "@/lib/auth-session";
 
 export type AppSection =
   | "dashboard"
@@ -155,11 +160,14 @@ export function AppShell({
   children,
   contentClassName,
   searchPlaceholder = "Search students, courses or reports...",
-  profileName = "Naomi Tan",
-  profileRole = "Super Admin",
+  profileName,
+  profileRole,
   showHeaderHelp = false,
 }: AppShellProps) {
+  const { session } = useAuthSession();
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const resolvedProfileName = profileName ?? getSessionProfileName(session);
+  const resolvedProfileRole = profileRole ?? getSessionProfileRole(session);
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#fafbff] text-[#173257] lg:h-screen lg:overflow-hidden">
@@ -289,8 +297,8 @@ export function AppShell({
 
                   <button type="button" className="flex shrink-0 items-center gap-3 text-left">
                     <div className="min-w-0 hidden sm:block">
-                      <p className="text-[15px] font-bold text-[#16345d]">{profileName}</p>
-                      <p className="text-[13px] font-medium text-[#787f90]">{profileRole}</p>
+                      <p className="text-[15px] font-bold text-[#16345d]">{resolvedProfileName}</p>
+                      <p className="text-[13px] font-medium text-[#787f90]">{resolvedProfileRole}</p>
                     </div>
                     <AvatarIllustration />
                     <ChevronDown className="h-4 w-4 text-[#5f6676]" strokeWidth={2.2} />

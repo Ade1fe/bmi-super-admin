@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   BadgeCheck,
   FileSpreadsheet,
@@ -18,6 +18,8 @@ import {
   X,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { parseStudentList, type StudentSummary } from "@/lib/backend-models";
+import { useAuthSession } from "@/lib/auth-session";
 import { apiRequest, endpoints } from "@/lib/endpoints";
 
 type StudentTab = "manual" | "csv" | "invite";
@@ -32,11 +34,30 @@ const tabs: {
   { key: "invite", label: "Invite Link", icon: LinkIcon },
 ];
 
-const metrics = [
-  { label: "Total Students", value: "1,284", note: "+12 this week", noteClassName: "text-[#0f8a4f]" },
-  { label: "Pending Invites", value: "42", note: "Sent via invite link", noteClassName: "text-[#90a1bf]" },
-  { label: "Last Upload", value: "Oct 12", note: "128 students added", noteClassName: "text-[#90a1bf]" },
-];
+function formatCompactNumber(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: value >= 1000 ? 1 : 0,
+    notation: value >= 1000 ? "compact" : "standard",
+  }).format(value);
+}
+
+function formatDisplayDate(value: string | undefined) {
+  if (!value) {
+    return "N/A";
+  }
+
+  const parsedDate = new Date(value);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return "N/A";
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+  }).format(parsedDate);
+}
 
 function TabButton({
   active,
@@ -169,23 +190,60 @@ function StudentSuccessModal({ onClose }: { onClose: () => void }) {
 }
 
 export default function AddStudentsPage() {
+  const { session } = useAuthSession();
   const [activeTab, setActiveTab] = useState<StudentTab>("manual");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [students, setStudents] = useState<StudentSummary[]>([]);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [studentId, setStudentId] = useState("");
   const [email, setEmail] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingStudents, setIsLoadingStudents] = useState(true);
 
   const submitDisabled = !firstName.trim() || !lastName.trim() || !email.trim() || isSubmitting;
 
+  const loadStudents = async (token: string | undefined) => {
+    if (!token) {
+      setStudents([]);
+      setIsLoadingStudents(false);
+      return;
+    }
+
+    try {
+      setIsLoadingStudents(true);
+      setErrorMessage("");
+
+      const response = await apiRequest(endpoints.schools.students, {
+        authToken: token,
+        cache: "no-store",
+      });
+
+      setStudents(parseStudentList(response));
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Unable to load students.");
+    } finally {
+      setIsLoadingStudents(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadStudents(session?.token);
+  }, [session?.token]);
+
   const handleAddStudent = async () => {
+    if (!session?.token) {
+      setErrorMessage("Sign in again to add students.");
+      return;
+    }
+
     setIsSubmitting(true);
     setErrorMessage("");
 
     try {
       await apiRequest(endpoints.schools.registerStudent, {
+        authToken: session.token,
         method: "POST",
         body: {
           first_name: firstName.trim(),
@@ -198,6 +256,7 @@ export default function AddStudentsPage() {
       setFirstName("");
       setLastName("");
       setEmail("");
+      await loadStudents(session.token);
       setShowSuccessModal(true);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Unable to add student.");
@@ -205,6 +264,33 @@ export default function AddStudentsPage() {
       setIsSubmitting(false);
     }
   };
+
+  const newestStudent = [...students]
+    .sort((first, second) => (second.createdAt ?? "").localeCompare(first.createdAt ?? ""))[0];
+  const metrics = [
+    {
+      label: "Total Students",
+      value: formatCompactNumber(students.length),
+      note: isLoadingStudents ? "Loading student count..." : "Live from schools/students",
+      noteClassName: "text-[#0f8a4f]",
+    },
+    {
+      label: "Current School",
+      value: session?.school?.name ?? "Not linked",
+      note: session?.school?.email || "No school metadata on session",
+      noteClassName: "text-[#90a1bf]",
+    },
+    {
+      label: "Newest Student",
+      value: newestStudent
+        ? `${newestStudent.user.firstName} ${newestStudent.user.lastName}`.trim()
+        : "No records",
+      note: newestStudent
+        ? `${newestStudent.user.email} • ${formatDisplayDate(newestStudent.createdAt)}`
+        : "Waiting for first student record",
+      noteClassName: "text-[#90a1bf]",
+    },
+  ];
 
   return (
     <AppShell title="Schools Management" activeSection="schools">
@@ -215,7 +301,7 @@ export default function AddStudentsPage() {
           <h1 className="text-[28px] font-extrabold tracking-[-0.05em] text-[#16345d] sm:text-[32px]">
             Add New Students
           </h1>
-          <p className="mt-3 text-[16px] text-[#304a72] sm:text-[18px]">
+              <p className="mt-3 text-[16px] text-[#304a72] sm:text-[18px]">
             Expand your school community by adding students manually, via bulk upload, or secure invitation.
           </p>
         </section>

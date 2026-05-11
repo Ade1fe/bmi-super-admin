@@ -11,9 +11,11 @@ import {
   PrimaryButton,
 } from "@/components/onboarding-shell";
 import { apiRequest, endpoints } from "@/lib/endpoints";
+import { createSessionFromAuthResponse, useAuthSession } from "@/lib/auth-session";
 
 export default function AuthSignUpPage() {
   const router = useRouter();
+  const { setSession } = useAuthSession();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -40,17 +42,38 @@ export default function AuthSignUpPage() {
     setErrorMessage("");
 
     try {
-      await apiRequest(endpoints.admin.register, {
+      const normalizedEmail = email.trim().toLowerCase();
+      const response = await apiRequest(endpoints.admin.register, {
         method: "POST",
         body: {
           first_name: firstName.trim(),
           last_name: lastName.trim(),
-          email: email.trim().toLowerCase(),
+          email: normalizedEmail,
           password,
         },
       });
 
-      router.push(`/auth/verify-email?email=${encodeURIComponent(email.trim().toLowerCase())}`);
+      const nextSession =
+        createSessionFromAuthResponse(response, {
+          user: {
+            firstName: firstName.trim(),
+            lastName: lastName.trim(),
+            email: normalizedEmail,
+          },
+        }) ??
+        createSessionFromAuthResponse(
+          {},
+          {
+            user: {
+              firstName: firstName.trim(),
+              lastName: lastName.trim(),
+              email: normalizedEmail,
+            },
+          },
+        );
+
+      setSession(nextSession);
+      router.replace("/dashboard");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Unable to create admin account.");
     } finally {

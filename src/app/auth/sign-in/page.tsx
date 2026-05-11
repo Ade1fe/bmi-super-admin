@@ -12,9 +12,11 @@ import {
   RememberRow,
 } from "@/components/onboarding-shell";
 import { apiRequest, endpoints } from "@/lib/endpoints";
+import { createSessionFromAuthResponse, useAuthSession } from "@/lib/auth-session";
 
 export default function SignInPage() {
   const router = useRouter();
+  const { setSession } = useAuthSession();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
@@ -27,7 +29,7 @@ export default function SignInPage() {
     setErrorMessage("");
 
     try {
-      await apiRequest(endpoints.admin.login, {
+      const response = await apiRequest(endpoints.admin.login, {
         method: "POST",
         body: {
           email: email.trim().toLowerCase(),
@@ -35,7 +37,23 @@ export default function SignInPage() {
         },
       });
 
-      router.push("/auth/login-success");
+      const nextSession =
+        createSessionFromAuthResponse(response, {
+          user: {
+            email: email.trim().toLowerCase(),
+          },
+        }) ??
+        createSessionFromAuthResponse(
+          {},
+          {
+            user: {
+              email: email.trim().toLowerCase(),
+            },
+          },
+        );
+
+      setSession(nextSession);
+      router.replace("/dashboard");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Unable to sign in.");
     } finally {

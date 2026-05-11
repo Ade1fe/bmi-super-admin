@@ -1,3 +1,5 @@
+"use client";
+
 import {
   Building2,
   CalendarDays,
@@ -8,12 +10,16 @@ import {
   WalletCards,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { parseSchoolList, type SchoolSummary } from "@/lib/backend-models";
+import { formatRoleLabel, getSessionProfileName, useAuthSession } from "@/lib/auth-session";
+import { apiRequest, endpoints } from "@/lib/endpoints";
 
 type StatCard = {
   label: string;
   value: string;
-  delta: string;
+  helper: string;
   icon: LucideIcon;
   iconBox: string;
 };
@@ -25,37 +31,6 @@ type ActivityItem = {
   icon: LucideIcon;
   iconBox: string;
 };
-
-const stats: StatCard[] = [
-  {
-    label: "Total Schools",
-    value: "140",
-    delta: "+5.2%",
-    icon: Landmark,
-    iconBox: "bg-[#f1ebff] text-[#7f5af0]",
-  },
-  {
-    label: "Total Students",
-    value: "9,200",
-    delta: "+12.4%",
-    icon: Users,
-    iconBox: "bg-[#e9f2ff] text-[#2d83ff]",
-  },
-  {
-    label: "Active Subscriptions",
-    value: "6,700",
-    delta: "+8.1%",
-    icon: CalendarDays,
-    iconBox: "bg-[#edf4ef] text-[#55715c]",
-  },
-  {
-    label: "Monthly Revenue",
-    value: "$15,400",
-    delta: "+15.3%",
-    icon: WalletCards,
-    iconBox: "bg-[#f4ebfb] text-[#8e63af]",
-  },
-];
 
 const growthBars = [
   { day: "Mon", value: 24 },
@@ -137,10 +112,8 @@ function SummaryCard({ card }: { card: StatCard }) {
             <p className="text-[29px] font-extrabold tracking-[-0.04em] text-[#16345d]">
               {card.value}
             </p>
-            <span className="rounded-full bg-[#e8fbf0] px-3 py-1.5 text-[14px] font-bold text-[#19b873]">
-              {card.delta}
-            </span>
           </div>
+          <p className="mt-3 text-[14px] font-medium text-[#7c89a2]">{card.helper}</p>
         </div>
 
         <div className={`rounded-xl p-3.5 ${card.iconBox}`}>
@@ -151,9 +124,130 @@ function SummaryCard({ card }: { card: StatCard }) {
   );
 }
 
+function formatCompactNumber(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: value >= 1000 ? 1 : 0,
+    notation: value >= 1000 ? "compact" : "standard",
+  }).format(value);
+}
+
 export default function DashboardPage() {
+  const { session } = useAuthSession();
+  const [schools, setSchools] = useState<SchoolSummary[]>([]);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadSchools = async () => {
+      if (!session?.token) {
+        if (isMounted) {
+          setSchools([]);
+          setIsLoading(false);
+        }
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        setErrorMessage("");
+
+        const response = await apiRequest(endpoints.admin.schools, {
+          authToken: session.token,
+          cache: "no-store",
+        });
+
+        if (!isMounted) {
+          return;
+        }
+
+        setSchools(parseSchoolList(response));
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        setErrorMessage(error instanceof Error ? error.message : "Unable to load dashboard data.");
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void loadSchools();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [session?.token]);
+
+  const activeSchoolCount = schools.filter((school) => school.isActive).length;
+  const totalStudents = schools.reduce((sum, school) => sum + school.population, 0);
+  const countriesCovered = new Set(
+    schools.map((school) => school.country).filter((country): country is string => Boolean(country)),
+  ).size;
+  const stats: StatCard[] = [
+    {
+      label: "Total Schools",
+      value: formatCompactNumber(schools.length),
+      helper: !session?.token
+        ? "Sign in to load live backend data."
+        : isLoading
+          ? "Loading live backend data..."
+          : "Connected through admin/schools",
+      icon: Landmark,
+      iconBox: "bg-[#f1ebff] text-[#7f5af0]",
+    },
+    {
+      label: "Total Students",
+      value: formatCompactNumber(totalStudents),
+      helper: errorMessage ? "Population totals unavailable right now." : "Summed from school population records",
+      icon: Users,
+      iconBox: "bg-[#e9f2ff] text-[#2d83ff]",
+    },
+    {
+      label: "Active Schools",
+      value: formatCompactNumber(activeSchoolCount),
+      helper: `${Math.max(0, schools.length - activeSchoolCount)} inactive school accounts`,
+      icon: CalendarDays,
+      iconBox: "bg-[#edf4ef] text-[#55715c]",
+    },
+    {
+      label: "Countries Covered",
+      value: formatCompactNumber(countriesCovered),
+      helper: session?.school?.name
+        ? `Current school: ${session.school.name}`
+        : session?.role
+          ? formatRoleLabel(session.role)
+          : "No active admin session",
+      icon: WalletCards,
+      iconBox: "bg-[#f4ebfb] text-[#8e63af]",
+    },
+  ];
+
   return (
     <AppShell title="Dashboard" activeSection="dashboard">
+      <section className="mb-6 rounded-[20px] border border-[#e8ecf7] bg-white px-6 py-6 shadow-[0_18px_40px_rgba(182,192,227,0.08)] sm:px-8">
+        <p className="text-[14px] font-semibold uppercase tracking-[0.14em] text-[#6f7d97]">
+          Connected Admin
+        </p>
+        <h1 className="mt-3 text-[26px] font-extrabold tracking-[-0.05em] text-[#16345d] sm:text-[30px]">
+          {getSessionProfileName(session)}
+        </h1>
+        <p className="mt-2 text-[16px] text-[#516581]">
+          {session?.user?.email || "No authenticated email found."}
+        </p>
+        <p className="mt-4 text-[15px] font-medium text-[#617693]">
+          {errorMessage
+            ? `Backend connected, but dashboard data could not be loaded: ${errorMessage}`
+            : isLoading
+              ? "Fetching live school metrics from the backend."
+              : `Live data loaded for ${schools.length} school account${schools.length === 1 ? "" : "s"}.`}
+        </p>
+      </section>
+
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {stats.map((card) => (
           <SummaryCard key={card.label} card={card} />
