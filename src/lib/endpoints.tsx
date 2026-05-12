@@ -70,9 +70,6 @@ const prodApiUrl = normalizeBaseUrl(
 export const apiConfig = {
   apiBaseUrl,
   prodApiUrl,
-  defaultSchoolId: (
-    process.env.NEXT_PUBLIC_DEFAULT_SCHOOL_ID ?? ""
-  ).trim(),
 };
 
 export const endpoints = {
