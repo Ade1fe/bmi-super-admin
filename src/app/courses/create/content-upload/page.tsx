@@ -3,6 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import type { ComponentType } from "react";
+import { Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -1250,7 +1251,7 @@ function QuizBuilderView({
   );
 }
 
-export default function CourseContentUploadPage() {
+function CourseContentUploadContent() {
   const searchParams = useSearchParams();
   const tab: BuilderTab = searchParams.get("tab") === "quiz" ? "quiz" : "content";
   const modal = searchParams.get("modal");
@@ -1313,5 +1314,13 @@ export default function CourseContentUploadPage() {
       {modal === "question-editor" ? <QuestionEditorModal closeHref={quizStateHref} /> : null}
       {modal === "quiz-settings" ? <QuizSettingsModal closeHref={quizStateHref} /> : null}
     </AppShell>
+  );
+}
+
+export default function CourseContentUploadPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <CourseContentUploadContent />
+    </Suspense>
   );
 }
