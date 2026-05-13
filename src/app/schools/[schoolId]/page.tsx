@@ -45,7 +45,7 @@ function StatCard({
 
 export default function SchoolDetailsPage() {
   const params = useParams();
-  const schoolId = params?.schoolId;
+  const schoolId = Array.isArray(params?.schoolId) ? params.schoolId[0] : params?.schoolId;
   const { session } = useAuthSession();
   const [school, setSchool] = useState<SchoolSummary | null>(null);
   const [errorMessage, setErrorMessage] = useState("Loading school details...");
@@ -143,9 +143,14 @@ export default function SchoolDetailsPage() {
                     </p>
                   </div>
                 </div>
-                <button className="rounded-[8px] border border-[#d1e0d6] bg-white px-4 py-3 text-[14px] font-semibold text-[#4e7c5f] hover:bg-[#f6faf8]">
-                  Edit Profile
-                </button>
+                <div className="flex gap-3">
+                  <button className="rounded-[8px] border border-[#d1e0d6] bg-white px-4 py-3 text-[14px] font-semibold text-[#4e7c5f] hover:bg-[#f6faf8]">
+                    Edit Profile
+                  </button>
+                  <button className="rounded-[8px] border border-[#14985b] bg-[#14985b] px-4 py-3 text-[14px] font-semibold text-white hover:bg-[#0d6a46]">
+                    + Add New Student
+                  </button>
+                </div>
               </div>
             </div>
 
