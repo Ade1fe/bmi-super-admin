@@ -107,7 +107,7 @@ export default function SchoolDetailsPage() {
           <Link href="/schools" className="text-[#223b61]">
             <ArrowLeft className="h-6 w-6" strokeWidth={2.2} />
           </Link>
-          <span>Greenfield Schools</span>
+          <span>{school?.name ?? "School Details"}</span>
         </div>
       }
       activeSection="schools"
@@ -138,7 +138,11 @@ export default function SchoolDetailsPage() {
                   </div>
                   <div>
                     <h1 className="text-[24px] font-bold text-[#182c4e]">{school.name}</h1>
-                    <p className="mt-1 text-[14px] text-[#7a88a2]">
+                    <div className="mt-2 space-y-1 text-[14px] text-[#7a88a2]">
+                      <p>{school.email}</p>
+                      {school.address ? <p>{school.address}</p> : null}
+                    </div>
+                    <p className="mt-3 text-[14px] text-[#7a88a2]">
                       {school.isActive ? "✓ Active Entity" : "Inactive"}
                     </p>
                   </div>
