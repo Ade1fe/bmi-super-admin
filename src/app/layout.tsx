@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import { Providers } from "@/components/providers";
 import "./globals.css";
+import { Toaster } from "sonner";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   variable: "--font-geist-sans",
@@ -30,6 +31,7 @@ export default function RootLayout({
       className={`${plusJakartaSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <Toaster position="top-right" richColors />
         <Providers>{children}</Providers>
       </body>
     </html>
