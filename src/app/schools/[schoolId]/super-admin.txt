@@ -130,7 +130,7 @@ Authorization: Bearer {{adminToken}}
     "updatedAt": "2026-05-23T07:04:21.943Z"
   }
 }
-```
+
 
 ---
 
