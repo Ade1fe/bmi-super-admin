@@ -177,8 +177,46 @@ export const endpoints = {
         buildEndpoint(
           apiBaseUrl,
           `/courses/categories/${categoryId}`
-        ),
+      ),
     },
+  },
+
+  subscriptions: {
+    adminPlans: buildEndpoint(
+      apiBaseUrl,
+      "/subscriptions/admin/plans"
+    ),
+
+    adminList: buildEndpoint(
+      apiBaseUrl,
+      "/subscriptions/admin/list"
+    ),
+
+    createPlan: buildEndpoint(
+      apiBaseUrl,
+      "/subscriptions/plans"
+    ),
+
+    updatePlan: (planId: string) =>
+      buildEndpoint(
+        apiBaseUrl,
+        `/subscriptions/plans/${planId}`
+      ),
+
+    addFeature: (planId: string) =>
+      buildEndpoint(
+        apiBaseUrl,
+        `/subscriptions/plans/${planId}/features`
+      ),
+
+    removeFeature: (
+      planId: string,
+      featureId: string
+    ) =>
+      buildEndpoint(
+        apiBaseUrl,
+        `/subscriptions/plans/${planId}/features/${featureId}`
+      ),
   },
 };
 
