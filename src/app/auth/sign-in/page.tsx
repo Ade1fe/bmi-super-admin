@@ -52,6 +52,8 @@ export default function SignInPage() {
           },
         );
 
+        console.log("LOGIN RESPONSE", response);
+
       setSession(nextSession);
       router.replace("/dashboard");
     } catch (error) {

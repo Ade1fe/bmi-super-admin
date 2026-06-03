@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Archive,
   BookOpen,
@@ -15,11 +15,13 @@ import {
   Users,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { useAuthSession } from "@/lib/auth-session";
+import { getCourses, type Course } from "@/lib/course-api";
 
 type CourseTab = "all" | "published" | "drafts" | "archived";
 
 type CourseRow = {
-  id: number;
+  id: string | number;
   slug: string;
   title: string;
   code: string;
@@ -36,151 +38,54 @@ type CourseRow = {
   archivedDate: string;
 };
 
-const courseRows: CourseRow[] = [
-  {
-    id: 1,
-    slug: "advanced-react-nodejs",
-    title: "Advanced React & Node.js",
-    code: "CRS-20432",
-    category: "DEVELOPMENT",
-    categoryClassName: "bg-[#deebff] text-[#2463e7]",
-    lessons: "14 Lessons",
-    students: "980",
-    instructor: "Amara Okafor",
-    instructorInitials: "AO",
-    instructorAvatarClassName: "from-[#2b2ad4] via-[#bf39dc] to-[#18c0ff]",
-    status: "PUBLISHED",
-    statusClassName: "bg-[#e5f7ef] text-[#0f8a4f]",
-    lastEdited: "Oct 24, 2023",
-    archivedDate: "Nov 08, 2023",
-  },
-  {
-    id: 2,
-    slug: "introduction-to-ui-design",
-    title: "Introduction to UI Design",
-    code: "CRS-10293",
-    category: "DATA SCIENCE",
-    categoryClassName: "bg-[#deebff] text-[#2463e7]",
-    lessons: "12 Lessons",
-    students: "1,240",
-    instructor: "Amara Okafor",
-    instructorInitials: "AO",
-    instructorAvatarClassName: "from-[#4058ff] via-[#8446ff] to-[#ff5d85]",
-    status: "DRAFT",
-    statusClassName: "bg-[#fff2cf] text-[#d88709]",
-    lastEdited: "Oct 24, 2023",
-    archivedDate: "Nov 08, 2023",
-  },
-  {
-    id: 3,
-    slug: "introduction-to-ui-design",
-    title: "Introduction to UI Design",
-    code: "CRS-10293",
-    category: "BUSINESS",
-    categoryClassName: "bg-[#deebff] text-[#2463e7]",
-    lessons: "12 Lessons",
-    students: "1,240",
-    instructor: "Amara Okafor",
-    instructorInitials: "AO",
-    instructorAvatarClassName: "from-[#1037dc] via-[#c72be1] to-[#16bea7]",
-    status: "ARCHIVED",
-    statusClassName: "bg-[#edf1f7] text-[#70809d]",
-    lastEdited: "Oct 24, 2023",
-    archivedDate: "Nov 08, 2023",
-  },
-  {
-    id: 4,
-    slug: "introduction-to-ui-design",
-    title: "Introduction to UI Design",
-    code: "CRS-10293",
-    category: "DEVELOPMENT",
-    categoryClassName: "bg-[#deebff] text-[#2463e7]",
-    lessons: "12 Lessons",
-    students: "1,240",
-    instructor: "Amara Okafor",
-    instructorInitials: "AO",
-    instructorAvatarClassName: "from-[#2b2ad4] via-[#bf39dc] to-[#18c0ff]",
-    status: "PUBLISHED",
-    statusClassName: "bg-[#e5f7ef] text-[#0f8a4f]",
-    lastEdited: "Oct 24, 2023",
-    archivedDate: "Nov 08, 2023",
-  },
-  {
-    id: 5,
-    slug: "advanced-ux-research",
-    title: "Advanced UX Research: User Research Deep Dive",
-    code: "CRS-20411",
-    category: "DESIGN",
-    categoryClassName: "bg-[#deebff] text-[#2463e7]",
-    lessons: "14 Lessons",
-    students: "980",
-    instructor: "Amara Okafor",
-    instructorInitials: "SM",
-    instructorAvatarClassName: "from-[#eef1ff] to-[#e0e7ff]",
-    status: "DRAFT",
-    statusClassName: "bg-[#fff2cf] text-[#d88709]",
-    lastEdited: "Oct 24, 2023",
-    archivedDate: "Nov 08, 2023",
-  },
-  {
-    id: 6,
-    slug: "introduction-to-ui-design",
-    title: "Introduction to UI Design",
-    code: "CRS-10293",
-    category: "DESIGN",
-    categoryClassName: "bg-[#deebff] text-[#2463e7]",
-    lessons: "12 Lessons",
-    students: "1,240",
-    instructor: "Amara Okafor",
-    instructorInitials: "AO",
-    instructorAvatarClassName: "from-[#2b2ad4] via-[#bf39dc] to-[#18c0ff]",
-    status: "PUBLISHED",
-    statusClassName: "bg-[#e5f7ef] text-[#0f8a4f]",
-    lastEdited: "Oct 24, 2023",
-    archivedDate: "Nov 08, 2023",
-  },
-  {
-    id: 7,
-    slug: "introduction-to-ui-design",
-    title: "Introduction to UI Design",
-    code: "CRS-10293",
-    category: "DESIGN",
-    categoryClassName: "bg-[#deebff] text-[#2463e7]",
-    lessons: "12 Lessons",
-    students: "1,240",
-    instructor: "Amara Okafor",
-    instructorInitials: "AO",
-    instructorAvatarClassName: "from-[#2b2ad4] via-[#bf39dc] to-[#18c0ff]",
-    status: "PUBLISHED",
-    statusClassName: "bg-[#e5f7ef] text-[#0f8a4f]",
-    lastEdited: "Oct 24, 2023",
-    archivedDate: "Nov 08, 2023",
-  },
-  {
-    id: 8,
-    slug: "introduction-to-ui-design",
-    title: "Introduction to UI Design",
-    code: "CRS-10293",
-    category: "DESIGN",
-    categoryClassName: "bg-[#deebff] text-[#2463e7]",
-    lessons: "12 Lessons",
-    students: "1,240",
-    instructor: "Amara Okafor",
-    instructorInitials: "AO",
-    instructorAvatarClassName: "from-[#2b2ad4] via-[#bf39dc] to-[#18c0ff]",
-    status: "PUBLISHED",
-    statusClassName: "bg-[#e5f7ef] text-[#0f8a4f]",
-    lastEdited: "Oct 24, 2023",
-    archivedDate: "Nov 08, 2023",
-  },
-];
-
 const tabs: { key: CourseTab; label: string }[] = [
   { key: "all", label: "All Courses" },
   { key: "published", label: "Published" },
   { key: "drafts", label: "Drafts" },
   { key: "archived", label: "Archived" },
 ];
+
+function formatStatusClass(status: string) {
+  const normalized = status.toLowerCase();
+
+  if (normalized === "published") {
+    return "bg-[#e5f7ef] text-[#0f8a4f]";
+  }
+
+  if (normalized === "draft") {
+    return "bg-[#fff2cf] text-[#d88709]";
+  }
+
+  if (normalized === "archived") {
+    return "bg-[#edf1f7] text-[#70809d]";
+  }
+
+  return "bg-[#eef1ff] text-[#5b6d8a]";
+}
+
+function mapCourseToRow(course: Course): CourseRow {
+  return {
+    id: course.id,
+    slug: course.slug || course.id,
+    title: course.name,
+    code: course.id.slice(0, 8).toUpperCase(),
+    category: course.categoryName ?? "Uncategorized",
+    categoryClassName: "bg-[#deebff] text-[#2463e7]",
+    lessons: "0 Lessons",
+    students: "0",
+    instructor: "Course Admin",
+    instructorInitials: course.name
+      .split(" ")
+      .map((token) => token[0]?.toUpperCase() ?? "")
+      .slice(0, 2)
+      .join(""),
+    instructorAvatarClassName: "from-[#2b2ad4] via-[#bf39dc] to-[#18c0ff]",
+    status: (course.status ?? "draft").toUpperCase(),
+    statusClassName: formatStatusClass(course.status ?? "draft"),
+    lastEdited: course.updatedAt ? new Date(course.updatedAt).toLocaleDateString() : "Unknown",
+    archivedDate: course.updatedAt ? new Date(course.updatedAt).toLocaleDateString() : "Unknown",
+  };
+}
 
 function CourseSummaryCard({
   label,
@@ -204,22 +109,6 @@ function CourseSummaryCard({
       <p className="mt-9 text-[34px] font-extrabold tracking-[-0.05em] text-[#16345d]">{value}</p>
     </article>
   );
-}
-
-function getRowsForTab(activeTab: CourseTab) {
-  if (activeTab === "published") {
-    return courseRows.filter((row) => row.status === "PUBLISHED");
-  }
-
-  if (activeTab === "drafts") {
-    return courseRows.filter((row) => row.status === "DRAFT");
-  }
-
-  if (activeTab === "archived") {
-    return courseRows.filter((row) => row.status === "ARCHIVED");
-  }
-
-  return courseRows;
 }
 
 function getSummaryCards(activeTab: CourseTab) {
@@ -292,9 +181,62 @@ function getSummaryCards(activeTab: CourseTab) {
 }
 
 export default function CoursesPage() {
+  const { session, isHydrated } = useAuthSession();
   const [activeTab, setActiveTab] = useState<CourseTab>("all");
-  const rows = getRowsForTab(activeTab);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+
+
+  console.log("SESSION", session);
+console.log("USER", session?.user);
+console.log("USER ID", session?.user?.id);
+console.log("ROLE", session?.role);
+
+  useEffect(() => {
+    async function loadCourses() {
+      if (!isHydrated) {
+        return;
+      }
+
+      setIsLoading(true);
+      setFetchError(null);
+
+      try {
+        const statusFilter =
+          activeTab === "all"
+            ? undefined
+            : activeTab === "drafts"
+              ? "draft"
+              : activeTab;
+
+        const response = await getCourses(
+          {
+            page: 1,
+            limit: 20,
+            status: statusFilter,
+            search: searchTerm || undefined,
+          },
+          session?.token
+        );
+
+        setCourses(response.courses);
+      } catch (err) {
+        setFetchError(err instanceof Error ? err.message : "Unable to load courses.");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadCourses();
+  }, [activeTab, isHydrated, searchTerm, session?.token]);
+
+  const rows = courses.map(mapCourseToRow);
   const summaryCards = getSummaryCards(activeTab);
+  const resultSummary = isLoading
+    ? "Loading courses..."
+    : `Showing ${rows.length} ${rows.length === 1 ? "course" : "courses"}`;
 
   return (
     <AppShell title="Course Management" activeSection="courses">
@@ -340,6 +282,8 @@ export default function CoursesPage() {
             <label className="flex h-12 items-center gap-3 rounded-[10px] border border-[#dce3f2] bg-[#fbfcff] px-4 text-[#95a0b4] sm:min-w-[360px]">
               <Search className="h-4.5 w-4.5" strokeWidth={2} />
               <input
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
                 className="w-full bg-transparent text-[15px] text-[#274267] outline-none placeholder:text-[#98a2b6]"
                 placeholder="Search by name, ID or course..."
               />
@@ -361,6 +305,29 @@ export default function CoursesPage() {
             </button>
           </div>
         </div>
+
+        {fetchError ? (
+          <div className="mx-6 mt-6 rounded-[14px] border border-[#f8d6d6] bg-[#fff1f1] px-5 py-4 text-[15px] text-[#a42f2f]">
+            {fetchError}
+          </div>
+        ) : null}
+
+        {isLoading ? (
+          <div className="mx-6 mt-6 rounded-[14px] border border-[#dfe6f7] bg-[#fbfcff] px-5 py-8 text-center text-[15px] font-semibold text-[#62718a]">
+            Loading courses from the backend...
+          </div>
+        ) : null}
+
+        {!isLoading && !fetchError && rows.length === 0 ? (
+          <div className="mx-6 mt-6 rounded-[14px] border border-dashed border-[#dceadf] bg-[#fbfcff] px-5 py-10 text-center">
+            <h3 className="text-[20px] font-extrabold tracking-[-0.04em] text-[#22314c]">
+              No courses found
+            </h3>
+            <p className="mt-2 text-[15px] text-[#71819d]">
+              Create a course or adjust the current filters.
+            </p>
+          </div>
+        ) : null}
 
         <div className="space-y-4 p-4 xl:hidden">
           {rows.map((row) => (
@@ -711,7 +678,7 @@ export default function CoursesPage() {
         </div>
 
         <div className="flex flex-col gap-4 border-t border-[#edf0f7] px-6 py-5 text-[15px] font-semibold text-[#6e7c98] sm:flex-row sm:items-center sm:justify-between">
-          <p>Showing 1 to 5 of 42 courses</p>
+          <p>{resultSummary}</p>
           <div className="flex items-center gap-2">
             <button className="flex h-10 w-10 items-center justify-center rounded-[8px] border border-[#dfe4f0] text-[#93a0b7]">
               ‹

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ChangeEvent, ReactNode } from "react";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, ChevronDown, X } from "lucide-react";
 
@@ -28,21 +28,29 @@ type CourseFieldProps = {
   label: string;
   placeholder?: string;
   defaultValue?: string;
+  value?: string;
   fullWidth?: boolean;
   rightIcon?: ReactNode;
+  onChange?: (event: ChangeEvent<HTMLInputElement>) => void;
 };
 
 type CourseTextAreaProps = {
   label: string;
   placeholder?: string;
   defaultValue?: string;
+  value?: string;
   rows?: number;
+  onChange?: (event: ChangeEvent<HTMLTextAreaElement>) => void;
 };
+
+type SelectOption = string | { label: string; value: string };
 
 type CourseSelectFieldProps = {
   label: string;
-  options: string[];
-  defaultValue: string;
+  options: SelectOption[];
+  defaultValue?: string;
+  value?: string;
+  onChange?: (event: ChangeEvent<HTMLSelectElement>) => void;
 };
 
 type CourseModalProps = {
@@ -127,8 +135,10 @@ export function CourseTextField({
   label,
   placeholder,
   defaultValue,
+  value,
   fullWidth,
   rightIcon = <ChevronDown className="h-5 w-5 text-[#8c98b1]" strokeWidth={2.1} />,
+  onChange,
 }: CourseFieldProps) {
   return (
     <label className={fullWidth ? "col-span-full" : ""}>
@@ -137,7 +147,8 @@ export function CourseTextField({
       </span>
       <span className="flex h-[68px] items-center justify-between rounded-[18px] border border-[#d7deee] bg-white px-5">
         <input
-          defaultValue={defaultValue}
+          value={value ?? defaultValue ?? ""}
+          onChange={onChange}
           placeholder={placeholder}
           className="w-full bg-transparent text-[16px] text-[#264267] outline-none placeholder:text-[#8d99b1]"
         />
@@ -151,6 +162,8 @@ export function CourseSelectField({
   label,
   options,
   defaultValue,
+  value,
+  onChange,
 }: CourseSelectFieldProps) {
   return (
     <label>
@@ -159,14 +172,25 @@ export function CourseSelectField({
       </span>
       <span className="relative flex h-[68px] items-center rounded-[18px] border border-[#d7deee] bg-white px-5">
         <select
-          defaultValue={defaultValue}
+          value={value ?? defaultValue ?? ""}
+          onChange={onChange}
           className="h-full w-full appearance-none bg-transparent pr-10 text-[16px] text-[#264267] outline-none"
         >
-          {options.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
+          {options.map((option) => {
+            if (typeof option === "string") {
+              return (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              );
+            }
+
+            return (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            );
+          })}
         </select>
         <ChevronDown className="pointer-events-none absolute right-5 top-1/2 h-5 w-5 -translate-y-1/2 text-[#8c98b1]" strokeWidth={2.1} />
       </span>
@@ -178,7 +202,9 @@ export function CourseTextArea({
   label,
   placeholder,
   defaultValue,
+  value,
   rows = 6,
+  onChange,
 }: CourseTextAreaProps) {
   return (
     <label>
@@ -187,7 +213,8 @@ export function CourseTextArea({
       </span>
       <textarea
         rows={rows}
-        defaultValue={defaultValue}
+        value={value ?? defaultValue ?? ""}
+        onChange={onChange}
         placeholder={placeholder}
         className="w-full rounded-[18px] border border-[#d7deee] bg-white px-5 py-4 text-[16px] leading-7 text-[#264267] outline-none placeholder:text-[#8d99b1]"
       />

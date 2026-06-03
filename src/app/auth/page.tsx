@@ -24,6 +24,10 @@ export default function AuthSignUpPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const { session } = useAuthSession();
+
+
+
   const submitDisabled =
     !firstName.trim() ||
     !lastName.trim() ||
@@ -40,6 +44,8 @@ export default function AuthSignUpPage() {
 
     setIsSubmitting(true);
     setErrorMessage("");
+
+    
 
     try {
       const normalizedEmail = email.trim().toLowerCase();
@@ -72,6 +78,10 @@ export default function AuthSignUpPage() {
           },
         );
 
+        console.log("SESSION", session);
+console.log("USER", session?.user);
+console.log("USER ID", session?.user?.id);
+console.log("ROLE", session?.role);
       setSession(nextSession);
       router.replace("/dashboard");
     } catch (error) {
@@ -81,6 +91,8 @@ export default function AuthSignUpPage() {
     }
   };
 
+
+  
   return (
     <OnboardingShell
       heroTitle={

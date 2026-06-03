@@ -61,6 +61,9 @@ const authSessionStorageKey = "bmi-super-admin-session";
 
 const AuthSessionContext = createContext<AuthSessionContextValue | null>(null);
 
+
+
+
 function isRecord(value: unknown): value is AuthRecord {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -155,6 +158,7 @@ function loadStoredSession() {
 
   const storedValue = window.localStorage.getItem(authSessionStorageKey);
 
+  
   if (!storedValue) {
     return null;
   }
@@ -175,7 +179,10 @@ export function createSessionFromAuthResponse(payload: unknown, fallback: AuthSe
   const permissions = readStringArray(nestedData.permissions).length
     ? readStringArray(nestedData.permissions)
     : fallback.permissions ?? [];
-  const user = coerceUser(nestedData.user ?? root.user, fallback.user);
+
+  // ✅ Try data.user first, then treat data itself as the user object (your API shape)
+  const userSource = isRecord(nestedData.user) ? nestedData.user : nestedData;
+  const user = coerceUser(userSource ?? root.user, fallback.user);
   const school = coerceSchool(nestedData.school ?? root.school, fallback.school);
 
   if (!token && !user && !school) {
@@ -269,6 +276,8 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     </AuthSessionContext.Provider>
   );
 }
+
+
 
 export function useAuthSession() {
   const context = useContext(AuthSessionContext);

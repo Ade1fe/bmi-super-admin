@@ -62,14 +62,8 @@ const apiBaseUrl = normalizeBaseUrl(
   process.env.NEXT_PUBLIC_API_BASE_URL
 );
 
-const prodApiUrl = normalizeBaseUrl(
-  process.env.NEXT_PUBLIC_PROD_API_URL ||
-    process.env.NEXT_PUBLIC_API_BASE_URL
-);
-
 export const apiConfig = {
   apiBaseUrl,
-  prodApiUrl,
 };
 
 export const endpoints = {
@@ -93,126 +87,132 @@ export const endpoints = {
   },
 
   schools: {
-    verifyEmail: buildEndpoint(
-      prodApiUrl,
-      "/schools/verify-email"
-    ),
-
-    verifyEmailOtp: buildEndpoint(
-      prodApiUrl,
-      "/schools/verify-email-otp"
-    ),
-
-    register: buildEndpoint(prodApiUrl, "/schools/register"),
-
-    login: buildEndpoint(prodApiUrl, "/schools/login"),
-
+    verifyEmail: buildEndpoint(apiBaseUrl, "/schools/verify-email"),
+    verifyEmailOtp: buildEndpoint(apiBaseUrl, "/schools/verify-email-otp"),
+    register: buildEndpoint(apiBaseUrl, "/schools/register"),
+    login: buildEndpoint(apiBaseUrl, "/schools/login"),
     update: buildEndpoint(apiBaseUrl, "/schools"),
 
     retrieve: (schoolId: string) =>
-      buildEndpoint(prodApiUrl, `/schools/${schoolId}`),
+      buildEndpoint(apiBaseUrl, `/schools/${schoolId}`),
 
     addTeamMember: (schoolId: string) =>
-      buildEndpoint(prodApiUrl, `/schools/${schoolId}/team`),
+      buildEndpoint(apiBaseUrl, `/schools/${schoolId}/team`),
 
     teamMembers: (schoolId: string) =>
-      buildEndpoint(prodApiUrl, `/schools/${schoolId}/team`),
+      buildEndpoint(apiBaseUrl, `/schools/${schoolId}/team`),
 
-    registerStudent: buildEndpoint(
-      prodApiUrl,
-      "/schools/students/register"
-    ),
-
-    students: buildEndpoint(prodApiUrl, "/schools/students"),
+    registerStudent: buildEndpoint(apiBaseUrl, "/schools/students/register"),
+    students: buildEndpoint(apiBaseUrl, "/schools/students"),
 
     verifyPasswordResetEmail: buildEndpoint(
-      prodApiUrl,
+      apiBaseUrl,
       "/schools/verify-school-email-password-reset"
     ),
 
     confirmPasswordResetOtp: buildEndpoint(
-      prodApiUrl,
+      apiBaseUrl,
       "/schools/confirm-school-email-password-reset-otp"
     ),
 
-    resetPassword: buildEndpoint(
-      prodApiUrl,
-      "/schools/reset-school-password"
-    ),
+    resetPassword: buildEndpoint(apiBaseUrl, "/schools/reset-school-password"),
   },
 
   students: {
-    login: buildEndpoint(prodApiUrl, "/students/login"),
+    login: buildEndpoint(apiBaseUrl, "/students/login"),
 
     profile: (studentId: string) =>
-      buildEndpoint(prodApiUrl, `/students/profile/${studentId}`),
+      buildEndpoint(apiBaseUrl, `/students/profile/${studentId}`),
   },
 
   courses: {
+    // GET  /courses?page=&limit=&status=&search=
     all: buildEndpoint(apiBaseUrl, "/courses"),
 
+    // GET  /courses/:id
     byId: (courseId: string) =>
-      buildEndpoint(prodApiUrl, `/courses/${courseId}`),
+      buildEndpoint(apiBaseUrl, `/courses/${courseId}`),
 
+    // POST /courses
     create: buildEndpoint(apiBaseUrl, "/courses"),
 
+    // PUT  /courses/:id
+    update: (courseId: string) =>
+      buildEndpoint(apiBaseUrl, `/courses/${courseId}`),
+
     categories: {
-      all: buildEndpoint(
-        apiBaseUrl,
-        "/courses/get-categories"
-      ),
+      // GET  /courses/get-categories
+      all: buildEndpoint(apiBaseUrl, "/courses/get-categories"),
 
-      create: buildEndpoint(
-        apiBaseUrl,
-        "/courses/categories"
-      ),
+      // POST /courses/categories
+      create: buildEndpoint(apiBaseUrl, "/courses/categories"),
 
+      // PUT  /courses/categories/:categoryId
       update: (categoryId: string) =>
-        buildEndpoint(
-          apiBaseUrl,
-          `/courses/categories/${categoryId}`
-        ),
+        buildEndpoint(apiBaseUrl, `/courses/categories/${categoryId}`),
 
+      // DELETE /courses/categories/:categoryId
       delete: (categoryId: string) =>
-        buildEndpoint(
-          apiBaseUrl,
-          `/courses/categories/${categoryId}`
-      ),
+        buildEndpoint(apiBaseUrl, `/courses/categories/${categoryId}`),
+    },
+
+    modules: {
+      // POST /courses/modules
+      create: buildEndpoint(apiBaseUrl, "/courses/modules"),
+
+      // PUT  /courses/modules/:moduleId
+      update: (moduleId: string) =>
+        buildEndpoint(apiBaseUrl, `/courses/modules/${moduleId}`),
+
+      // DELETE /courses/modules/:moduleId
+      delete: (moduleId: string) =>
+        buildEndpoint(apiBaseUrl, `/courses/modules/${moduleId}`),
+
+      // GET  /courses/modules/:courseId  (fetch all modules for a course)
+      fetchByCourse: (courseId: string) =>
+        buildEndpoint(apiBaseUrl, `/courses/modules/${courseId}`),
+    },
+
+    lessons: {
+      // POST /courses/lessons
+      create: buildEndpoint(apiBaseUrl, "/courses/lessons"),
+
+      // PUT  /courses/lessons/:lessonId
+      update: (lessonId: string) =>
+        buildEndpoint(apiBaseUrl, `/courses/lessons/${lessonId}`),
+
+      // DELETE /courses/lessons/:lessonId
+      delete: (lessonId: string) =>
+        buildEndpoint(apiBaseUrl, `/courses/lessons/${lessonId}`),
+    },
+
+    quizzes: {
+      // POST /courses/modules/:moduleId/quiz
+      create: (moduleId: string) =>
+        buildEndpoint(apiBaseUrl, `/courses/modules/${moduleId}/quiz`),
+
+      // PUT  /courses/modules/:moduleId/quiz
+      update: (moduleId: string) =>
+        buildEndpoint(apiBaseUrl, `/courses/modules/${moduleId}/quiz`),
+
+      // DELETE /courses/modules/:moduleId/quiz
+      delete: (moduleId: string) =>
+        buildEndpoint(apiBaseUrl, `/courses/modules/${moduleId}/quiz`),
     },
   },
 
   subscriptions: {
-    adminPlans: buildEndpoint(
-      apiBaseUrl,
-      "/subscriptions/admin/plans"
-    ),
-
-    adminList: buildEndpoint(
-      apiBaseUrl,
-      "/subscriptions/admin/list"
-    ),
-
-    createPlan: buildEndpoint(
-      apiBaseUrl,
-      "/subscriptions/plans"
-    ),
+    adminPlans: buildEndpoint(apiBaseUrl, "/subscriptions/admin/plans"),
+    adminList: buildEndpoint(apiBaseUrl, "/subscriptions/admin/list"),
+    createPlan: buildEndpoint(apiBaseUrl, "/subscriptions/plans"),
 
     updatePlan: (planId: string) =>
-      buildEndpoint(
-        apiBaseUrl,
-        `/subscriptions/plans/${planId}`
-      ),
+      buildEndpoint(apiBaseUrl, `/subscriptions/plans/${planId}`),
 
     addFeature: (planId: string) =>
-      buildEndpoint(
-        apiBaseUrl,
-        `/subscriptions/plans/${planId}/features`
-      ),
+      buildEndpoint(apiBaseUrl, `/subscriptions/plans/${planId}/features`),
 
-    removeFeature: (
-      planId: string,
-      featureId: string
-    ) =>
+    removeFeature: (planId: string, featureId: string) =>
       buildEndpoint(
         apiBaseUrl,
         `/subscriptions/plans/${planId}/features/${featureId}`
@@ -226,7 +226,7 @@ export async function apiRequest<TResponse>(
 ) {
   if (!url) {
     throw new Error(
-      "API URL is not configured. Set NEXT_PUBLIC_API_BASE_URL and NEXT_PUBLIC_PROD_API_URL in .env."
+      "API URL is not configured. Set NEXT_PUBLIC_API_BASE_URL in .env."
     );
   }
 
@@ -236,47 +236,27 @@ export async function apiRequest<TResponse>(
 
   const method = rest.method ?? "GET";
 
-  if (
-    body !== undefined &&
-    !requestHeaders.has("Content-Type")
-  ) {
-    requestHeaders.set(
-      "Content-Type",
-      "application/json"
-    );
+  if (body !== undefined && !requestHeaders.has("Content-Type")) {
+    requestHeaders.set("Content-Type", "application/json");
   }
 
-  if (
-    authToken &&
-    !requestHeaders.has("Authorization")
-  ) {
-    requestHeaders.set(
-      "Authorization",
-      `Bearer ${authToken}`
-    );
+  if (authToken && !requestHeaders.has("Authorization")) {
+    requestHeaders.set("Authorization", `Bearer ${authToken}`);
   }
 
-  logApiEvent("[API Request]", {
-    method,
-    url,
-    body,
-  });
+  logApiEvent("[API Request]", { method, url, body });
+  console.log("Lesson payload:", body);
+  
 
   const response = await fetch(url, {
     ...rest,
     headers: requestHeaders,
-    body:
-      body === undefined
-        ? undefined
-        : JSON.stringify(body),
+    body: body === undefined ? undefined : JSON.stringify(body),
   });
 
-  const contentType =
-    response.headers.get("content-type") ?? "";
+  const contentType = response.headers.get("content-type") ?? "";
 
-  const payload = contentType.includes(
-    "application/json"
-  )
+  const payload = contentType.includes("application/json")
     ? await response.json()
     : await response.text();
 
@@ -300,19 +280,12 @@ export async function apiRequest<TResponse>(
   return payload as TResponse;
 }
 
-export function combineNameParts(
-  firstName: string,
-  lastName: string
-) {
-  return [firstName.trim(), lastName.trim()]
-    .filter(Boolean)
-    .join(" ");
+export function combineNameParts(firstName: string, lastName: string) {
+  return [firstName.trim(), lastName.trim()].filter(Boolean).join(" ");
 }
 
 export function splitFullName(fullName: string) {
-  const [firstName = "", ...rest] = fullName
-    .trim()
-    .split(/\s+/);
+  const [firstName = "", ...rest] = fullName.trim().split(/\s+/);
 
   return {
     firstName,

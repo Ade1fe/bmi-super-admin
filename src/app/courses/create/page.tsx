@@ -1,16 +1,127 @@
+"use client";
+
 import { Upload } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import {
   ContinueArrow,
-  CourseActionLink,
   CourseFlowStepper,
   CoursePageTitle,
   CourseSelectField,
   CourseTextArea,
   CourseTextField,
 } from "@/components/course-flow";
+import { useAuthSession } from "@/lib/auth-session";
+import {
+  createCourse,
+  getCategories,
+  type ApiCourseCategory,
+  type CourseDifficultyLevel,
+} from "@/lib/course-api";
+
+const defaultThumbnail =
+  "https://res.cloudinary.com/dhvct8axq/image/upload/v1780333350/Frame_2147225028_rkfdtg.png";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function extractCreatedCourseId(response: unknown) {
+  const payload = isRecord(response) && "data" in response ? response.data : response;
+  const nestedPayload = isRecord(payload) && "data" in payload ? payload.data : payload;
+
+  if (!isRecord(nestedPayload)) {
+    return "";
+  }
+
+  return typeof nestedPayload.id === "string" ? nestedPayload.id : "";
+}
 
 export default function CreateCoursePage() {
+  const router = useRouter();
+  const { session, isHydrated } = useAuthSession();
+  const [name, setName] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [difficultyLevel, setDifficultyLevel] = useState<CourseDifficultyLevel>("beginner");
+  const [description, setDescription] = useState("");
+  const [thumbnailUrl, setThumbnailUrl] = useState("");
+  const [categories, setCategories] = useState<ApiCourseCategory[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchCourseCategories() {
+      if (!isHydrated) {
+        return;
+      }
+
+      setLoadingCategories(true);
+      try {
+        const fetchedCategories = await getCategories(session?.token);
+        setCategories(fetchedCategories);
+        if (fetchedCategories.length && !categoryId) {
+          setCategoryId(fetchedCategories[0].id);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoadingCategories(false);
+      }
+    }
+
+    fetchCourseCategories();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isHydrated, session?.token]);
+
+  async function handleSaveCourse(continueToContent = false) {
+    if (!name.trim()) {
+      setError("Please enter a course title.");
+      return;
+    }
+
+    if (!categoryId) {
+      setError("Please select a course category.");
+      return;
+    }
+
+    setError(null);
+    setIsSaving(true);
+
+    try {
+      const response = await createCourse(
+        {
+          name: name.trim(),
+          categoryId,
+          difficultyLevel,
+          description: description.trim(),
+          status: "draft",
+          thumbnailUrl: thumbnailUrl.trim() || defaultThumbnail,
+        },
+        session?.token
+      );
+
+      const courseId = extractCreatedCourseId(response);
+
+      if (!courseId) {
+        throw new Error("Unable to read course ID from the backend response.");
+      }
+
+      if (continueToContent) {
+        router.push(`/courses/create/content-upload?courseId=${encodeURIComponent(courseId)}`);
+        return;
+      }
+
+      router.push("/courses");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save course.");
+      console.error(err);
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   return (
     <AppShell title={<CoursePageTitle label="Create New Course" />} activeSection="courses">
       <div className="mx-auto max-w-[1320px]">
@@ -27,18 +138,31 @@ export default function CreateCoursePage() {
           </div>
 
           <div className="flex flex-col gap-4 sm:flex-row">
-            <CourseActionLink href="/courses" variant="secondary" className="min-w-[190px]">
-              Save as Draft
-            </CourseActionLink>
-            <CourseActionLink
-              href="/courses/create/content-upload"
-              className="min-w-[234px] justify-between px-7"
+            <button
+              type="button"
+              onClick={() => handleSaveCourse(false)}
+              disabled={isSaving}
+              className="inline-flex h-14 min-w-[190px] items-center justify-center rounded-[10px] border border-[#cadfd5] bg-[#edf5f1] px-6 text-[15px] font-semibold text-[#4b8a60] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <span>Save &amp; Continue</span>
+              {isSaving ? "Saving…" : "Save as Draft"}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSaveCourse(true)}
+              disabled={isSaving}
+              className="inline-flex h-14 min-w-[234px] items-center justify-between rounded-[10px] bg-[#4b8a60] px-7 text-[15px] font-semibold text-white shadow-[0_20px_38px_rgba(75,138,96,0.18)] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <span>{isSaving ? "Saving…" : "Save & Continue"}</span>
               <ContinueArrow />
-            </CourseActionLink>
+            </button>
           </div>
         </div>
+
+        {error ? (
+          <div className="mt-6 rounded-[18px] border border-[#f8d6d6] bg-[#fff1f1] px-5 py-4 text-[15px] text-[#a42f2f]">
+            {error}
+          </div>
+        ) : null}
 
         <section className="mt-10 grid gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
           <article className="rounded-[28px] bg-white p-8 shadow-[0_20px_45px_rgba(169,183,217,0.10)] sm:p-10">
@@ -51,22 +175,43 @@ export default function CreateCoursePage() {
                 label="Course Title"
                 placeholder="e.g. Advanced UI Design Patterns"
                 fullWidth
+                value={name}
+                onChange={(event) => setName(event.target.value)}
               />
               <CourseSelectField
                 label="Category"
-                defaultValue="Product Design"
-                options={["Product Design", "Development", "Business", "Data Science"]}
+                value={categoryId}
+                onChange={(event) => setCategoryId(event.target.value)}
+                options={
+                  loadingCategories
+                    ? ["Loading categories..."]
+                    : categories.length
+                      ? categories.map((category) => ({
+                          label: category.name,
+                          value: category.id,
+                        }))
+                      : [{ label: "Uncategorized", value: "" }]
+                }
               />
               <CourseSelectField
                 label="Difficulty Level"
-                defaultValue="Beginner"
-                options={["Beginner", "Intermediate", "Advanced"]}
+                value={difficultyLevel}
+                onChange={(event) =>
+                  setDifficultyLevel(event.target.value as CourseDifficultyLevel)
+                }
+                options={[
+                  { label: "Beginner", value: "beginner" },
+                  { label: "Intermediate", value: "intermediate" },
+                  { label: "Advanced", value: "advanced" },
+                ]}
               />
               <div className="md:col-span-2">
                 <CourseTextArea
                   label="Course Description"
                   placeholder="Describe what students will learn..."
                   rows={8}
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
                 />
               </div>
             </div>
@@ -85,6 +230,15 @@ export default function CreateCoursePage() {
                 </span>
                 <span className="mt-2 text-[16px] text-[#72829a]">JPG, PNG (Max 5MB)</span>
               </label>
+
+              <div className="mt-6">
+                <CourseTextField
+                  label="Thumbnail URL"
+                  placeholder="Paste the image URL"
+                  value={thumbnailUrl}
+                  onChange={(event) => setThumbnailUrl(event.target.value)}
+                />
+              </div>
             </div>
 
             <div className="mt-6 rounded-[24px] border border-[#f0deab] bg-[#fff9ea] p-6">
