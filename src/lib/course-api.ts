@@ -643,43 +643,73 @@ export async function deleteLesson(lessonId: string, authToken?: string) {
  * Body: { title, passMark, allowPartialCredit, timeLimit, attempts, visibility }
  * Response: { message, data: { ...quiz } }
  */
+
+/**
+ * POST /courses/modules/:moduleId/quiz
+ * Body: { title, passMark, allowPartialCredit, timeLimit, attempts, visibility }
+ * Response: { message, data: { ...quiz } }
+ */
 export async function createQuiz(
   moduleId: string,
   payload: CreateQuizPayload,
   authToken?: string
 ) {
+  console.log("[QUIZ createQuiz] →", { moduleId, payload });
+ 
   const response = await apiRequest<unknown>(
     endpoints.courses.quizzes.create(moduleId),
     { method: "POST", body: payload, authToken }
   );
-
+ 
+  console.log("[QUIZ createQuiz] raw response:", response);
+ 
   const data = unwrapData(response);
-  return parseQuiz(data);
+  const parsed = parseQuiz(data);
+  console.log("[QUIZ createQuiz] parsed:", parsed);
+  return parsed;
 }
-
-/** PUT /courses/modules/:moduleId/quiz → { message, data: { ...quiz } } */
+ 
+/**
+ * PUT /courses/modules/:moduleId/quiz
+ * Body: partial quiz fields
+ * Response: { message, data: { ...quiz } }
+ */
 export async function updateQuiz(
   moduleId: string,
   payload: UpdateQuizPayload,
   authToken?: string
 ) {
+  console.log("[QUIZ updateQuiz] →", { moduleId, payload });
+ 
   const response = await apiRequest<unknown>(
     endpoints.courses.quizzes.update(moduleId),
     { method: "PUT", body: payload, authToken }
   );
-
+ 
+  console.log("[QUIZ updateQuiz] raw response:", response);
+ 
   const data = unwrapData(response);
-  return parseQuiz(data);
+  const parsed = parseQuiz(data);
+  console.log("[QUIZ updateQuiz] parsed:", parsed);
+  return parsed;
 }
-
-/** DELETE /courses/modules/:moduleId/quiz → { message } */
+ 
+/**
+ * DELETE /courses/modules/:moduleId/quiz
+ * Response: { message: "Quiz deleted successfully." }
+ */
 export async function deleteQuiz(moduleId: string, authToken?: string) {
-  return apiRequest<{ message: string }>(
+  console.log("[QUIZ deleteQuiz] →", { moduleId });
+ 
+  const response = await apiRequest<{ message: string }>(
     endpoints.courses.quizzes.delete(moduleId),
     { method: "DELETE", authToken }
   );
+ 
+  console.log("[QUIZ deleteQuiz] response:", response);
+  return response;
 }
-
+ 
 // ---------------------------------------------------------------------------
 // PREREQUISITES — placeholder functions (backend not yet implemented)
 // ---------------------------------------------------------------------------

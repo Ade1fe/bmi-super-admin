@@ -71,8 +71,12 @@ function mapCourseToRow(course: Course): CourseRow {
     code: course.id.slice(0, 8).toUpperCase(),
     category: course.categoryName ?? "Uncategorized",
     categoryClassName: "bg-[#deebff] text-[#2463e7]",
-    lessons: "0 Lessons",
-    students: "0",
+    lessons: `${course.totalLessons ?? 0} ${(course.totalLessons ?? 0) === 1 ? "Lesson" : "Lessons"}`,
+    students: String(course.totalStudents ?? 0),
+//     lessons: course.totalLessons
+//   ? `${course.totalLessons} ${course.totalLessons === 1 ? "Lesson" : "Lessons"}`
+//   : "—",
+// students: course.totalStudents ? String(course.totalStudents) : "—",
     instructor: "Course Admin",
     instructorInitials: course.name
       .split(" ")
@@ -228,7 +232,7 @@ console.log("ROLE", session?.role);
         setIsLoading(false);
       }
     }
-
+ console.log("COURSES", courses);
     loadCourses();
   }, [activeTab, isHydrated, searchTerm, session?.token]);
 
@@ -237,6 +241,10 @@ console.log("ROLE", session?.role);
   const resultSummary = isLoading
     ? "Loading courses..."
     : `Showing ${rows.length} ${rows.length === 1 ? "course" : "courses"}`;
+
+    console.log("rows", rows);
+
+   
 
   return (
     <AppShell title="Course Management" activeSection="courses">

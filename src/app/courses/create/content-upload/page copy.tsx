@@ -1,3 +1,5 @@
+
+
 "use client";
 
 export const dynamic = "force-dynamic";
@@ -11,15 +13,19 @@ import {
   createLesson,
   createModule,
   createQuiz,
+  deleteLesson,    // ← add
   deleteModule,
   fetchModules,
+  updateLesson,    // ← add
+  updateModule,
   type CourseLesson,
   type CourseModule,
+  type UpdateLessonPayload,  // ← add
+  type UpdateModulePayload,
 } from "@/lib/course-api";
 import {
   BookOpen,
   Bold,
-  Calendar,
   ChevronDown,
   ChevronUp,
   Circle,
@@ -79,6 +85,7 @@ type ModuleCardData = {
   lessons?: LessonCardData[];
   collapsed?: boolean;
   empty?: boolean;
+  onDeleteLesson?: (lessonId: string) => void;
 };
 
 type QuizQuestionData = {
@@ -110,98 +117,22 @@ const lessonTypeCards = [
   },
 ];
 
-const courseModules: ModuleCardData[] = [
-  {
-    id: "sample-module-1",
-    number: "01",
-    title: "Introduction to React Architecture",
-    lessonCount: "4 Lessons",
-    duration: "45 mins",
-    lessons: [
-      {
-        id: "sample-lesson-1",
-        number: "1.1",
-        title: "Introduction to the Platform",
-        summary: "A brief overview of the core features and dashboard layout.",
-        type: "video",
-        metaOne: "08:45",
-        metaTwo: "Public",
-      },
-      {
-        id: "sample-lesson-2",
-        number: "1.2",
-        title: "Core Principles & Values",
-        summary: "Deep dive into the underlying philosophy of the course content.",
-        type: "reading",
-        metaOne: "08:45",
-        metaTwo: "Public",
-        highlighted: true,
-      },
-      {
-        id: "sample-lesson-3",
-        number: "1.3",
-        title: "Knowledge Check",
-        summary: "A short quiz to test your understanding of the first two lessons.",
-        type: "quiz",
-        metaOne: "10 Questions",
-        metaTwo: "80% to pass",
-      },
-    ],
-  },
-  {
-    id: "sample-module-2",
-    number: "02",
-    title: "Advanced State Management",
-    lessonCount: "6 Lessons",
-    duration: "1h 20mins",
-    collapsed: true,
-  },
-  {
-    id: "sample-module-3",
-    number: "03",
-    title: "Enter Module Title...",
-    lessonCount: "New Module",
-    duration: "",
-    empty: true,
-  },
-];
-
-const quizQuestions: QuizQuestionData[] = [
-  {
-    id: "Q1",
-    title: "QUESTION TEXT",
-    prompt:
-      "What is the primary indicator of long-term economic growth according to the Solow Model?",
-    options: ["Gold", "Silver", "Copper", "Copper"],
-    selectedIndex: 0,
-  },
-  {
-    id: "Q2",
-    title: "QUESTION TEXT",
-    prompt: "The Phillips Curve suggests a permanent trade-off between inflation ?",
-    options: ["True", "False"],
-    selectedIndex: 0,
-  },
-];
-
 function buildHref({
   tab = "content",
   modal,
   courseId,
   moduleId,
 }: {
-  tab?: BuilderTab;
+  tab?: "content" | "quiz";
   modal?: string;
   courseId?: string | null;
   moduleId?: string | null;
 }) {
   const params = new URLSearchParams();
-
   if (tab === "quiz") params.set("tab", "quiz");
   if (modal) params.set("modal", modal);
   if (courseId) params.set("courseId", courseId);
   if (moduleId) params.set("moduleId", moduleId);
-
   const query = params.toString();
   return query
     ? `/courses/create/content-upload?${query}`
@@ -252,7 +183,7 @@ function mapLessonToCard(
     metaOne:
       type === "video"
         ? lesson.videoUrl || "Video"
-        : lesson.estimatedReadingTime || "10 mins",
+        : lesson.estimatedReadingTime || "—",
     metaTwo: lesson.accessLevel || "Enrolled Students",
   };
 }
@@ -317,13 +248,17 @@ function LessonMeta({
   );
 }
 
+// Change the LessonCard props to accept onEdit and onDelete
 function LessonCard({
   lesson,
-  editHref,
+  onEditLesson,    // ← replace editHref with this
+  onDeleteLesson,
 }: {
   lesson: LessonCardData;
-  editHref: string;
+  onEditLesson?: (lessonId: string) => void;   // ← add
+  onDeleteLesson?: (lessonId: string) => void;
 }) {
+
   const visual = LessonVisual({ type: lesson.type });
   const Icon = visual.icon;
 
@@ -331,9 +266,7 @@ function LessonCard({
     <article
       className={[
         "rounded-[20px] border bg-white px-5 py-5 shadow-[0_12px_24px_rgba(205,214,235,0.06)] transition-colors sm:px-6",
-        lesson.highlighted
-          ? "border-[#1da565] shadow-none"
-          : "border-[#e4ebf7]",
+        lesson.highlighted ? "border-[#1da565] shadow-none" : "border-[#e4ebf7]",
       ].join(" ")}
     >
       <div className="flex items-start justify-between gap-4">
@@ -359,26 +292,30 @@ function LessonCard({
             </div>
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2 text-[#7b899f]">
-          {lesson.highlighted ? (
-            <>
-              <Link
-                href={editHref}
-                className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-[#f3f6fb]"
-              >
-                <PenSquare className="h-5 w-5" strokeWidth={2.1} />
-              </Link>
-              <button
-                type="button"
-                className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-[#f3f6fb]"
-              >
-                <Trash2 className="h-5 w-5" strokeWidth={2.1} />
-              </button>
-            </>
-          ) : null}
+        {/* Always-visible action icons */}
+        <div className="flex shrink-0 items-center gap-1 text-[#7b899f]">
+ <button
+    type="button"
+    aria-label="Edit lesson"
+    title="Edit lesson"
+    onClick={() => onEditLesson?.(lesson.id)}
+    className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-[#f3f6fb]"
+  >
+    <PenSquare className="h-5 w-5" strokeWidth={2.1} />
+  </button>
           <button
             type="button"
-            className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-[#f3f6fb]"
+            aria-label="Delete lesson"
+            title="Delete lesson"
+            onClick={() => onDeleteLesson?.(lesson.id)}
+            className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-[#fff1f1] hover:text-[#c0392b]"
+          >
+            <Trash2 className="h-5 w-5" strokeWidth={2.1} />
+          </button>
+          <button
+            type="button"
+            aria-label="Drag to reorder"
+            className="flex h-9 w-9 cursor-grab items-center justify-center rounded-full hover:bg-[#f3f6fb]"
           >
             <GripVertical className="h-5 w-5" strokeWidth={2.1} />
           </button>
@@ -388,27 +325,33 @@ function LessonCard({
   );
 }
 
+// ---------------------------------------------------------------------------
+// ModuleCard — fixed prop names + always-visible edit (PenSquare) icon
+// ---------------------------------------------------------------------------
 function ModuleCard({
   module,
   settingsHref,
   lessonEditorHref,
   onDeleteModule,
+  onEditModule,
+  onDeleteLesson,
+  onEditLesson,    // ← add
   disabled,
 }: {
   module: ModuleCardData;
   settingsHref: string;
   lessonEditorHref: string;
   onDeleteModule?: (moduleId: string) => void;
+  onEditModule?: (moduleId: string) => void;
+  onDeleteLesson?: (lessonId: string) => void;  // ← add
   disabled?: boolean;
+onEditLesson?: (lessonId: string) => void; 
 }) {
   return (
     <article className="overflow-hidden rounded-[22px] border border-[#dfe6f7] bg-white shadow-[0_18px_40px_rgba(182,192,227,0.07)]">
       <div className="flex flex-col gap-4 bg-[#eef1fb] px-5 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex min-w-0 items-center gap-4">
-          <GripVertical
-            className="h-5 w-5 shrink-0 text-[#98a6be]"
-            strokeWidth={2.2}
-          />
+          <GripVertical className="h-5 w-5 shrink-0 text-[#98a6be]" strokeWidth={2.2} />
           <div className="min-w-0">
             <p className="text-[15px] font-extrabold uppercase tracking-[0.08em] text-[#0f8751]">
               Module {module.number}
@@ -429,7 +372,19 @@ function ModuleCard({
             </p>
           </div>
         </div>
+
         <div className="flex items-center gap-2 text-[#66748b]">
+          {/* Edit module — always visible so users can click to update module details */}
+          <button
+            type="button"
+            onClick={() => onEditModule?.(module.id)}
+            aria-label="Edit module"
+            title="Edit module"
+            className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-white"
+          >
+            <PenSquare className="h-5 w-5" strokeWidth={2.1} />
+          </button>
+
           {!module.empty ? (
             <>
               <Link
@@ -442,19 +397,22 @@ function ModuleCard({
                 href={lessonEditorHref}
                 className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-white"
               >
-                <PenSquare className="h-5 w-5" strokeWidth={2.1} />
+                {/* lesson-editor link intentionally left without extra icon here */}
               </Link>
             </>
           ) : null}
+
           <button
             type="button"
             disabled={disabled}
             onClick={() => onDeleteModule?.(module.id)}
             aria-label="Delete module"
+            title="Delete module"
             className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-white disabled:opacity-60 disabled:hover:bg-transparent"
           >
             <Trash2 className="h-5 w-5" strokeWidth={2.1} />
           </button>
+
           {!module.empty ? (
             <button
               type="button"
@@ -491,13 +449,14 @@ function ModuleCard({
         </div>
       ) : (
         <div className="space-y-6 border-t border-[#e8edf7] bg-[#fbfcff] p-4 sm:p-6">
-          {module.lessons?.map((lesson) => (
-            <LessonCard
-              key={lesson.number}
-              lesson={lesson}
-              editHref={lessonEditorHref}
-            />
-          ))}
+{module.lessons?.map((lesson) => (
+    <LessonCard
+      key={lesson.id}
+      lesson={lesson}
+      onEditLesson={onEditLesson}      // ← add
+      onDeleteLesson={onDeleteLesson}
+    />
+  ))}
           <Link
             href={lessonEditorHref}
             className="flex min-h-[54px] items-center justify-center rounded-[14px] border-2 border-dashed border-[#dceadf] bg-white px-4 text-center text-[15px] font-medium text-[#7a8aa3]"
@@ -510,7 +469,222 @@ function ModuleCard({
   );
 }
 
-function ContentSidebar({ settingsHref }: { settingsHref: string }) {
+// ---------------------------------------------------------------------------
+// EditModuleModal — opens when user clicks the PenSquare icon on a module
+// ---------------------------------------------------------------------------
+function EditModuleModal({
+  module,
+  onSave,
+  isSaving,
+  onClose,
+}: {
+  module: CourseModule;
+  onSave: (payload: {
+    title: string;
+    description: string;
+    order: number;
+    status: string;
+    enableDripRelease: boolean;
+    releaseInterval?: number;
+  }) => Promise<void>;
+  isSaving?: boolean;
+  onClose: () => void;
+}) {
+  const [title, setTitle] = useState(module.title);
+  const [description, setDescription] = useState(module.description || "");
+  const [order, setOrder] = useState(String(module.order || 1));
+  const [status, setStatus] = useState(module.status || "draft");
+  const [enableDripRelease, setEnableDripRelease] = useState(
+    Boolean(module.enableDripRelease)
+  );
+  const [releaseInterval, setReleaseInterval] = useState(
+    String(module.releaseInterval || 7)
+  );
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function handleSave() {
+    if (!title.trim()) {
+      setError("Enter a module title.");
+      return;
+    }
+    const parsedOrder = Number.parseInt(order, 10);
+    if (!Number.isFinite(parsedOrder) || parsedOrder < 1) {
+      setError("Module order must be a number greater than zero.");
+      return;
+    }
+    setError(null);
+    setIsSubmitting(true);
+    try {
+      await onSave({
+        title: title.trim(),
+        description: description.trim(),
+        order: parsedOrder,
+        status,
+        enableDripRelease,
+        releaseInterval: enableDripRelease
+          ? Number.parseInt(releaseInterval, 10) || 7
+          : undefined,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to save module.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <CourseModal closeHref="#" maxWidthClassName="max-w-[700px]">
+      {/* Close button */}
+      <button
+        type="button"
+        onClick={onClose}
+        className="absolute right-5 top-5 flex h-9 w-9 items-center justify-center rounded-full text-[#7b899f] hover:bg-[#f3f6fb]"
+        aria-label="Close"
+      >
+        ✕
+      </button>
+
+      <div className="p-8">
+        <h2 className="text-[28px] font-extrabold tracking-[-0.05em] text-[#16345d]">
+          Edit Module
+        </h2>
+        <p className="mt-2 text-[16px] text-[#4b6182]">
+          Update the title, description, order and release settings for this module.
+        </p>
+
+        {error ? (
+          <div className="mt-5 rounded-[14px] border border-[#f8d6d6] bg-[#fff1f1] px-4 py-3 text-[14px] text-[#a42f2f]">
+            {error}
+          </div>
+        ) : null}
+
+        <div className="mt-8 space-y-5">
+          <section className="rounded-[20px] bg-[#f8faff] p-6">
+            <h3 className="text-[18px] font-extrabold tracking-[-0.04em] text-[#1a2f51]">
+              Module Details
+            </h3>
+            <div className="mt-5 grid gap-5">
+              <ModalInput
+                label="Module Title"
+                placeholder="Enter module title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+              />
+              <label>
+                <span className="mb-3 block text-[14px] font-semibold text-[#51627f]">
+                  Module Description
+                </span>
+                <textarea
+                  rows={4}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Enter module description"
+                  className="w-full resize-none rounded-[14px] border border-[#d7deee] bg-white px-4 py-4 text-[15px] leading-6 text-[#264267] outline-none placeholder:text-[#8d99b1]"
+                />
+              </label>
+              <div className="grid gap-5 sm:grid-cols-2">
+                <ModalInput
+                  label="Module Order"
+                  value={order}
+                  onChange={(e) => setOrder(e.target.value)}
+                />
+                <ModalSelect
+                  label="Status"
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                  options={[
+                    { label: "Draft", value: "draft" },
+                    { label: "Published", value: "published" },
+                  ]}
+                />
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-[20px] bg-[#f8faff] p-6">
+            <h3 className="text-[18px] font-extrabold tracking-[-0.04em] text-[#1a2f51]">
+              Delivery Schedule
+            </h3>
+            <div className="mt-5 flex items-center justify-between gap-4">
+              <div>
+                <p className="text-[16px] font-bold text-[#22314c]">Enable Drip Release</p>
+                <p className="mt-1 text-[15px] text-[#6d7d98]">
+                  Release content on a timed interval
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEnableDripRelease((v) => !v)}
+                className={[
+                  "flex h-8 w-16 items-center rounded-full px-1 transition-colors",
+                  enableDripRelease ? "bg-[#0f8751]" : "bg-[#cbd5e1]",
+                ].join(" ")}
+              >
+                <span
+                  className={[
+                    "flex h-6 w-6 rounded-full bg-white transition-transform",
+                    enableDripRelease ? "translate-x-8" : "translate-x-0",
+                  ].join(" ")}
+                />
+              </button>
+            </div>
+
+            {enableDripRelease ? (
+              <div className="mt-5">
+                <label>
+                  <span className="mb-3 block text-[14px] font-semibold text-[#51627f]">
+                    Release Interval
+                  </span>
+                  <div className="flex h-[56px] items-center justify-between rounded-[14px] border border-[#d7deee] bg-white px-5 text-[15px] text-[#264267]">
+                    <input
+                      value={releaseInterval}
+                      onChange={(e) => setReleaseInterval(e.target.value)}
+                      className="h-full min-w-0 flex-1 bg-transparent outline-none"
+                    />
+                    <span className="text-[#72829a]">Days</span>
+                  </div>
+                  <p className="mt-2 text-[13px] text-[#7b89a2]">
+                    Module will unlock {releaseInterval} days after enrollment.
+                  </p>
+                </label>
+              </div>
+            ) : null}
+          </section>
+        </div>
+
+        <div className="mt-8 flex flex-col gap-4 sm:flex-row">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex min-w-[136px] items-center justify-center rounded-[12px] border border-[#d7deee] px-6 py-3 text-[15px] font-semibold text-[#4b6182] transition-colors hover:bg-[#f8faff]"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={isSubmitting || isSaving}
+            onClick={handleSave}
+            className="inline-flex min-w-[176px] items-center justify-between rounded-[12px] bg-[#4b8a60] px-6 py-3 text-[15px] font-semibold text-white shadow-[0_20px_38px_rgba(75,138,96,0.18)] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <span>{isSubmitting || isSaving ? "Saving…" : "Save Changes"}</span>
+            <ContinueArrow />
+          </button>
+        </div>
+      </div>
+    </CourseModal>
+  );
+}
+
+function ContentSidebar({
+  settingsHref,
+  modules,
+}: {
+  settingsHref: string;
+  modules: CourseModule[];
+}) {
+  const totalLessons = modules.reduce((sum, m) => sum + m.lessons.length, 0);
+
   return (
     <div className="space-y-6">
       <aside className="rounded-[22px] border border-[#dfe6f7] bg-white p-6 shadow-[0_18px_35px_rgba(180,193,229,0.08)]">
@@ -534,9 +708,7 @@ function ContentSidebar({ settingsHref }: { settingsHref: string }) {
                   <Icon className="h-5 w-5" strokeWidth={2.1} />
                 </span>
                 <div>
-                  <p className="text-[16px] font-extrabold text-[#22314c]">
-                    {item.title}
-                  </p>
+                  <p className="text-[16px] font-extrabold text-[#22314c]">{item.title}</p>
                   <p className="mt-1 text-[14px] text-[#72829a]">{item.detail}</p>
                 </div>
               </div>
@@ -559,52 +731,25 @@ function ContentSidebar({ settingsHref }: { settingsHref: string }) {
         </div>
         <dl className="mt-7 space-y-4 text-[16px] text-[#576a88]">
           <div className="flex items-center justify-between gap-4">
-            <dt>Total Lessons</dt>
-            <dd className="font-semibold text-[#22314c]">3</dd>
-          </div>
-          <div className="flex items-center justify-between gap-4">
-            <dt>Estimated Duration</dt>
-            <dd className="font-semibold text-[#22314c]">45 mins</dd>
+            <dt>Total Modules</dt>
+            <dd className="font-semibold text-[#22314c]">{modules.length}</dd>
           </div>
           <div className="flex items-center justify-between gap-4 border-b border-[#d5dff0] pb-4">
-            <dt>Difficulty</dt>
-            <dd className="rounded-full bg-[#edf8ef] px-3 py-1 text-[13px] font-bold uppercase tracking-[0.08em] text-[#0f8751]">
-              Beginner
-            </dd>
+            <dt>Total Lessons</dt>
+            <dd className="font-semibold text-[#22314c]">{totalLessons}</dd>
           </div>
         </dl>
-        <div className="mt-5 flex items-start gap-3">
-          <span className="mt-0.5 flex h-6 w-6 items-center justify-center rounded-[6px] bg-[#0f8751] text-white">
-            ✓
-          </span>
-          <div>
-            <p className="text-[16px] font-extrabold text-[#22314c]">
-              Enable Drip Content
-            </p>
-            <p className="mt-2 text-[14px] italic text-[#72829a]">
-              Release this module 7 days after enrollment.
-            </p>
-          </div>
-        </div>
       </aside>
     </div>
   );
 }
 
-function QuestionOption({
-  label,
-  selected,
-}: {
-  label: string;
-  selected: boolean;
-}) {
+function QuestionOption({ label, selected }: { label: string; selected: boolean }) {
   return (
     <div
       className={[
         "flex items-center justify-between gap-4 rounded-[16px] border px-5 py-5 text-[16px] font-semibold transition-colors",
-        selected
-          ? "border-[#15985a] text-[#1a2f51]"
-          : "border-[#e4ebf7] text-[#273a57]",
+        selected ? "border-[#15985a] text-[#1a2f51]" : "border-[#e4ebf7] text-[#273a57]",
       ].join(" ")}
     >
       <span>{label}</span>
@@ -632,10 +777,7 @@ function QuestionCard({
     <article className="overflow-hidden rounded-[22px] border border-[#dfe6f7] bg-white shadow-[0_18px_40px_rgba(182,192,227,0.07)]">
       <div className="flex flex-col gap-4 bg-[#eef1fb] px-5 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex min-w-0 items-center gap-4">
-          <GripVertical
-            className="h-5 w-5 shrink-0 text-[#98a6be]"
-            strokeWidth={2.2}
-          />
+          <GripVertical className="h-5 w-5 shrink-0 text-[#98a6be]" strokeWidth={2.2} />
           <div className="min-w-0">
             <p className="text-[15px] font-extrabold uppercase tracking-[0.08em] text-[#0f8751]">
               {question.id}
@@ -678,10 +820,7 @@ function QuestionCard({
             <p className="max-w-[760px] text-[17px] font-semibold leading-7 text-[#1d2f4b]">
               {question.prompt}
             </p>
-            <GripVertical
-              className="mt-1 h-5 w-5 shrink-0 text-[#c0cad9]"
-              strokeWidth={2.1}
-            />
+            <GripVertical className="mt-1 h-5 w-5 shrink-0 text-[#c0cad9]" strokeWidth={2.1} />
           </div>
           <div className="mt-6 space-y-4">
             {question.options.map((option, index) => (
@@ -741,18 +880,14 @@ function QuizSidebar({ settingsHref }: { settingsHref: string }) {
             <div className="flex items-center justify-between rounded-[16px] border border-[#e6ebf7] px-4 py-4">
               <div className="flex items-center gap-3">
                 <Clock3 className="h-5 w-5 text-[#4b8a60]" strokeWidth={2.1} />
-                <span className="text-[15px] font-bold text-[#22314c]">
-                  Time Limit
-                </span>
+                <span className="text-[15px] font-bold text-[#22314c]">Time Limit</span>
               </div>
               <span className="text-[15px] font-bold text-[#0f8751]">45 min</span>
             </div>
             <div className="flex items-center justify-between rounded-[16px] border border-[#e6ebf7] px-4 py-4">
               <div className="flex items-center gap-3">
                 <RotateCcw className="h-5 w-5 text-[#4b8a60]" strokeWidth={2.1} />
-                <span className="text-[15px] font-bold text-[#22314c]">
-                  Attempts
-                </span>
+                <span className="text-[15px] font-bold text-[#22314c]">Attempts</span>
               </div>
               <span className="text-[15px] font-bold text-[#0f8751]">02</span>
             </div>
@@ -770,25 +905,6 @@ function QuizSidebar({ settingsHref }: { settingsHref: string }) {
             <span className="text-[14px] font-bold uppercase tracking-[0.06em] text-[#0f8751]">
               Publish Now
             </span>
-          </div>
-        </div>
-      </aside>
-      <aside className="rounded-[22px] border border-[#dfe6f7] bg-[#f6f8fd] p-6 shadow-[0_18px_35px_rgba(180,193,229,0.08)]">
-        <p className="text-[13px] font-bold uppercase tracking-[0.18em] text-[#44536d]">
-          Total Weighting
-        </p>
-        <div className="mt-6 flex items-end justify-between gap-6">
-          <div>
-            <p className="text-[46px] font-extrabold leading-none tracking-[-0.06em] text-[#0f8751]">
-              12
-            </p>
-            <p className="mt-2 text-[15px] text-[#6a7b95]">questions</p>
-          </div>
-          <div className="text-right">
-            <p className="text-[46px] font-extrabold leading-none tracking-[-0.06em] text-[#0f8751]">
-              150
-            </p>
-            <p className="mt-2 text-[15px] text-[#6a7b95]">pts total</p>
           </div>
         </div>
       </aside>
@@ -813,9 +929,7 @@ function ModalSelect({
 }) {
   return (
     <label>
-      <span className="mb-3 block text-[14px] font-semibold text-[#51627f]">
-        {label}
-      </span>
+      <span className="mb-3 block text-[14px] font-semibold text-[#51627f]">{label}</span>
       <span className="relative flex h-[56px] items-center rounded-[14px] border border-[#d7deee] bg-white px-4">
         <select
           value={value}
@@ -824,10 +938,8 @@ function ModalSelect({
           className="h-full w-full appearance-none bg-transparent pr-10 text-[15px] text-[#264267] outline-none"
         >
           {options.map((option) => {
-            const optionValue =
-              typeof option === "string" ? option : option.value;
-            const optionLabel =
-              typeof option === "string" ? option : option.label;
+            const optionValue = typeof option === "string" ? option : option.value;
+            const optionLabel = typeof option === "string" ? option : option.label;
             return (
               <option key={optionValue} value={optionValue}>
                 {optionLabel}
@@ -859,9 +971,7 @@ function ModalInput({
 }) {
   return (
     <label>
-      <span className="mb-3 block text-[14px] font-semibold text-[#51627f]">
-        {label}
-      </span>
+      <span className="mb-3 block text-[14px] font-semibold text-[#51627f]">{label}</span>
       <input
         value={value}
         defaultValue={value === undefined ? (defaultValue ?? "") : undefined}
@@ -898,17 +1008,13 @@ function ContentLessonEditorModal({
   isSaving?: boolean;
 }) {
   const [lessonType, setLessonType] = useState("Reading Material");
-  const [lessonTitle, setLessonTitle] = useState("Core Principles & Values");
-  const [content, setContent] = useState(
-    "This module covers the core principles of institutional design and structural integrity within complex data environments."
-  );
+  const [lessonTitle, setLessonTitle] = useState("");
+  const [content, setContent] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
   const [accessLevel, setAccessLevel] = useState("Enrolled Students");
   const [estimatedReadingTime, setEstimatedReadingTime] = useState("10 mins");
   const [lessonOrder, setLessonOrder] = useState("1");
-  const [moduleId, setModuleId] = useState(
-    selectedModuleId || modules[0]?.id || ""
-  );
+  const [moduleId, setModuleId] = useState(selectedModuleId || modules[0]?.id || "");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -920,17 +1026,14 @@ function ContentLessonEditorModal({
 
   async function handleSave() {
     if (!onSaveLesson) return;
-
     if (!moduleId) {
       setError("Create or select a module before saving a lesson.");
       return;
     }
-
     if (!lessonTitle.trim()) {
       setError("Enter a lesson title.");
       return;
     }
-
     setError(null);
     setIsSubmitting(true);
     try {
@@ -961,8 +1064,7 @@ function ContentLessonEditorModal({
           Lesson Editor
         </h2>
         <p className="mt-2 text-[16px] text-[#4b6182]">
-          Configure the content, access level, and delivery details for this
-          lesson.
+          Configure the content, access level, and delivery details for this lesson.
         </p>
 
         {courseId && (
@@ -978,11 +1080,7 @@ function ContentLessonEditorModal({
         ) : null}
 
         <div className="mt-8 flex flex-col gap-4 sm:flex-row">
-          <CourseActionLink
-            href={closeHref}
-            variant="secondary"
-            className="min-w-[136px]"
-          >
+          <CourseActionLink href={closeHref} variant="secondary" className="min-w-[136px]">
             Discard
           </CourseActionLink>
           <button
@@ -1029,7 +1127,7 @@ function ContentLessonEditorModal({
               />
               <ModalInput
                 label="Video URL"
-                placeholder="https://vimeo.com/1119928946"
+                placeholder="https://vimeo.com/..."
                 value={videoUrl}
                 onChange={(e) => setVideoUrl(e.target.value)}
               />
@@ -1041,23 +1139,22 @@ function ContentLessonEditorModal({
               </span>
               <div className="overflow-hidden rounded-[16px] border border-[#d7deee]">
                 <div className="flex flex-wrap gap-3 border-b border-[#e7edf8] px-4 py-3 text-[#5f6f8b]">
-                  {[Bold, Italic, Underline, List, List, Link2, Image, Code].map(
-                    (Icon, index) => (
-                      <button
-                        key={index}
-                        type="button"
-                        className="flex h-8 w-8 items-center justify-center rounded-[8px] hover:bg-[#f3f6fb]"
-                      >
-                        <Icon className="h-4 w-4" strokeWidth={2.1} />
-                      </button>
-                    )
-                  )}
+                  {[Bold, Italic, Underline, List, List, Link2, Image, Code].map((Icon, index) => (
+                    <button
+                      key={index}
+                      type="button"
+                      className="flex h-8 w-8 items-center justify-center rounded-[8px] hover:bg-[#f3f6fb]"
+                    >
+                      <Icon className="h-4 w-4" strokeWidth={2.1} />
+                    </button>
+                  ))}
                 </div>
                 <textarea
                   rows={5}
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
-                  className="w-full resize-none px-4 py-4 text-[15px] leading-6 text-[#264267] outline-none"
+                  placeholder="Enter lesson description..."
+                  className="w-full resize-none px-4 py-4 text-[15px] leading-6 text-[#264267] outline-none placeholder:text-[#8d99b1]"
                 />
               </div>
             </div>
@@ -1080,10 +1177,7 @@ function ContentLessonEditorModal({
                 onChange={(e) => setEstimatedReadingTime(e.target.value)}
                 options={["10 mins", "20 mins", "30 mins"]}
               />
-              <ModalInput
-                label="Attachment Label"
-                defaultValue="Reading Material PDF"
-              />
+              <ModalInput label="Attachment Label" placeholder="e.g. Reading Material PDF" />
             </div>
 
             <div>
@@ -1095,11 +1189,183 @@ function ContentLessonEditorModal({
                 <span className="mt-4 text-[15px] font-semibold text-[#47617f]">
                   Click to upload or drag and drop
                 </span>
-                <span className="mt-1 text-[15px] text-[#72829a]">
-                  PDF, DOCX or MP4 (Max 50MB)
-                </span>
+                <span className="mt-1 text-[15px] text-[#72829a]">PDF, DOCX or MP4 (Max 50MB)</span>
               </label>
             </div>
+          </div>
+        </div>
+      </div>
+    </CourseModal>
+  );
+}
+
+function EditLessonModal({
+  lesson,
+  modules,
+  onSave,
+  isSaving,
+  onClose,
+}: {
+  lesson: CourseLesson;
+  modules: CourseModule[];
+  onSave: (lessonId: string, payload: UpdateLessonPayload) => Promise<void>;
+  isSaving?: boolean;
+  onClose: () => void;
+}) {
+  const [title, setTitle] = useState(lesson.title);
+  const [content, setContent] = useState(lesson.content || "");
+  const [videoUrl, setVideoUrl] = useState(lesson.videoUrl || "");
+  const [type, setType] = useState(
+    lesson.type === "video"
+      ? "Video Lesson"
+      : lesson.type === "quiz"
+        ? "Interactive Quiz"
+        : "Reading Material"
+  );
+  const [accessLevel, setAccessLevel] = useState(lesson.accessLevel || "Enrolled Students");
+  const [estimatedReadingTime, setEstimatedReadingTime] = useState(
+    lesson.estimatedReadingTime || "10 mins"
+  );
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function handleSave() {
+    if (!title.trim()) {
+      setError("Enter a lesson title.");
+      return;
+    }
+    setError(null);
+    setIsSubmitting(true);
+    try {
+      await onSave(lesson.id, {
+        title: title.trim(),
+        content: content.trim(),
+        videoUrl: videoUrl.trim() || undefined,
+        type:
+          type === "Video Lesson"
+            ? "video"
+            : type === "Interactive Quiz"
+              ? "quiz"
+              : "reading",
+        estimatedReadingTime,
+        accessLevel,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to save lesson.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <CourseModal closeHref="#" maxWidthClassName="max-w-[920px]">
+      <button
+        type="button"
+        onClick={onClose}
+        className="absolute right-5 top-5 flex h-9 w-9 items-center justify-center rounded-full text-[#7b899f] hover:bg-[#f3f6fb]"
+        aria-label="Close"
+      >
+        ✕
+      </button>
+
+      <div className="p-7 pr-14 sm:p-9 sm:pr-16">
+        <h2 className="text-[28px] font-extrabold tracking-[-0.05em] text-[#16345d]">
+          Edit Lesson
+        </h2>
+        <p className="mt-2 text-[16px] text-[#4b6182]">
+          Update the content, access level, and delivery details for this lesson.
+        </p>
+
+        {error ? (
+          <div className="mt-5 rounded-[14px] border border-[#f8d6d6] bg-[#fff1f1] px-4 py-3 text-[14px] text-[#a42f2f]">
+            {error}
+          </div>
+        ) : null}
+
+        <div className="mt-8 flex flex-col gap-4 sm:flex-row">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex min-w-[136px] items-center justify-center rounded-[12px] border border-[#d7deee] px-6 py-3 text-[15px] font-semibold text-[#4b6182] transition-colors hover:bg-[#f8faff]"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={isSubmitting || isSaving}
+            className="inline-flex min-w-[176px] items-center justify-between rounded-[12px] bg-[#4b8a60] px-6 py-3 text-[15px] font-semibold text-white shadow-[0_20px_38px_rgba(75,138,96,0.18)] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <span>{isSubmitting || isSaving ? "Saving…" : "Save Changes"}</span>
+            <ContinueArrow />
+          </button>
+        </div>
+
+        <div className="mt-10 rounded-[24px] border border-[#87a5d7] p-4 sm:p-6">
+          <div className="grid gap-6">
+            <div className="grid gap-5 md:grid-cols-2">
+              <ModalSelect
+                label="Lesson Type"
+                value={type}
+                onChange={(e) => setType(e.target.value)}
+                options={["Reading Material", "Video Lesson", "Interactive Quiz"]}
+              />
+              <ModalSelect
+                label="Access Level"
+                value={accessLevel}
+                onChange={(e) => setAccessLevel(e.target.value)}
+                options={["Public", "Enrolled Students", "Private"]}
+              />
+            </div>
+
+            <ModalInput
+              label="Lesson Title"
+              placeholder="Enter lesson title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+
+            {type === "Video Lesson" ? (
+              <ModalInput
+                label="Video URL"
+                placeholder="https://vimeo.com/..."
+                value={videoUrl}
+                onChange={(e) => setVideoUrl(e.target.value)}
+              />
+            ) : null}
+
+            <div>
+              <span className="mb-3 block text-[14px] font-semibold text-[#51627f]">
+                Detail Description
+              </span>
+              <div className="overflow-hidden rounded-[16px] border border-[#d7deee]">
+                <div className="flex flex-wrap gap-3 border-b border-[#e7edf8] px-4 py-3 text-[#5f6f8b]">
+                  {[Bold, Italic, Underline, List, List, Link2, Image, Code].map((Icon, index) => (
+                    <button
+                      key={index}
+                      type="button"
+                      className="flex h-8 w-8 items-center justify-center rounded-[8px] hover:bg-[#f3f6fb]"
+                    >
+                      <Icon className="h-4 w-4" strokeWidth={2.1} />
+                    </button>
+                  ))}
+                </div>
+                <textarea
+                  rows={5}
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  placeholder="Enter lesson description..."
+                  className="w-full resize-none px-4 py-4 text-[15px] leading-6 text-[#264267] outline-none placeholder:text-[#8d99b1]"
+                />
+              </div>
+            </div>
+
+            <ModalSelect
+              label="Estimated Reading Time"
+              value={estimatedReadingTime}
+              onChange={(e) => setEstimatedReadingTime(e.target.value)}
+              options={["10 mins", "20 mins", "30 mins"]}
+            />
           </div>
         </div>
       </div>
@@ -1128,10 +1394,8 @@ function CourseSettingsModal({
   }) => Promise<void>;
   isSaving?: boolean;
 }) {
-  const [moduleTitle, setModuleTitle] = useState("Module 1: Foundations");
-  const [moduleDescription, setModuleDescription] = useState(
-    "Basic principles of the course"
-  );
+  const [moduleTitle, setModuleTitle] = useState("");
+  const [moduleDescription, setModuleDescription] = useState("");
   const [moduleOrder, setModuleOrder] = useState(String(nextModuleOrder));
   const [moduleStatus, setModuleStatus] = useState("draft");
   const [enableDripRelease, setEnableDripRelease] = useState(false);
@@ -1146,23 +1410,19 @@ function CourseSettingsModal({
 
   async function handleSave() {
     if (!onSaveModule) return;
-
     if (!courseId) {
       setError("Create the course before adding modules.");
       return;
     }
-
     if (!moduleTitle.trim()) {
       setError("Enter a module title.");
       return;
     }
-
     const parsedOrder = Number.parseInt(moduleOrder, 10);
     if (!Number.isFinite(parsedOrder) || parsedOrder < 1) {
       setError("Module order must be a number greater than zero.");
       return;
     }
-
     setError(null);
     setIsSubmitting(true);
     try {
@@ -1172,15 +1432,11 @@ function CourseSettingsModal({
         order: parsedOrder,
         status: moduleStatus,
         enableDripRelease,
-        releaseInterval: enableDripRelease
-          ? Number.parseInt(releaseInterval, 10) || 7
-          : undefined,
+        releaseInterval: enableDripRelease ? Number.parseInt(releaseInterval, 10) || 7 : undefined,
         fixedReleaseDate: fixedReleaseDate.trim() || undefined,
       });
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Unable to save module settings."
-      );
+      setError(err instanceof Error ? err.message : "Unable to save module settings.");
     } finally {
       setIsSubmitting(false);
     }
@@ -1209,11 +1465,7 @@ function CourseSettingsModal({
         ) : null}
 
         <div className="mt-8 flex flex-col gap-4 sm:flex-row">
-          <CourseActionLink
-            href={closeHref}
-            variant="secondary"
-            className="min-w-[136px]"
-          >
+          <CourseActionLink href={closeHref} variant="secondary" className="min-w-[136px]">
             Discard
           </CourseActionLink>
           <button
@@ -1235,6 +1487,7 @@ function CourseSettingsModal({
             <div className="mt-6 grid gap-5">
               <ModalInput
                 label="Module Title"
+                placeholder="Enter module title"
                 value={moduleTitle}
                 onChange={(e) => setModuleTitle(e.target.value)}
               />
@@ -1246,7 +1499,8 @@ function CourseSettingsModal({
                   rows={4}
                   value={moduleDescription}
                   onChange={(e) => setModuleDescription(e.target.value)}
-                  className="w-full resize-none rounded-[14px] border border-[#d7deee] bg-white px-4 py-4 text-[15px] leading-6 text-[#264267] outline-none"
+                  placeholder="Enter module description"
+                  className="w-full resize-none rounded-[14px] border border-[#d7deee] bg-white px-4 py-4 text-[15px] leading-6 text-[#264267] outline-none placeholder:text-[#8d99b1]"
                 />
               </label>
               <div className="grid gap-5 sm:grid-cols-2">
@@ -1274,9 +1528,7 @@ function CourseSettingsModal({
             </h3>
             <div className="mt-6 flex items-center justify-between gap-4">
               <div>
-                <p className="text-[16px] font-bold text-[#22314c]">
-                  Enable Drip Release
-                </p>
+                <p className="text-[16px] font-bold text-[#22314c]">Enable Drip Release</p>
                 <p className="mt-1 text-[15px] text-[#6d7d98]">
                   Release content on a timed interval
                 </p>
@@ -1312,8 +1564,7 @@ function CourseSettingsModal({
                   <span className="text-[#72829a]">Days</span>
                 </div>
                 <p className="mt-2 text-[13px] text-[#7b89a2]">
-                  Module will unlock exactly {releaseInterval} days after
-                  enrollment.
+                  Module will unlock exactly {releaseInterval} days after enrollment.
                 </p>
               </label>
               <label>
@@ -1342,21 +1593,12 @@ function QuestionEditorModal({ closeHref }: { closeHref: string }) {
         <h2 className="text-[28px] font-extrabold tracking-[-0.05em] text-[#16345d]">
           Quiz Builder
         </h2>
-        <p className="mt-2 text-[16px] text-[#4b6182]">
-          Set your quiz questions here
-        </p>
+        <p className="mt-2 text-[16px] text-[#4b6182]">Set your quiz questions here</p>
         <div className="mt-8 flex flex-col gap-4 sm:flex-row">
-          <CourseActionLink
-            href={closeHref}
-            variant="secondary"
-            className="min-w-[136px]"
-          >
+          <CourseActionLink href={closeHref} variant="secondary" className="min-w-[136px]">
             Discard
           </CourseActionLink>
-          <CourseActionLink
-            href={closeHref}
-            className="min-w-[176px] justify-between px-6"
-          >
+          <CourseActionLink href={closeHref} className="min-w-[176px] justify-between px-6">
             <span>Save Changes</span>
             <ContinueArrow />
           </CourseActionLink>
@@ -1385,54 +1627,50 @@ function QuestionEditorModal({ closeHref }: { closeHref: string }) {
             </span>
             <div className="overflow-hidden rounded-[16px] border border-[#d7deee]">
               <div className="flex flex-wrap gap-3 border-b border-[#e7edf8] px-4 py-3 text-[#5f6f8b]">
-                {[Bold, Italic, Underline, List, List, Link2, Image, Code].map(
-                  (Icon, index) => (
-                    <button
-                      key={index}
-                      type="button"
-                      className="flex h-8 w-8 items-center justify-center rounded-[8px] hover:bg-[#f3f6fb]"
-                    >
-                      <Icon className="h-4 w-4" strokeWidth={2.1} />
-                    </button>
-                  )
-                )}
+                {[Bold, Italic, Underline, List, List, Link2, Image, Code].map((Icon, index) => (
+                  <button
+                    key={index}
+                    type="button"
+                    className="flex h-8 w-8 items-center justify-center rounded-[8px] hover:bg-[#f3f6fb]"
+                  >
+                    <Icon className="h-4 w-4" strokeWidth={2.1} />
+                  </button>
+                ))}
               </div>
               <textarea
                 rows={4}
-                defaultValue="This module covers the core principles of institutional design and structural integrity within complex data environments."
-                className="w-full resize-none px-4 py-4 text-[15px] leading-6 text-[#264267] outline-none"
+                placeholder="Enter question text..."
+                className="w-full resize-none px-4 py-4 text-[15px] leading-6 text-[#264267] outline-none placeholder:text-[#8d99b1]"
               />
             </div>
           </div>
           <div className="mt-6 space-y-5">
-            {["Option 1", "Option 2", "Option 3", "Option 4"].map(
-              (label, index) => (
-                <div key={label}>
-                  <span className="mb-3 block text-[14px] font-semibold text-[#51627f]">
-                    {label}
-                  </span>
-                  <div className="space-y-3">
-                    <input
-                      defaultValue="Reading"
-                      className="h-[54px] w-full rounded-[14px] border border-[#d7deee] bg-white px-4 text-[15px] text-[#264267] outline-none"
+            {["Option 1", "Option 2", "Option 3", "Option 4"].map((label, index) => (
+              <div key={label}>
+                <span className="mb-3 block text-[14px] font-semibold text-[#51627f]">
+                  {label}
+                </span>
+                <div className="space-y-3">
+                  <input
+                    placeholder={`Enter ${label.toLowerCase()}...`}
+                    className="h-[54px] w-full rounded-[14px] border border-[#d7deee] bg-white px-4 text-[15px] text-[#264267] outline-none placeholder:text-[#8d99b1]"
+                  />
+                  <span className="relative flex h-[56px] items-center rounded-[14px] border border-[#d7deee] bg-white px-4">
+                    <select
+                      defaultValue={index === 0 ? "True" : "False"}
+                      className="h-full w-full appearance-none bg-transparent pr-10 text-[15px] text-[#264267] outline-none"
+                    >
+                      <option>True</option>
+                      <option>False</option>
+                    </select>
+                    <ChevronDown
+                      className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#8c98b1]"
+                      strokeWidth={2.1}
                     />
-                    <span className="relative flex h-[56px] items-center rounded-[14px] border border-[#d7deee] bg-white px-4">
-                      <select
-                        defaultValue={index === 0 ? "True" : "false"}
-                        className="h-full w-full appearance-none bg-transparent pr-10 text-[15px] text-[#264267] outline-none"
-                      >
-                        <option>True</option>
-                        <option>false</option>
-                      </select>
-                      <ChevronDown
-                        className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#8c98b1]"
-                        strokeWidth={2.1}
-                      />
-                    </span>
-                  </div>
+                  </span>
                 </div>
-              )
-            )}
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -1463,10 +1701,8 @@ function QuizSettingsModal({
   ) => Promise<void>;
   isSaving?: boolean;
 }) {
-  const [moduleId, setModuleId] = useState(
-    selectedModuleId || modules[0]?.id || ""
-  );
-  const [title, setTitle] = useState("Module 1 Quiz");
+  const [moduleId, setModuleId] = useState(selectedModuleId || modules[0]?.id || "");
+  const [title, setTitle] = useState("");
   const [passMark, setPassMark] = useState("75");
   const [allowPartialCredit, setAllowPartialCredit] = useState(true);
   const [timeLimit, setTimeLimit] = useState("45");
@@ -1483,17 +1719,14 @@ function QuizSettingsModal({
 
   async function handleSave() {
     if (!onSaveQuiz) return;
-
     if (!moduleId) {
       setError("Create or select a module before saving quiz settings.");
       return;
     }
-
     if (!title.trim()) {
       setError("Enter a quiz title.");
       return;
     }
-
     setError(null);
     setIsSubmitting(true);
     try {
@@ -1516,15 +1749,9 @@ function QuizSettingsModal({
         <h2 className="text-[28px] font-extrabold tracking-[-0.05em] text-[#16345d]">
           Quiz Parameters Setting
         </h2>
-        <p className="mt-2 text-[16px] text-[#4b6182]">
-          Set your quiz questions here
-        </p>
+        <p className="mt-2 text-[16px] text-[#4b6182]">Set your quiz questions here</p>
         <div className="mt-8 flex flex-col gap-4 sm:flex-row">
-          <CourseActionLink
-            href={closeHref}
-            variant="secondary"
-            className="min-w-[136px]"
-          >
+          <CourseActionLink href={closeHref} variant="secondary" className="min-w-[136px]">
             Discard
           </CourseActionLink>
           <button
@@ -1565,6 +1792,7 @@ function QuizSettingsModal({
               />
               <ModalInput
                 label="Quiz Title"
+                placeholder="Enter quiz title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
               />
@@ -1589,9 +1817,7 @@ function QuizSettingsModal({
                 ]}
               />
               <div className="flex items-center justify-between gap-4">
-                <span className="text-[15px] font-bold text-[#22314c]">
-                  Allow Partial Credit
-                </span>
+                <span className="text-[15px] font-bold text-[#22314c]">Allow Partial Credit</span>
                 <button
                   type="button"
                   onClick={() => setAllowPartialCredit((v) => !v)}
@@ -1668,6 +1894,9 @@ function QuizSettingsModal({
   );
 }
 
+// ---------------------------------------------------------------------------
+// ContentBuilderView — accepts onEditModule and forwards it to each ModuleCard
+// ---------------------------------------------------------------------------
 function ContentBuilderView({
   courseId,
   settingsHref,
@@ -1675,7 +1904,10 @@ function ContentBuilderView({
   isLoadingModules,
   modulesError,
   onDeleteModule,
+  onEditModule,
   isDeletingModule,
+  onDeleteLesson,
+  onEditLesson,       // ← add
 }: {
   courseId?: string | null;
   settingsHref: string;
@@ -1683,11 +1915,12 @@ function ContentBuilderView({
   isLoadingModules: boolean;
   modulesError: string | null;
   onDeleteModule?: (moduleId: string) => void;
+  onEditModule?: (moduleId: string) => void;
   isDeletingModule: boolean;
+  onDeleteLesson?: (lessonId: string) => void;
+  onEditLesson?: (lessonId: string) => void;   // ← add
 }) {
-  const visibleModules = courseId
-    ? modules.map((m, i) => mapModuleToCard(m, i))
-    : courseModules;
+  const visibleModules = modules.map((m, i) => mapModuleToCard(m, i));
 
   return (
     <section className="mt-10 grid gap-8 xl:grid-cols-[minmax(0,1fr)_294px]">
@@ -1709,7 +1942,7 @@ function ContentBuilderView({
 
         <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-[24px] font-extrabold tracking-[-0.04em] text-[#182f53]">
-            Course Structure
+            Course Structure 101
           </h2>
           <Link
             href={settingsHref}
@@ -1735,7 +1968,16 @@ function ContentBuilderView({
             </div>
           ) : null}
 
-          {!isLoadingModules && visibleModules.length === 0 ? (
+          {!isLoadingModules && !courseId ? (
+            <div className="rounded-[22px] border border-dashed border-[#dceadf] bg-white px-6 py-14 text-center">
+              <h3 className="text-[22px] font-extrabold tracking-[-0.04em] text-[#22314c]">
+                No course selected
+              </h3>
+              <p className="mx-auto mt-3 max-w-[440px] text-[15px] leading-6 text-[#71819d]">
+                Go back and select or create a course first.
+              </p>
+            </div>
+          ) : !isLoadingModules && visibleModules.length === 0 ? (
             <div className="rounded-[22px] border border-dashed border-[#dceadf] bg-white px-6 py-14 text-center">
               <h3 className="text-[22px] font-extrabold tracking-[-0.04em] text-[#22314c]">
                 No modules yet
@@ -1750,26 +1992,32 @@ function ContentBuilderView({
           ) : null}
 
           {!isLoadingModules
-            ? visibleModules.map((module) => (
-                <ModuleCard
-                  key={module.id}
-                  module={module}
-                  settingsHref={settingsHref}
-                  lessonEditorHref={buildHref({
-                    tab: "content",
-                    modal: "lesson-editor",
-                    courseId,
-                    moduleId: module.id,
-                  })}
-                  onDeleteModule={onDeleteModule}
-                  disabled={isDeletingModule}
-                />
-              ))
+            ? visibleModules.map((module) => {
+                const lessonEditorHref = buildHref({
+                  tab: "content",
+                  modal: "lesson-editor",
+                  courseId,
+                  moduleId: module.id,
+                });
+                return (
+       <ModuleCard
+  key={module.id}
+  module={module}
+  settingsHref={settingsHref}
+  lessonEditorHref={lessonEditorHref}
+  onDeleteModule={onDeleteModule}
+  onEditModule={onEditModule}
+  onDeleteLesson={onDeleteLesson}
+  onEditLesson={onEditLesson}     // ← add
+  disabled={isDeletingModule}
+/>
+                );
+              })
             : null}
         </div>
       </div>
 
-      <ContentSidebar settingsHref={settingsHref} />
+      <ContentSidebar settingsHref={settingsHref} modules={modules} />
     </section>
   );
 }
@@ -1778,10 +2026,12 @@ function QuizBuilderView({
   courseId,
   settingsHref,
   editorHref,
+  quizQuestions,
 }: {
   courseId?: string | null;
   settingsHref: string;
   editorHref: string;
+  quizQuestions: QuizQuestionData[];
 }) {
   return (
     <section className="mt-10 grid gap-8 xl:grid-cols-[minmax(0,1fr)_320px]">
@@ -1806,14 +2056,25 @@ function QuizBuilderView({
           </h2>
         </div>
         <div className="mt-8 space-y-7">
-          {quizQuestions.map((question) => (
-            <QuestionCard
-              key={question.id}
-              question={question}
-              settingsHref={settingsHref}
-              editorHref={editorHref}
-            />
-          ))}
+          {quizQuestions.length === 0 ? (
+            <div className="rounded-[22px] border border-dashed border-[#dceadf] bg-white px-6 py-14 text-center">
+              <h3 className="text-[22px] font-extrabold tracking-[-0.04em] text-[#22314c]">
+                No questions yet
+              </h3>
+              <p className="mx-auto mt-3 max-w-[440px] text-[15px] leading-6 text-[#71819d]">
+                Add your first quiz question to get started.
+              </p>
+            </div>
+          ) : (
+            quizQuestions.map((question) => (
+              <QuestionCard
+                key={question.id}
+                question={question}
+                settingsHref={settingsHref}
+                editorHref={editorHref}
+              />
+            ))
+          )}
           <Link
             href={editorHref}
             className="flex min-h-[54px] items-center justify-center rounded-[14px] border-2 border-dashed border-[#dceadf] bg-white px-4 text-center text-[15px] font-medium text-[#7a8aa3]"
@@ -1827,28 +2088,38 @@ function QuizBuilderView({
   );
 }
 
+// ---------------------------------------------------------------------------
+// CourseContentUploadContent — main page component, all state lives here
+// ---------------------------------------------------------------------------
 function CourseContentUploadContent() {
   const router = useRouter();
   const { session, isHydrated } = useAuthSession();
   const searchParams = useSearchParams();
   const courseId = searchParams.get("courseId");
   const selectedModuleId = searchParams.get("moduleId");
-  const tab: BuilderTab =
-    searchParams.get("tab") === "quiz" ? "quiz" : "content";
+  const tab: BuilderTab = searchParams.get("tab") === "quiz" ? "quiz" : "content";
   const modal = searchParams.get("modal");
+
   const [isSaving, setIsSaving] = useState(false);
   const [isDeletingModule, setIsDeletingModule] = useState(false);
   const [modules, setModules] = useState<CourseModule[]>([]);
   const [isLoadingModules, setIsLoadingModules] = useState(false);
   const [modulesError, setModulesError] = useState<string | null>(null);
 
+  // Edit module modal state — lives here so the modal can access session + modules
+  const [editingModule, setEditingModule] = useState<CourseModule | null>(null);
+
+  // Quiz questions are managed locally until a backend endpoint exists for them
+  const [quizQuestions] = useState<QuizQuestionData[]>([]);
+
+  // Add state for the lesson being edited
+const [editingLesson, setEditingLesson] = useState<CourseLesson | null>(null);
+const [isDeletingLesson, setIsDeletingLesson] = useState(false);
+
+
   const contentStateHref = buildHref({ tab: "content", courseId });
   const quizStateHref = buildHref({ tab: "quiz", courseId });
-  const courseSettingsHref = buildHref({
-    tab: "content",
-    modal: "course-settings",
-    courseId,
-  });
+  const courseSettingsHref = buildHref({ tab: "content", modal: "course-settings", courseId });
   const questionEditorHref = buildHref({
     tab: "quiz",
     modal: "question-editor",
@@ -1864,16 +2135,13 @@ function CourseContentUploadContent() {
 
   async function loadCourseModules() {
     if (!courseId || !isHydrated) return;
-
     setIsLoadingModules(true);
     setModulesError(null);
     try {
       const fetched = await fetchModules(courseId, session?.token);
       setModules(fetched);
     } catch (err) {
-      setModulesError(
-        err instanceof Error ? err.message : "Unable to load modules."
-      );
+      setModulesError(err instanceof Error ? err.message : "Unable to load modules.");
     } finally {
       setIsLoadingModules(false);
     }
@@ -1883,6 +2151,85 @@ function CourseContentUploadContent() {
     loadCourseModules();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [courseId, isHydrated, session?.token]);
+
+  // Opens the EditModuleModal by looking up the full CourseModule from state
+  function handleOpenEditModule(moduleId: string) {
+    const found = modules.find((m) => m.id === moduleId);
+    if (found) setEditingModule(found);
+  }
+
+  function handleOpenEditLesson(lessonId: string) {
+  for (const mod of modules) {
+    const found = mod.lessons.find((l) => l.id === lessonId);
+    if (found) {
+      setEditingLesson(found);
+      return;
+    }
+  }
+}
+
+
+async function handleUpdateLesson(lessonId: string, payload: UpdateLessonPayload) {
+  setIsSaving(true);
+  try {
+    await updateLesson(lessonId, payload, session?.token);
+    await loadCourseModules();
+    setEditingLesson(null);
+  } catch (err) {
+    console.error(err);
+    throw err;
+  } finally {
+    setIsSaving(false);
+  }
+}
+
+
+async function handleDeleteLesson(lessonId: string) {
+  if (!lessonId) return;
+  if (!window.confirm("Delete this lesson? This cannot be undone.")) return;
+  setIsDeletingLesson(true);
+  setModulesError(null);
+  try {
+    await deleteLesson(lessonId, session?.token);
+    await loadCourseModules();
+  } catch (err) {
+    setModulesError(err instanceof Error ? err.message : "Unable to delete lesson.");
+    console.error(err);
+  } finally {
+    setIsDeletingLesson(false);
+  }
+}
+
+  async function handleUpdateModule(payload: {
+    title: string;
+    description: string;
+    order: number;
+    status: string;
+    enableDripRelease: boolean;
+    releaseInterval?: number;
+  }) {
+    if (!editingModule) return;
+    setIsSaving(true);
+    try {
+      await updateModule(
+        editingModule.id,
+        {
+          title: payload.title,
+          description: payload.description,
+          enableDripRelease: payload.enableDripRelease,
+          releaseInterval: payload.enableDripRelease ? payload.releaseInterval : undefined,
+        } as UpdateModulePayload,
+        session?.token
+      );
+      await loadCourseModules();
+      setEditingModule(null);
+    } catch (err) {
+      console.error(err);
+      throw err; // re-throw so EditModuleModal can show the error
+    } finally {
+      setIsSaving(false);
+    }
+  }
 
   async function handleSaveModule(payload: {
     title: string;
@@ -1894,7 +2241,6 @@ function CourseContentUploadContent() {
     fixedReleaseDate?: string;
   }) {
     if (!courseId) throw new Error("Course ID is required to save a module.");
-
     setIsSaving(true);
     try {
       await createModule(
@@ -1930,41 +2276,32 @@ function CourseContentUploadContent() {
     order: number;
     moduleId: string;
   }) {
-   if (!courseId) throw new Error("Course ID is required to save a lesson.");
-  
-  // Guard: ensure we have a valid instructor ID before attempting the save
-  const instructorId = session?.user?.id;
-  if (!instructorId) {
-    throw new Error("Session expired. Please sign in again before saving a lesson.");
-  }
+    if (!courseId) throw new Error("Course ID is required to save a lesson.");
 
-  setIsSaving(true);
-  try {
-    await createLesson(
-      {
-        title: payload.title,
-        content: payload.content,
-        videoUrl: payload.videoUrl,
-        type: payload.type,
-        order: payload.order,
-        moduleId: payload.moduleId,
-        estimatedReadingTime: payload.estimatedReadingTime,
-        accessLevel: payload.accessLevel,
-        instructorId, // guaranteed non-empty string
-      },
-      session?.token
-    );
-console.log("Session:", session);
-console.log("User:", session?.user);
-console.log("User ID:", session?.user?.id);
+    const instructorId = session?.user?.id;
+    if (!instructorId) {
+      throw new Error("Session expired. Please sign in again before saving a lesson.");
+    }
 
-
-console.log("Token:", session?.token);
-console.log("User:", session?.user);
-
-
+    setIsSaving(true);
+    try {
+      await createLesson(
+        {
+          title: payload.title,
+          content: payload.content,
+          videoUrl: payload.videoUrl,
+          type: payload.type,
+          order: payload.order,
+          moduleId: payload.moduleId,
+          estimatedReadingTime: payload.estimatedReadingTime,
+          accessLevel: payload.accessLevel,
+          instructorId,
+        },
+        session?.token
+      );
       await loadCourseModules();
       router.push(contentStateHref);
+     
     } catch (err) {
       console.error(err);
       throw err;
@@ -1976,16 +2313,13 @@ console.log("User:", session?.user);
   async function handleDeleteModule(moduleId: string) {
     if (!moduleId) return;
     if (!window.confirm("Delete this module? This cannot be undone.")) return;
-
     setIsDeletingModule(true);
     setModulesError(null);
     try {
       await deleteModule(moduleId, session?.token);
       await loadCourseModules();
     } catch (err) {
-      setModulesError(
-        err instanceof Error ? err.message : "Unable to delete module."
-      );
+      setModulesError(err instanceof Error ? err.message : "Unable to delete module.");
       console.error(err);
     } finally {
       setIsDeletingModule(false);
@@ -2033,8 +2367,7 @@ console.log("User:", session?.user);
             </p>
             {courseId ? (
               <p className="mt-3 text-[14px] text-[#4b8a60]">
-                Connected course ID:{" "}
-                <span className="font-semibold">{courseId}</span>
+                Connected course ID: <span className="font-semibold">{courseId}</span>
               </p>
             ) : null}
           </div>
@@ -2061,10 +2394,7 @@ console.log("User:", session?.user);
               </CourseActionLink>
             </div>
           ) : (
-            <CourseActionLink
-              href={quizStateHref}
-              className="min-w-[216px] gap-4 px-7"
-            >
+            <CourseActionLink href={quizStateHref} className="min-w-[216px] gap-4 px-7">
               <span>Save Assessment</span>
               <Save className="h-5 w-5" strokeWidth={2.1} />
             </CourseActionLink>
@@ -2080,16 +2410,21 @@ console.log("User:", session?.user);
             modulesError={modulesError}
             isDeletingModule={isDeletingModule}
             onDeleteModule={handleDeleteModule}
+            onEditModule={handleOpenEditModule}
+             onDeleteLesson={handleDeleteLesson}
+              onEditLesson={handleOpenEditLesson} 
           />
         ) : (
           <QuizBuilderView
             courseId={courseId}
             settingsHref={quizSettingsHref}
             editorHref={questionEditorHref}
+            quizQuestions={quizQuestions}
           />
         )}
       </div>
 
+      {/* URL-driven modals */}
       {modal === "course-settings" ? (
         <CourseSettingsModal
           closeHref={contentStateHref}
@@ -2121,6 +2456,27 @@ console.log("User:", session?.user);
           isSaving={isSaving}
         />
       ) : null}
+
+      {/* State-driven edit module modal — triggered by PenSquare icon on each ModuleCard */}
+      {editingModule ? (
+        <EditModuleModal
+          module={editingModule}
+          onSave={handleUpdateModule}
+          isSaving={isSaving}
+          onClose={() => setEditingModule(null)}
+        />
+      ) : null}
+
+
+      {editingLesson ? (
+  <EditLessonModal
+    lesson={editingLesson}
+    modules={modules}
+    onSave={handleUpdateLesson}
+    isSaving={isSaving}
+    onClose={() => setEditingLesson(null)}
+  />
+) : null}
     </AppShell>
   );
 }
@@ -2132,3 +2488,5 @@ export default function CourseContentUploadPage() {
     </Suspense>
   );
 }
+
+
