@@ -1,12 +1,20 @@
-"use client";
-
 import type { ChangeEvent, ReactNode } from "react";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, ChevronDown, X } from "lucide-react";
 
+const steps = [
+  { label: "Basic Info & Modules", href: "/courses/create" },
+  { label: "Content Upload", href: "/courses/create/content-upload" },
+  { label: "Review & Launch", href: "/courses/create/review-launch" },
+];
+
 type CoursePageTitleProps = {
   label: string;
   backHref?: string;
+};
+
+type CourseFlowStepperProps = {
+  currentStep: 1 | 2 | 3;
 };
 
 type CourseActionLinkProps = {
@@ -46,16 +54,13 @@ type CourseSelectFieldProps = {
 };
 
 type CourseModalProps = {
-  closeHref?: string;
+  closeHref: string;
   onClose?: () => void;
   maxWidthClassName?: string;
   children: ReactNode;
 };
 
-export function CoursePageTitle({
-  label,
-  backHref = "/courses",
-}: CoursePageTitleProps) {
+export function CoursePageTitle({ label, backHref = "/courses" }: CoursePageTitleProps) {
   return (
     <div className="flex items-center gap-2 sm:gap-3">
       <Link href={backHref} className="text-[#223b61]">
@@ -66,34 +71,7 @@ export function CoursePageTitle({
   );
 }
 
-export function CourseFlowStepper({
-  currentStep,
-  courseId,
-}: {
-  currentStep: 1 | 2 | 3;
-  courseId?: string | null;
-}) {
-  const steps = [
-    {
-      label: "Basic Info & Modules",
-      href: courseId
-        ? `/courses/create?courseId=${encodeURIComponent(courseId)}`
-        : "/courses/create",
-    },
-    {
-      label: "Content Upload",
-      href: courseId
-        ? `/courses/create/content-upload?courseId=${encodeURIComponent(courseId)}`
-        : "/courses/create/content-upload",
-    },
-    {
-      label: "Review & Launch",
-      href: courseId
-        ? `/courses/create/review-launch?courseId=${encodeURIComponent(courseId)}`
-        : "/courses/create/review-launch",
-    },
-  ];
-
+export function CourseFlowStepper({ currentStep }: CourseFlowStepperProps) {
   return (
     <div className="overflow-hidden rounded-[20px] border border-[#e6ebf7] bg-[#eef1fb]">
       <div className="grid gap-3 p-3 md:grid-cols-3 md:gap-4">
@@ -206,6 +184,7 @@ export function CourseSelectField({
                 </option>
               );
             }
+
             return (
               <option key={option.value} value={option.value}>
                 {option.label}
@@ -213,10 +192,7 @@ export function CourseSelectField({
             );
           })}
         </select>
-        <ChevronDown
-          className="pointer-events-none absolute right-5 top-1/2 h-5 w-5 -translate-y-1/2 text-[#8c98b1]"
-          strokeWidth={2.1}
-        />
+        <ChevronDown className="pointer-events-none absolute right-5 top-1/2 h-5 w-5 -translate-y-1/2 text-[#8c98b1]" strokeWidth={2.1} />
       </span>
     </label>
   );
@@ -269,7 +245,7 @@ export function CourseModal({
           >
             <X className="h-5 w-5" strokeWidth={2.2} />
           </button>
-        ) : closeHref ? (
+        ) : (
           <Link
             href={closeHref}
             aria-label="Close modal"
@@ -277,7 +253,7 @@ export function CourseModal({
           >
             <X className="h-5 w-5" strokeWidth={2.2} />
           </Link>
-        ) : null}
+        )}
         {children}
       </div>
     </div>

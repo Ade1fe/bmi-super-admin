@@ -618,7 +618,7 @@ function EditModuleModal({
   }
 
   return (
-    <CourseModal closeHref="#" maxWidthClassName="max-w-[700px]">
+  <CourseModal onClose={onClose} maxWidthClassName="max-w-[700px]">
       <button
         type="button"
         onClick={onClose}
@@ -1165,11 +1165,13 @@ function CourseSettingsModal({
   courseId,
   nextModuleOrder,
   onSaveModule,
+    onClose,  
   isSaving,
 }: {
   closeHref: string;
   courseId?: string | null;
   nextModuleOrder: number;
+  onClose?: () => void; 
   onSaveModule?: (payload: {
     title: string;
     description: string;
@@ -1230,7 +1232,7 @@ function CourseSettingsModal({
   }
 
   return (
-    <CourseModal closeHref={closeHref} maxWidthClassName="max-w-[760px]">
+    <CourseModal closeHref={closeHref}   onClose={onClose} maxWidthClassName="max-w-[760px]">
       <div className="p-7 pr-14 sm:p-9 sm:pr-16">
         <h2 className="text-[28px] font-extrabold tracking-[-0.05em] text-[#16345d]">
           Course Setting
@@ -1989,11 +1991,11 @@ function ContentBuilderView({
               label="Lessons & Content"
               active
             />
-            <TabButton
-              href={buildHref({ tab: "quiz", courseId })}
-              label="Quiz Builder"
-              active={false}
-            />
+           <TabButton
+  href={buildHref({ tab: "quiz", courseId })}
+  label="Quiz Builder"
+  active={false}
+/>
           </div>
         </div>
 
@@ -2440,9 +2442,16 @@ function CourseContentUploadContent() {
   }
 
   return (
-    <AppShell title={<CoursePageTitle label="Create New Course" />} activeSection="courses">
+    <AppShell title={<CoursePageTitle
+  label="Create New Course"
+  backHref={
+    courseId
+      ? `/courses/create?courseId=${encodeURIComponent(courseId)}`
+      : "/courses/create"
+  }
+/>} activeSection="courses">
       <div className="mx-auto max-w-[1320px]">
-        <CourseFlowStepper currentStep={2} />
+        <CourseFlowStepper currentStep={2} courseId={courseId} />
 
         <div className="mt-10 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div>
@@ -2519,6 +2528,7 @@ function CourseContentUploadContent() {
           courseId={courseId}
           nextModuleOrder={modules.length + 1}
           onSaveModule={handleSaveModule}
+          onClose={() => router.push(contentStateHref)} 
           isSaving={isSaving}
         />
       ) : null}
