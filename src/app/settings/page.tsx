@@ -146,7 +146,7 @@ export default function SettingsPage() {
       profileRole="School Administrator"
       showHeaderHelp
     >
-      <div className="mx-auto max-w-[1320px]">
+      <div className="mx-auto ">
         <section className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h1 className="text-[36px] font-extrabold tracking-[-0.06em] text-[#173257] sm:text-[42px]">

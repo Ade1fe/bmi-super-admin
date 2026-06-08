@@ -363,7 +363,7 @@ function ReviewAndLaunchContent() {
       }
       activeSection="courses"
     >
-      <div className="mx-auto max-w-[1320px]">
+      <div className="mx-auto ">
         <CourseFlowStepper currentStep={3} courseId={courseId} />
 
         <div className="mt-10 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">

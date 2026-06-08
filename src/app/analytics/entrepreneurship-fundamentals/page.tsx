@@ -163,7 +163,7 @@ export default function EntrepreneurshipAnalyticsDetailPage() {
       activeSection="analytics"
       contentClassName="px-4 py-5 sm:px-6 lg:px-9 lg:py-8"
     >
-      <div className="mx-auto max-w-[1280px]">
+      <div className="mx-auto ">
         <section className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h1 className="text-[40px] font-extrabold tracking-[-0.06em] text-[#173257]">

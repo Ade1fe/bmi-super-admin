@@ -7,7 +7,7 @@ export default function LoadingCourseEditPage() {
       title={<CoursePageTitle label="Edit Course" backHref="/courses" />}
       activeSection="courses"
     >
-      <div className="mx-auto max-w-[1320px] animate-pulse">
+      <div className="mx-auto  animate-pulse">
         <div className="h-12 w-80 rounded-2xl bg-[#e8edf7]" />
         <div className="mt-4 h-6 w-96 rounded-2xl bg-[#eef2f9]" />
 

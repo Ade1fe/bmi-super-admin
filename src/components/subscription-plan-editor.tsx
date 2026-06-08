@@ -685,7 +685,7 @@ export function SubscriptionPlanEditor({
       activeSection="subscriptions"
       contentClassName="px-4 py-5 sm:px-6 lg:px-9 lg:py-8"
     >
-      <div className="mx-auto max-w-[1320px]">
+      <div className="mx-auto ">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h1 className="text-[34px] font-extrabold tracking-[-0.05em] text-[#16345d] sm:text-[42px]">

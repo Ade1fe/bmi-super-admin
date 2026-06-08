@@ -54,7 +54,7 @@ function VisibilityCard({
 export default function VisibilitySettingsPage() {
   return (
     <AppShell title="Catalog Management" activeSection="catalog">
-      <div className="mx-auto max-w-[1320px]">
+      <div className="mx-auto ">
         <section className="mt-12">
           <div className="flex flex-wrap items-center gap-5">
             <span className="inline-flex rounded-[10px] bg-[#eef1ff] px-7 py-4 text-[13px] font-extrabold uppercase tracking-[0.14em] text-[#4057d8]">

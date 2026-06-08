@@ -181,7 +181,7 @@ setCourseStatus(fetchedCourse.status ?? "");
       title={<CoursePageTitle label={`Edit Course: ${title}`} backHref="/courses" />}
       activeSection="courses"
     >
-      <div className="mx-auto max-w-[1320px]">
+      <div className="mx-auto ">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h1 className="text-[34px] font-extrabold tracking-[-0.05em] text-[#16345d] sm:text-[42px]">
@@ -192,7 +192,8 @@ setCourseStatus(fetchedCourse.status ?? "");
             </p>
           </div>
 
-      <button
+<div className="flex gap-2 flex-end">
+        <button
   onClick={() => setIsEditCourseOpen(true)}
   className="flex h-12 items-center rounded-xl bg-[#16345d] px-5 text-white transition hover:bg-[#102846]"
 >
@@ -200,8 +201,9 @@ setCourseStatus(fetchedCourse.status ?? "");
 </button>
 
           <CourseActionLink href={addModuleHref} className="min-w-[220px]">
-            Add New Module 101
+            Add New Module 
           </CourseActionLink>
+</div>
         </div>
 
         <section className="mt-12">

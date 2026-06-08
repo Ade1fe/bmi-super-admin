@@ -32,7 +32,7 @@ function MetricCard({
 export default function FeaturedSettingsPage() {
   return (
     <AppShell title="Catalog Management" activeSection="catalog">
-      <div className="mx-auto max-w-[1320px]">
+      <div className="mx-auto ">
         <section className="mt-12">
           <div className="flex items-start justify-between gap-6">
             <h1 className="text-[30px] font-extrabold tracking-[-0.05em] text-[#16345d] sm:text-[36px]">
