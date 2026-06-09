@@ -104,13 +104,18 @@ function StudentSummaryCard({
 // ─── Action menu (portal-positioned) ─────────────────────────────────────────
 
 function StudentActionMenu({
+  menuRef,
   position,
   studentId,
   onDeactivate,
   onReactivate,
   onGrantAccess,
 }: {
-  position: { top: number; right: number };
+  menuRef: React.RefObject<HTMLDivElement | null>;
+  position: {
+    top: number;
+    right: number;
+  };
   studentId: string;
   onDeactivate: () => void;
   onReactivate: () => void;
@@ -118,9 +123,14 @@ function StudentActionMenu({
 }) {
   return (
     <div
-      style={{ position: "fixed", top: position.top, right: position.right, zIndex: 50 }}
+      ref={menuRef}
+      style={{
+        position: "fixed",
+        top: position.top,
+        right: position.right,
+        zIndex: 9999,
+      }}
       className="w-[228px] rounded-[12px] border border-[#e4e8f4] bg-white p-2 shadow-[0_24px_44px_rgba(166,178,214,0.22)]"
-      onMouseDown={(e) => e.stopPropagation()}
     >
       <Link
         href={`/students/${studentId}`}
@@ -576,13 +586,27 @@ const [openMenu, setOpenMenu] = useState<{
   }, [fetchStudents]);
 
   // Close menu on outside click
-// Outside click handler:
+const menuRef = useRef<HTMLDivElement | null>(null);
+
 useEffect(() => {
-  function handler(e: MouseEvent) {
+  function handler(event: MouseEvent) {
+    if (!menuRef.current) return;
+
+    if (
+      event.target instanceof Node &&
+      menuRef.current.contains(event.target)
+    ) {
+      return;
+    }
+
     setOpenMenu(null);
   }
+
   document.addEventListener("mousedown", handler);
-  return () => document.removeEventListener("mousedown", handler);
+
+  return () => {
+    document.removeEventListener("mousedown", handler);
+  };
 }, []);
 
 // openDialog:
@@ -871,13 +895,14 @@ onClick={(e) => {
 </button>
 
 {openMenu?.rowId === row.id && (
-  <StudentActionMenu
-    position={{ top: openMenu.top, right: openMenu.right }}
-    studentId={row.id}
-    onDeactivate={() => openDialog("deactivate", row)}
-    onReactivate={() => openDialog("reactivate", row)}
-    onGrantAccess={() => openDialog("grant", row)}
-  />
+<StudentActionMenu
+  menuRef={menuRef}
+  position={{ top: openMenu.top, right: openMenu.right }}
+  studentId={row.id}
+  onDeactivate={() => openDialog("deactivate", row)}
+  onReactivate={() => openDialog("reactivate", row)}
+  onGrantAccess={() => openDialog("grant", row)}
+/>
 )}
                     </td>
                   </tr>
