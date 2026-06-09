@@ -369,5 +369,5 @@ export function splitFullName(fullName: string) {
   };
 }
 
-// notification-api.ts — re-exports broadcast-api so both import paths work
+// notification-api.ts — re-exports broadcast-api so both import paths
 export * from "./broadcast-api";
