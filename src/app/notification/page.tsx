@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { useAuthSession } from "@/lib/auth-session"; 
-import { BroadcastData, BroadcastStatsData, createBroadcast, fetchAllBroadcasts, fetchBroadcastStats } from "@/lib/broadcast-api";
+import { BroadcastData, BroadcastStatsData, createBroadcast, fetchAllBroadcasts, fetchBroadcastStats } from "@/lib/notification-api";
 
 
 // ---------------------------------------------------------------------------
