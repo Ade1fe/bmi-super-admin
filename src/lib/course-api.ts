@@ -23,26 +23,17 @@ function buildQueryString(params: Record<string, string | number | undefined>) {
 /**
  * All successful API responses follow this envelope:
  *   { "message": "...", "data": <array|object> }
- *
- * We always pull from `data` first, then fall back to the root payload so
- * the helpers stay safe if the shape ever changes.
  */
 function unwrapData(payload: unknown): unknown {
   if (!isRecord(payload)) return payload;
-  // The backend always puts content under "data"
   return "data" in payload ? payload.data : payload;
 }
 
-/**
- * Unwrap a list response.  The backend puts arrays directly under `data`.
- * Fallback keys are kept for defensive resilience.
- */
 function unwrapCollection(payload: unknown): unknown[] {
   const data = unwrapData(payload);
 
   if (Array.isArray(data)) return data;
 
-  // Defensive: sometimes the array is nested one level deeper
   if (isRecord(data)) {
     for (const key of ["data", "items", "courses", "modules", "lessons", "categories"]) {
       const v = data[key];
@@ -76,7 +67,6 @@ function parseCourse(value: unknown): Course | null {
 
   if (!id || !name) return null;
 
-  // The API returns the category as a nested object: { id, name }
   const category = isRecord(value.category)
     ? {
         id: readString(value.category.id),
@@ -96,8 +86,6 @@ function parseCourse(value: unknown): Course | null {
     difficultyLevel: readString(value.difficultyLevel) as CourseDifficultyLevel,
     status: readString(value.status) as CourseStatus,
     thumbnailUrl: readString(value.thumbnailUrl),
-    // The API does not return a slug field; we fall back to id so
-    // getCourseBySlug lookups and edit-page hrefs stay functional.
     slug: readString(value.slug) || id,
     totalLessons:
       typeof value.totalLessons === "number" ? value.totalLessons : 0,
@@ -143,6 +131,67 @@ function parseLesson(value: unknown): CourseLesson | null {
   };
 }
 
+/**
+ * Parse a quiz question from the API response.
+ * Shape: { id, quizId, question, type, marks, options, correctOption, order, createdAt, updatedAt }
+ * - `options` is null for theory questions
+ * - `correctOption` is null for theory questions
+ */
+function parseQuizQuestion(value: unknown): QuizQuestion | null {
+  if (!isRecord(value)) return null;
+
+  const id = readString(value.id);
+  const question = readString(value.question);
+
+  if (!id || !question) return null;
+
+  return {
+    id,
+    quizId: readString(value.quizId),
+    question,
+    type: (readString(value.type) || "multiple_choice") as QuizQuestionType,
+    marks: typeof value.marks === "number" ? value.marks : 10,
+    options: Array.isArray(value.options)
+      ? (value.options as unknown[]).map((o) => String(o))
+      : null,
+    correctOption:
+      typeof value.correctOption === "number" ? value.correctOption : null,
+    order: typeof value.order === "number" ? value.order : 0,
+    createdAt: readString(value.createdAt),
+    updatedAt: readString(value.updatedAt),
+  };
+}
+
+function parseQuiz(value: unknown): CourseQuiz | null {
+  if (!isRecord(value)) return null;
+
+  const id = readString(value.id);
+  if (!id) return null;
+
+  // Questions are returned as an array on the quiz object (from Create response)
+  const rawQuestions = Array.isArray(value.questions) ? value.questions : [];
+
+  return {
+    id,
+    moduleId: readString(value.moduleId),
+    title: readString(value.title),
+    passMark: typeof value.passMark === "number" ? value.passMark : 75,
+    allowPartialCredit:
+      typeof value.allowPartialCredit === "boolean"
+        ? value.allowPartialCredit
+        : false,
+    timeLimit: typeof value.timeLimit === "number" ? value.timeLimit : 45,
+    attempts: typeof value.attempts === "number" ? value.attempts : 2,
+    visibility: readString(value.visibility) || "publish",
+    questions: rawQuestions
+      .map((q) => parseQuizQuestion(q))
+      .filter((q): q is QuizQuestion => Boolean(q))
+      .sort((a, b) => a.order - b.order),
+    createdAt: readString(value.createdAt),
+    updatedAt: readString(value.updatedAt),
+  };
+}
+
 function parseModule(value: unknown): CourseModule | null {
   if (!isRecord(value)) return null;
 
@@ -151,10 +200,8 @@ function parseModule(value: unknown): CourseModule | null {
 
   if (!id || !title) return null;
 
-  // Lessons are returned as an array directly on the module object
   const rawLessons = Array.isArray(value.lessons) ? value.lessons : [];
 
-  // The API also returns a quiz object (or null) on each module
   const quiz =
     value.quiz && isRecord(value.quiz)
       ? parseQuiz(value.quiz)
@@ -185,35 +232,13 @@ function parseModule(value: unknown): CourseModule | null {
   };
 }
 
-function parseQuiz(value: unknown): CourseQuiz | null {
-  if (!isRecord(value)) return null;
-
-  const id = readString(value.id);
-  if (!id) return null;
-
-  return {
-    id,
-    moduleId: readString(value.moduleId),
-    title: readString(value.title),
-    passMark: typeof value.passMark === "number" ? value.passMark : 75,
-    allowPartialCredit:
-      typeof value.allowPartialCredit === "boolean"
-        ? value.allowPartialCredit
-        : false,
-    timeLimit: typeof value.timeLimit === "number" ? value.timeLimit : 45,
-    attempts: typeof value.attempts === "number" ? value.attempts : 2,
-    visibility: readString(value.visibility) || "publish",
-    createdAt: readString(value.createdAt),
-    updatedAt: readString(value.updatedAt),
-  };
-}
-
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 export type CourseDifficultyLevel = "beginner" | "intermediate" | "advanced";
 export type CourseStatus = "draft" | "published" | "archived" | string;
+export type QuizQuestionType = "multiple_choice" | "theory";
 
 export type ApiCourseCategory = {
   id: string;
@@ -229,7 +254,6 @@ export type Course = {
   difficultyLevel?: CourseDifficultyLevel;
   status?: CourseStatus;
   thumbnailUrl?: string;
-  /** Falls back to `id` when the backend does not return a slug field. */
   slug: string;
   totalLessons?: number;
   totalStudents?: number;
@@ -256,6 +280,24 @@ export type CourseLesson = {
   updatedAt?: string;
 };
 
+/**
+ * A single quiz question as returned by the API.
+ * - multiple_choice: has options[] and correctOption (index)
+ * - theory:          options is null, correctOption is null
+ */
+export type QuizQuestion = {
+  id: string;
+  quizId?: string;
+  question: string;
+  type: QuizQuestionType;
+  marks: number;
+  options: string[] | null;
+  correctOption: number | null;
+  order: number;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 export type CourseQuiz = {
   id: string;
   moduleId?: string;
@@ -265,6 +307,7 @@ export type CourseQuiz = {
   timeLimit: number;
   attempts: number;
   visibility: string;
+  questions: QuizQuestion[];
   createdAt?: string;
   updatedAt?: string;
 };
@@ -330,7 +373,7 @@ export type CreateLessonPayload = {
   accessLevel?: string;
   order: number;
   moduleId: string;
-  instructorId?: string; 
+  instructorId?: string;
 };
 
 export type UpdateLessonPayload = Partial<{
@@ -344,6 +387,26 @@ export type UpdateLessonPayload = Partial<{
   enableComments: boolean;
 }>;
 
+/**
+ * A question inside a CreateQuizPayload / UpdateQuizPayload.
+ *
+ * multiple_choice → requires options[] and correctOption (0-based index)
+ * theory          → options and correctOption must be omitted
+ */
+export type QuizQuestionInput = {
+  question: string;
+  type: QuizQuestionType;
+  marks: number;
+  order: number;
+  // multiple_choice only
+  options?: string[];
+  correctOption?: number;
+};
+
+/**
+ * POST /courses/modules/:moduleId/quiz
+ * Questions are sent inline — the API creates the quiz and all questions atomically.
+ */
 export type CreateQuizPayload = {
   title: string;
   passMark: number;
@@ -351,9 +414,23 @@ export type CreateQuizPayload = {
   timeLimit: number;
   attempts: number;
   visibility: string;
+  questions: QuizQuestionInput[];
 };
 
-export type UpdateQuizPayload = Partial<CreateQuizPayload>;
+export type UpdateQuizPayload = Partial<Omit<CreateQuizPayload, "questions">> & {
+  questions?: QuizQuestionInput[];
+};
+
+/**
+ * POST /courses/quizzes/:quizzId/questions
+ */
+export type AddQuestionPayload = {
+  question: string;
+  type: QuizQuestionType;
+  marks: number;
+  options?: string[];
+  correctOption?: number;
+};
 
 export type ModulePrerequisite = {
   moduleId: string;
@@ -373,11 +450,13 @@ export type LessonPrerequisite = {
 
 /** GET /courses/get-categories → { message, data: [...] } */
 export async function getCategories(authToken?: string) {
+  console.log("[v0] getCategories() called");
   const response = await apiRequest<unknown>(endpoints.courses.categories.all, {
     authToken,
   });
 
   const items = unwrapCollection(response);
+  console.log("[v0] getCategories() items parsed:", items.length);
 
   return items
     .map((item) => parseCategory(item))
@@ -386,7 +465,6 @@ export async function getCategories(authToken?: string) {
 
 /**
  * GET /courses?page=&limit=&status=&search=
- * Response: { message, data: [...courses], meta: { total, page, limit, totalPages } }
  */
 export async function getCourses(
   params: {
@@ -397,6 +475,8 @@ export async function getCourses(
   } = {},
   authToken?: string
 ) {
+  console.log("[v0] getCourses() called with params:", params);
+
   const query = buildQueryString({
     page: params.page,
     limit: params.limit,
@@ -413,7 +493,6 @@ export async function getCourses(
     .map((item) => parseCourse(item))
     .filter((item): item is Course => Boolean(item));
 
-  // meta lives at the root of the response envelope alongside `data`
   const meta =
     isRecord(response) && isRecord(response.meta) ? response.meta : undefined;
 
@@ -422,42 +501,34 @@ export async function getCourses(
     meta: {
       page: typeof meta?.page === "number" ? meta.page : (params.page ?? 1),
       limit: typeof meta?.limit === "number" ? meta.limit : (params.limit ?? 20),
-      total:
-        typeof meta?.total === "number" ? meta.total : courses.length,
+      total: typeof meta?.total === "number" ? meta.total : courses.length,
       totalPages:
         typeof meta?.totalPages === "number" ? meta.totalPages : undefined,
     },
   };
 }
 
-/**
- * GET /courses/:id
- * Response: { message, data: { ...course } }
- */
+/** GET /courses/:id */
 export async function getCourse(courseId: string, authToken?: string) {
+  console.log("[v0] getCourse() called with courseId:", courseId);
+
   const response = await apiRequest<unknown>(
     endpoints.courses.byId(courseId),
     { authToken }
   );
 
   const data = unwrapData(response);
-  return parseCourse(data) ?? null;
+  const parsed = parseCourse(data);
+
+  console.log("[v0] getCourse() parsed:", { courseId, found: !!parsed, courseName: parsed?.name });
+  return parsed ?? null;
 }
 
-/**
- * Look up a course by slug (or ID).
- *
- * The backend does not expose a slug-based lookup endpoint, so we:
- *   1. Try a direct GET /courses/:id (in case the slug IS the id or a UUID is passed).
- *   2. Fall back to GET /courses?search=<slug> and match by id or name-derived slug.
- */
 export async function getCourseBySlug(slug: string, authToken?: string) {
   if (!slug.trim()) return null;
 
   const normalized = slug.trim().toLowerCase();
 
-  // 1. Direct ID lookup — most common case when editing from the list page
-  //    (the href uses course.id as the slug already).
   try {
     const byId = await getCourse(slug, authToken);
     if (byId) return byId;
@@ -465,20 +536,17 @@ export async function getCourseBySlug(slug: string, authToken?: string) {
     // Not a valid ID — fall through to search
   }
 
-  // 2. Search and find a match by name-derived slug
   try {
     const response = await getCourses(
       { page: 1, limit: 50, search: normalized },
       authToken
     );
 
-    // Try exact id match first
     const byId = response.courses.find(
       (c) => c.id.toLowerCase() === normalized
     );
     if (byId) return byId;
 
-    // Try name → slug conversion match
     return (
       response.courses.find(
         (c) =>
@@ -490,7 +558,7 @@ export async function getCourseBySlug(slug: string, authToken?: string) {
   }
 }
 
-/** POST /courses → { message, data: { ...course } } */
+/** POST /courses */
 export async function createCourse(
   payload: CreateCoursePayload,
   authToken?: string
@@ -505,7 +573,7 @@ export async function createCourse(
   return parseCourse(data);
 }
 
-/** PUT /courses/:id → { message, data: { ...course } } */
+/** PUT /courses/:id */
 export async function updateCourse(
   courseId: string,
   payload: UpdateCoursePayload,
@@ -520,7 +588,7 @@ export async function updateCourse(
   return parseCourse(data);
 }
 
-/** POST /courses/modules → { message, data: { ...module } } */
+/** POST /courses/modules */
 export async function createModule(
   payload: CreateModulePayload,
   authToken?: string
@@ -535,7 +603,7 @@ export async function createModule(
   return parseModule(data);
 }
 
-/** PUT /courses/modules/:moduleId → { message, data: { ...module } } */
+/** PUT /courses/modules/:moduleId */
 export async function updateModule(
   moduleId: string,
   payload: UpdateModulePayload,
@@ -550,9 +618,7 @@ export async function updateModule(
   return parseModule(data);
 }
 
-
-
-/** DELETE /courses/modules/:moduleId → { message } */
+/** DELETE /courses/modules/:moduleId */
 export async function deleteModule(moduleId: string, authToken?: string) {
   return apiRequest<{ message: string }>(
     endpoints.courses.modules.delete(moduleId),
@@ -560,11 +626,10 @@ export async function deleteModule(moduleId: string, authToken?: string) {
   );
 }
 
-/**
- * GET /courses/modules/:courseId
- * Response: { message, data: [ { ...module, lessons: [...], quiz: null|{...} } ] }
- */
+/** GET /courses/modules/:courseId */
 export async function fetchModules(courseId: string, authToken?: string) {
+  console.log("[v0] fetchModules() called with courseId:", courseId);
+
   const response = await apiRequest<unknown>(
     endpoints.courses.modules.fetchByCourse(courseId),
     { authToken }
@@ -572,50 +637,49 @@ export async function fetchModules(courseId: string, authToken?: string) {
 
   const items = unwrapCollection(response);
 
-  return items
+  const modules = items
     .map((item) => parseModule(item))
     .filter((item): item is CourseModule => Boolean(item));
+
+  console.log("[v0] fetchModules() parsed:", {
+    courseId,
+    moduleCount: modules.length,
+    lessonsPerModule: modules.map((m) => m.lessons.length),
+  });
+
+  return modules;
 }
 
-/**
- * POST /courses/lessons
- * Body: { title, content, videoUrl?, type, estimatedReadingTime?, accessLevel?,
- *         order, moduleId, instructorId? }
- * Response: { message, data: { ...lesson } }
- */
+/** POST /courses/lessons */
 export async function createLesson(
   payload: CreateLessonPayload,
   authToken?: string
 ) {
-// AFTER
-const body: Record<string, any> = {
-  title: payload.title,
-  content: payload.content,
-  type: payload.type,
-  order: payload.order,
-  moduleId: payload.moduleId,
-  ...(payload.videoUrl ? { videoUrl: payload.videoUrl } : {}),
-  ...(payload.estimatedReadingTime
-    ? { estimatedReadingTime: payload.estimatedReadingTime }
-    : {}),
-  ...(payload.accessLevel ? { accessLevel: payload.accessLevel } : {}),
-  ...(payload.instructorId ? { instructorId: payload.instructorId } : {}),
-};
+  const body: Record<string, unknown> = {
+    title: payload.title,
+    content: payload.content,
+    type: payload.type,
+    order: payload.order,
+    moduleId: payload.moduleId,
+    ...(payload.videoUrl ? { videoUrl: payload.videoUrl } : {}),
+    ...(payload.estimatedReadingTime
+      ? { estimatedReadingTime: payload.estimatedReadingTime }
+      : {}),
+    ...(payload.accessLevel ? { accessLevel: payload.accessLevel } : {}),
+    ...(payload.instructorId ? { instructorId: payload.instructorId } : {}),
+  };
 
-  const response = await apiRequest<unknown>(
-    endpoints.courses.lessons.create,
-    {
-      method: "POST",
-      body,
-      authToken,
-    }
-  );
+  const response = await apiRequest<unknown>(endpoints.courses.lessons.create, {
+    method: "POST",
+    body,
+    authToken,
+  });
 
   const data = unwrapData(response);
   return parseLesson(data);
 }
 
-/** PUT /courses/lessons/:lessonId → { message, data: { ...lesson } } */
+/** PUT /courses/lessons/:lessonId */
 export async function updateLesson(
   lessonId: string,
   payload: UpdateLessonPayload,
@@ -630,7 +694,7 @@ export async function updateLesson(
   return parseLesson(data);
 }
 
-/** DELETE /courses/lessons/:lessonId → { message } */
+/** DELETE /courses/lessons/:lessonId */
 export async function deleteLesson(lessonId: string, authToken?: string) {
   return apiRequest<{ message: string }>(
     endpoints.courses.lessons.delete(lessonId),
@@ -638,78 +702,130 @@ export async function deleteLesson(lessonId: string, authToken?: string) {
   );
 }
 
-/**
- * POST /courses/modules/:moduleId/quiz
- * Body: { title, passMark, allowPartialCredit, timeLimit, attempts, visibility }
- * Response: { message, data: { ...quiz } }
- */
+// ---------------------------------------------------------------------------
+// Quiz API  — updated to match Postman collection
+// ---------------------------------------------------------------------------
 
 /**
  * POST /courses/modules/:moduleId/quiz
- * Body: { title, passMark, allowPartialCredit, timeLimit, attempts, visibility }
- * Response: { message, data: { ...quiz } }
+ *
+ * Creates the quiz AND its questions in one request.
+ * The questions array is required — send [] if you want to create the quiz
+ * settings first and add questions later via addQuizQuestion().
+ *
+ * Response shape: { message, data: { ...quiz, questions: [...] } }
  */
 export async function createQuiz(
   moduleId: string,
   payload: CreateQuizPayload,
   authToken?: string
 ) {
-  console.log("[QUIZ createQuiz] →", { moduleId, payload });
- 
+  console.log("[QUIZ createQuiz] →", { moduleId, questionCount: payload.questions.length });
+
   const response = await apiRequest<unknown>(
     endpoints.courses.quizzes.create(moduleId),
     { method: "POST", body: payload, authToken }
   );
- 
+
   console.log("[QUIZ createQuiz] raw response:", response);
- 
+
   const data = unwrapData(response);
   const parsed = parseQuiz(data);
   console.log("[QUIZ createQuiz] parsed:", parsed);
   return parsed;
 }
- 
+
 /**
  * PUT /courses/modules/:moduleId/quiz
- * Body: partial quiz fields
- * Response: { message, data: { ...quiz } }
+ *
+ * Updates quiz settings and optionally replaces the questions array.
+ * Omit `questions` to update settings only.
+ *
+ * NOTE: The update response does NOT return the questions array back,
+ * so we trigger a module refresh on the caller side after this resolves.
  */
 export async function updateQuiz(
   moduleId: string,
   payload: UpdateQuizPayload,
   authToken?: string
 ) {
-  console.log("[QUIZ updateQuiz] →", { moduleId, payload });
- 
+  console.log("[QUIZ updateQuiz] →", {
+    moduleId,
+    questionCount: payload.questions?.length,
+  });
+
   const response = await apiRequest<unknown>(
     endpoints.courses.quizzes.update(moduleId),
     { method: "PUT", body: payload, authToken }
   );
- 
+
   console.log("[QUIZ updateQuiz] raw response:", response);
- 
+
   const data = unwrapData(response);
   const parsed = parseQuiz(data);
   console.log("[QUIZ updateQuiz] parsed:", parsed);
   return parsed;
 }
- 
+
 /**
  * DELETE /courses/modules/:moduleId/quiz
- * Response: { message: "Quiz deleted successfully." }
  */
 export async function deleteQuiz(moduleId: string, authToken?: string) {
   console.log("[QUIZ deleteQuiz] →", { moduleId });
- 
+
   const response = await apiRequest<{ message: string }>(
     endpoints.courses.quizzes.delete(moduleId),
     { method: "DELETE", authToken }
   );
- 
+
   console.log("[QUIZ deleteQuiz] response:", response);
   return response;
 }
- 
+
+/**
+ * POST /courses/quizzes/:quizzId/questions
+ *
+ * Add a single question to an already-created quiz.
+ * Use this when editing an existing quiz to append new questions one at a time,
+ * rather than re-sending the full questions array via updateQuiz().
+ */
+export async function addQuizQuestion(
+  quizId: string,
+  payload: AddQuestionPayload,
+  authToken?: string
+) {
+  console.log("[QUIZ addQuizQuestion] →", { quizId, payload });
+
+  const response = await apiRequest<unknown>(
+    endpoints.courses.quizzes.addQuestion(quizId),
+    { method: "POST", body: payload, authToken }
+  );
+
+  console.log("[QUIZ addQuizQuestion] raw response:", response);
+
+  const data = unwrapData(response);
+  const parsed = parseQuizQuestion(data);
+  console.log("[QUIZ addQuizQuestion] parsed:", parsed);
+  return parsed;
+}
+
+/**
+ * DELETE /courses/quizzes/questions/:questionId
+ *
+ * Remove a single question from a quiz by its question ID.
+ */
+export async function deleteQuizQuestion(questionId: string, authToken?: string) {
+  console.log("[QUIZ deleteQuizQuestion] →", { questionId });
+
+  const response = await apiRequest<{ message: string }>(
+    endpoints.courses.quizzes.deleteQuestion(questionId),
+    { method: "DELETE", authToken }
+  );
+
+  console.log("[QUIZ deleteQuizQuestion] response:", response);
+  return response;
+}
+
 // ---------------------------------------------------------------------------
 // PREREQUISITES — placeholder functions (backend not yet implemented)
 // ---------------------------------------------------------------------------

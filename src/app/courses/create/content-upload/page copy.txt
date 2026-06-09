@@ -1,3 +1,6 @@
+
+
+
 "use client";
 
 export const dynamic = "force-dynamic";
@@ -8,25 +11,19 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthSession } from "@/lib/auth-session";
 import {
-  addQuizQuestion,
   createLesson,
   createModule,
   createQuiz,
   deleteLesson,
   deleteModule,
   deleteQuiz,
-  deleteQuizQuestion,
   fetchModules,
   updateLesson,
   updateModule,
   updateQuiz,
-  type AddQuestionPayload,
   type CourseLesson,
   type CourseModule,
   type CourseQuiz,
-  type QuizQuestion,
-  type QuizQuestionInput,
-  type QuizQuestionType,
   type CreateQuizPayload,
   type UpdateLessonPayload,
   type UpdateModulePayload,
@@ -58,7 +55,6 @@ import {
   Trash2,
   Underline,
   Upload,
-  X,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import {
@@ -93,6 +89,14 @@ type ModuleCardData = {
   lessons?: LessonCardData[];
   collapsed?: boolean;
   empty?: boolean;
+};
+
+type QuizQuestionData = {
+  id: string;
+  title: string;
+  prompt: string;
+  options: string[];
+  selectedIndex: number;
 };
 
 const lessonTypeCards = [
@@ -614,7 +618,7 @@ function EditModuleModal({
   }
 
   return (
-    <CourseModal onClose={onClose} maxWidthClassName="max-w-[700px]">
+  <CourseModal onClose={onClose} maxWidthClassName="max-w-[700px]">
       <button
         type="button"
         onClick={onClose}
@@ -1019,6 +1023,12 @@ function ContentLessonEditorModal({
           Configure the content, access level, and delivery details for this lesson.
         </p>
 
+        {courseId && (
+          <p className="mt-3 text-[13px] text-[#4b8a60]">
+            Course: <span className="font-semibold">{courseId}</span>
+          </p>
+        )}
+
         {error ? (
           <div className="mt-5 rounded-[14px] border border-[#f8d6d6] bg-[#fff1f1] px-4 py-3 text-[14px] text-[#a42f2f]">
             {error}
@@ -1155,13 +1165,13 @@ function CourseSettingsModal({
   courseId,
   nextModuleOrder,
   onSaveModule,
-  onClose,
+    onClose,  
   isSaving,
 }: {
   closeHref: string;
   courseId?: string | null;
   nextModuleOrder: number;
-  onClose?: () => void;
+  onClose?: () => void; 
   onSaveModule?: (payload: {
     title: string;
     description: string;
@@ -1222,7 +1232,7 @@ function CourseSettingsModal({
   }
 
   return (
-    <CourseModal closeHref={closeHref} onClose={onClose} maxWidthClassName="max-w-[760px]">
+    <CourseModal closeHref={closeHref}   onClose={onClose} maxWidthClassName="max-w-[760px]">
       <div className="p-7 pr-14 sm:p-9 sm:pr-16">
         <h2 className="text-[28px] font-extrabold tracking-[-0.05em] text-[#16345d]">
           Course Setting
@@ -1230,6 +1240,12 @@ function CourseSettingsModal({
         <p className="mt-2 text-[16px] text-[#4b6182]">
           Configure the structural parameters and release rules for this course.
         </p>
+
+        {courseId && (
+          <p className="mt-3 text-[13px] text-[#4b8a60]">
+            Course: <span className="font-semibold">{courseId}</span>
+          </p>
+        )}
 
         {error ? (
           <div className="mt-5 rounded-[14px] border border-[#f8d6d6] bg-[#fff1f1] px-4 py-3 text-[14px] text-[#a42f2f]">
@@ -1360,165 +1376,102 @@ function CourseSettingsModal({
 }
 
 // ---------------------------------------------------------------------------
-// QuestionRow — single question inside QuizSettingsModal
+// QuestionEditorModal
 // ---------------------------------------------------------------------------
-type DraftQuestion = {
-  key: string; // local identity (not a real id until saved)
-  question: string;
-  type: QuizQuestionType;
-  marks: number;
-  options: string[];      // always 4 strings; ignored for theory
-  correctOption: number;  // index; ignored for theory
-  order: number;
-};
-
-function emptyQuestion(order: number): DraftQuestion {
-  return {
-    key: `q-${Date.now()}-${order}`,
-    question: "",
-    type: "multiple_choice",
-    marks: 10,
-    options: ["", "", "", ""],
-    correctOption: 0,
-    order,
-  };
-}
-
-function QuestionRow({
-  q,
-  index,
-  onChange,
-  onDelete,
-}: {
-  q: DraftQuestion;
-  index: number;
-  onChange: (updated: DraftQuestion) => void;
-  onDelete: () => void;
-}) {
+function QuestionEditorModal({ closeHref }: { closeHref: string }) {
   return (
-    <div className="rounded-[18px] border border-[#d4ddf0] bg-white p-5">
-      <div className="flex items-center justify-between gap-4">
-        <span className="text-[13px] font-extrabold uppercase tracking-[0.08em] text-[#0f8751]">
-          Question {index + 1}
-        </span>
-        <button
-          type="button"
-          onClick={onDelete}
-          className="flex h-8 w-8 items-center justify-center rounded-full text-[#7b899f] hover:bg-[#fff1f1] hover:text-[#c0392b]"
-          aria-label="Delete question"
-        >
-          <X className="h-4 w-4" strokeWidth={2.2} />
-        </button>
-      </div>
-
-      <div className="mt-4 grid gap-4">
-        {/* Question text */}
-        <div>
-          <span className="mb-2 block text-[13px] font-semibold text-[#51627f]">
-            Question Text
-          </span>
-          <textarea
-            rows={2}
-            value={q.question}
-            onChange={(e) => onChange({ ...q, question: e.target.value })}
-            placeholder="Enter question..."
-            className="w-full resize-none rounded-[12px] border border-[#d7deee] bg-[#f8faff] px-4 py-3 text-[14px] leading-6 text-[#264267] outline-none placeholder:text-[#8d99b1]"
-          />
+    <CourseModal closeHref={closeHref} maxWidthClassName="max-w-[960px]">
+      <div className="p-7 pr-14 sm:p-9 sm:pr-16">
+        <h2 className="text-[28px] font-extrabold tracking-[-0.05em] text-[#16345d]">
+          Quiz Builder
+        </h2>
+        <p className="mt-2 text-[16px] text-[#4b6182]">Set your quiz questions here</p>
+        <div className="mt-8 flex flex-col gap-4 sm:flex-row">
+          <CourseActionLink href={closeHref} variant="secondary" className="min-w-[136px]">
+            Discard
+          </CourseActionLink>
+          <CourseActionLink href={closeHref} className="min-w-[176px] justify-between px-6">
+            <span>Save Changes</span>
+            <ContinueArrow />
+          </CourseActionLink>
         </div>
-
-        <div className="grid gap-4 sm:grid-cols-3">
-          {/* Type */}
-          <div>
-            <span className="mb-2 block text-[13px] font-semibold text-[#51627f]">Type</span>
-            <div className="relative flex h-[46px] items-center rounded-[12px] border border-[#d7deee] bg-[#f8faff] px-3">
-              <select
-                value={q.type}
-                onChange={(e) =>
-                  onChange({ ...q, type: e.target.value as QuizQuestionType })
-                }
-                className="h-full w-full appearance-none bg-transparent pr-8 text-[14px] text-[#264267] outline-none"
-              >
-                <option value="multiple_choice">Multiple Choice</option>
-                <option value="theory">Theory / Essay</option>
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-3 h-4 w-4 text-[#8c98b1]" strokeWidth={2.1} />
-            </div>
-          </div>
-
-          {/* Marks */}
-          <div>
-            <span className="mb-2 block text-[13px] font-semibold text-[#51627f]">Marks</span>
-            <input
-              type="number"
-              min={1}
-              value={q.marks}
-              onChange={(e) => onChange({ ...q, marks: Number(e.target.value) || 1 })}
-              className="h-[46px] w-full rounded-[12px] border border-[#d7deee] bg-[#f8faff] px-4 text-[14px] text-[#264267] outline-none"
+        <div className="mt-10 rounded-[18px] border border-[#cfd9ee] p-4 sm:p-6">
+          <div className="grid gap-5 md:grid-cols-2">
+            <ModalSelect
+              label="Weighted Score"
+              defaultValue="10 marks"
+              options={["5 marks", "10 marks", "15 marks", "20 marks"]}
+            />
+            <ModalSelect
+              label="Question Types"
+              defaultValue="Multiple Choice Question"
+              options={[
+                "Multiple Choice Question",
+                "True / False",
+                "Single Answer",
+                "Essay Question",
+              ]}
             />
           </div>
-
-          {/* Correct option (multiple_choice only) */}
-          {q.type === "multiple_choice" ? (
-            <div>
-              <span className="mb-2 block text-[13px] font-semibold text-[#51627f]">
-                Correct Answer
-              </span>
-              <div className="relative flex h-[46px] items-center rounded-[12px] border border-[#d7deee] bg-[#f8faff] px-3">
-                <select
-                  value={q.correctOption}
-                  onChange={(e) =>
-                    onChange({ ...q, correctOption: Number(e.target.value) })
-                  }
-                  className="h-full w-full appearance-none bg-transparent pr-8 text-[14px] text-[#264267] outline-none"
-                >
-                  {q.options.map((opt, i) => (
-                    <option key={i} value={i}>
-                      Option {i + 1}{opt ? ` – ${opt.slice(0, 20)}` : ""}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-3 h-4 w-4 text-[#8c98b1]" strokeWidth={2.1} />
+          <div className="mt-6">
+            <span className="mb-3 block text-[14px] font-semibold text-[#51627f]">
+              Q1 Text Question
+            </span>
+            <div className="overflow-hidden rounded-[16px] border border-[#d7deee]">
+              <div className="flex flex-wrap gap-3 border-b border-[#e7edf8] px-4 py-3 text-[#5f6f8b]">
+                {[Bold, Italic, Underline, List, List, Link2, Image, Code].map((Icon, index) => (
+                  <button
+                    key={index}
+                    type="button"
+                    className="flex h-8 w-8 items-center justify-center rounded-[8px] hover:bg-[#f3f6fb]"
+                  >
+                    <Icon className="h-4 w-4" strokeWidth={2.1} />
+                  </button>
+                ))}
               </div>
+              <textarea
+                rows={4}
+                placeholder="Enter question text..."
+                className="w-full resize-none px-4 py-4 text-[15px] leading-6 text-[#264267] outline-none placeholder:text-[#8d99b1]"
+              />
             </div>
-          ) : null}
-        </div>
-
-        {/* Options (multiple_choice only) */}
-        {q.type === "multiple_choice" ? (
-          <div className="grid gap-2 sm:grid-cols-2">
-            {q.options.map((opt, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <span
-                  className={[
-                    "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-extrabold",
-                    i === q.correctOption
-                      ? "bg-[#0f8751] text-white"
-                      : "bg-[#e8edf7] text-[#667792]",
-                  ].join(" ")}
-                >
-                  {String.fromCharCode(65 + i)}
+          </div>
+          <div className="mt-6 space-y-5">
+            {["Option 1", "Option 2", "Option 3", "Option 4"].map((label, index) => (
+              <div key={label}>
+                <span className="mb-3 block text-[14px] font-semibold text-[#51627f]">
+                  {label}
                 </span>
-                <input
-                  value={opt}
-                  onChange={(e) => {
-                    const newOpts = [...q.options];
-                    newOpts[i] = e.target.value;
-                    onChange({ ...q, options: newOpts });
-                  }}
-                  placeholder={`Option ${String.fromCharCode(65 + i)}`}
-                  className="h-[40px] flex-1 rounded-[10px] border border-[#d7deee] bg-[#f8faff] px-3 text-[14px] text-[#264267] outline-none placeholder:text-[#8d99b1]"
-                />
+                <div className="space-y-3">
+                  <input
+                    placeholder={`Enter ${label.toLowerCase()}...`}
+                    className="h-[54px] w-full rounded-[14px] border border-[#d7deee] bg-white px-4 text-[15px] text-[#264267] outline-none placeholder:text-[#8d99b1]"
+                  />
+                  <span className="relative flex h-[56px] items-center rounded-[14px] border border-[#d7deee] bg-white px-4">
+                    <select
+                      defaultValue={index === 0 ? "True" : "False"}
+                      className="h-full w-full appearance-none bg-transparent pr-10 text-[15px] text-[#264267] outline-none"
+                    >
+                      <option>True</option>
+                      <option>False</option>
+                    </select>
+                    <ChevronDown
+                      className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#8c98b1]"
+                      strokeWidth={2.1}
+                    />
+                  </span>
+                </div>
               </div>
             ))}
           </div>
-        ) : null}
+        </div>
       </div>
-    </div>
+    </CourseModal>
   );
 }
 
 // ---------------------------------------------------------------------------
-// QuizSettingsModal — create or edit a quiz with inline questions
+// QuizSettingsModal  (single definition — create or edit)
 // ---------------------------------------------------------------------------
 function QuizSettingsModal({
   module,
@@ -1537,7 +1490,6 @@ function QuizSettingsModal({
 }) {
   const isEditing = Boolean(existingQuiz);
 
-  // Quiz settings
   const [title, setTitle] = useState(existingQuiz?.title ?? "");
   const [passMark, setPassMark] = useState(String(existingQuiz?.passMark ?? 75));
   const [allowPartialCredit, setAllowPartialCredit] = useState(
@@ -1546,77 +1498,14 @@ function QuizSettingsModal({
   const [timeLimit, setTimeLimit] = useState(String(existingQuiz?.timeLimit ?? 45));
   const [attempts, setAttempts] = useState(String(existingQuiz?.attempts ?? 2));
   const [visibility, setVisibility] = useState(existingQuiz?.visibility ?? "publish");
-
-  // Questions — pre-populate from existing quiz
-  const [questions, setQuestions] = useState<DraftQuestion[]>(() => {
-    if (existingQuiz?.questions?.length) {
-      return existingQuiz.questions.map((q, i) => ({
-        key: q.id,
-        question: q.question,
-        type: q.type,
-        marks: q.marks,
-        options: q.options ?? ["", "", "", ""],
-        correctOption: q.correctOption ?? 0,
-        order: q.order ?? i + 1,
-      }));
-    }
-    return [emptyQuestion(1)];
-  });
-
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  function addQuestion() {
-    setQuestions((prev) => [...prev, emptyQuestion(prev.length + 1)]);
-  }
-
-  function updateQuestion(key: string, updated: DraftQuestion) {
-    setQuestions((prev) => prev.map((q) => (q.key === key ? updated : q)));
-  }
-
-  function removeQuestion(key: string) {
-    setQuestions((prev) =>
-      prev.filter((q) => q.key !== key).map((q, i) => ({ ...q, order: i + 1 }))
-    );
-  }
 
   async function handleSave() {
     if (!title.trim()) {
       setError("Enter a quiz title.");
       return;
     }
-
-    for (const q of questions) {
-      if (!q.question.trim()) {
-        setError("All questions must have text.");
-        return;
-      }
-      if (q.type === "multiple_choice") {
-        const filled = q.options.filter((o) => o.trim());
-        if (filled.length < 2) {
-          setError("Multiple choice questions need at least 2 options.");
-          return;
-        }
-      }
-    }
-
-    const questionPayload: QuizQuestionInput[] = questions.map((q) =>
-      q.type === "multiple_choice"
-        ? {
-            question: q.question.trim(),
-            type: q.type,
-            marks: q.marks,
-            order: q.order,
-            options: q.options.filter((o) => o.trim()),
-            correctOption: q.correctOption,
-          }
-        : {
-            question: q.question.trim(),
-            type: q.type,
-            marks: q.marks,
-            order: q.order,
-          }
-    );
 
     const payload: CreateQuizPayload = {
       title: title.trim(),
@@ -1625,7 +1514,6 @@ function QuizSettingsModal({
       timeLimit: Number.parseInt(timeLimit, 10) || 45,
       attempts: Number.parseInt(attempts, 10) || 2,
       visibility,
-      questions: questionPayload,
     };
 
     setError(null);
@@ -1655,7 +1543,7 @@ function QuizSettingsModal({
           {isEditing ? "Edit Quiz" : "Add Quiz"}
         </h2>
         <p className="mt-2 text-[16px] text-[#4b6182]">
-          {isEditing ? "Update" : "Configure"} quiz settings and questions for{" "}
+          {isEditing ? "Update" : "Configure"} quiz settings for{" "}
           <span className="font-semibold">{module.title}</span>.
         </p>
 
@@ -1685,62 +1573,37 @@ function QuizSettingsModal({
         </div>
 
         <div className="mt-10 space-y-6">
-          {/* Quiz Settings */}
           <section className="rounded-[18px] bg-[#f6f8ff] p-6">
             <h3 className="text-[16px] font-extrabold tracking-[-0.03em] text-[#1a2f51]">
-              Quiz Settings
+              Quiz Details
             </h3>
-            <div className="mt-5 grid gap-5">
+            <div className="mt-5">
               <ModalInput
                 label="Quiz Title"
                 placeholder="e.g. Module 1 Assessment"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
               />
-              <div className="grid gap-5 sm:grid-cols-2">
-                <ModalSelect
-                  label="Minimum Pass Mark"
-                  value={passMark}
-                  onChange={(e) => setPassMark(e.target.value)}
-                  options={[
-                    { label: "60%", value: "60" },
-                    { label: "70%", value: "70" },
-                    { label: "75%", value: "75" },
-                    { label: "80%", value: "80" },
-                    { label: "90%", value: "90" },
-                  ]}
-                />
-                <ModalSelect
-                  label="Time Limit"
-                  value={timeLimit}
-                  onChange={(e) => setTimeLimit(e.target.value)}
-                  options={[
-                    { label: "15 min", value: "15" },
-                    { label: "30 min", value: "30" },
-                    { label: "45 min", value: "45" },
-                    { label: "60 min", value: "60" },
-                  ]}
-                />
-                <ModalSelect
-                  label="Max Attempts"
-                  value={attempts}
-                  onChange={(e) => setAttempts(e.target.value)}
-                  options={[
-                    { label: "1", value: "1" },
-                    { label: "2", value: "2" },
-                    { label: "3", value: "3" },
-                  ]}
-                />
-                <ModalSelect
-                  label="Visibility"
-                  value={visibility}
-                  onChange={(e) => setVisibility(e.target.value)}
-                  options={[
-                    { label: "Publish", value: "publish" },
-                    { label: "Draft", value: "draft" },
-                  ]}
-                />
-              </div>
+            </div>
+          </section>
+
+          <section className="rounded-[18px] bg-[#f6f8ff] p-6">
+            <h3 className="text-[16px] font-extrabold tracking-[-0.03em] text-[#1a2f51]">
+              Passing Criteria
+            </h3>
+            <div className="mt-5 space-y-5">
+              <ModalSelect
+                label="Minimum Pass Mark"
+                value={passMark}
+                onChange={(e) => setPassMark(e.target.value)}
+                options={[
+                  { label: "60%", value: "60" },
+                  { label: "70%", value: "70" },
+                  { label: "75%", value: "75" },
+                  { label: "80%", value: "80" },
+                  { label: "90%", value: "90" },
+                ]}
+              />
               <div className="flex items-center justify-between gap-4">
                 <span className="text-[15px] font-bold text-[#22314c]">Allow Partial Credit</span>
                 <button
@@ -1762,35 +1625,62 @@ function QuizSettingsModal({
             </div>
           </section>
 
-          {/* Questions */}
           <section className="rounded-[18px] bg-[#f6f8ff] p-6">
-            <div className="flex items-center justify-between gap-4">
-              <h3 className="text-[16px] font-extrabold tracking-[-0.03em] text-[#1a2f51]">
-                Questions
-                <span className="ml-2 rounded-full bg-[#e6f7ee] px-2 py-0.5 text-[12px] font-bold text-[#0f8751]">
-                  {questions.length}
-                </span>
-              </h3>
-              <button
-                type="button"
-                onClick={addQuestion}
-                className="flex items-center gap-2 rounded-[10px] border border-[#bfe6d2] bg-white px-4 py-2 text-[13px] font-semibold text-[#0f8751] hover:bg-[#f1fdf6]"
-              >
-                <Plus className="h-4 w-4" strokeWidth={2.2} />
-                Add Question
-              </button>
+            <h3 className="text-[16px] font-extrabold tracking-[-0.03em] text-[#1a2f51]">
+              Administrative Settings
+            </h3>
+            <div className="mt-5 grid gap-5 sm:grid-cols-2">
+              <ModalSelect
+                label="Time Limit"
+                value={timeLimit}
+                onChange={(e) => setTimeLimit(e.target.value)}
+                options={[
+                  { label: "15 min", value: "15" },
+                  { label: "30 min", value: "30" },
+                  { label: "45 min", value: "45" },
+                  { label: "60 min", value: "60" },
+                ]}
+              />
+              <ModalSelect
+                label="Max Attempts"
+                value={attempts}
+                onChange={(e) => setAttempts(e.target.value)}
+                options={[
+                  { label: "1", value: "1" },
+                  { label: "2", value: "2" },
+                  { label: "3", value: "3" },
+                ]}
+              />
             </div>
+          </section>
 
-            <div className="mt-5 space-y-4">
-              {questions.map((q, i) => (
-                <QuestionRow
-                  key={q.key}
-                  q={q}
-                  index={i}
-                  onChange={(updated) => updateQuestion(q.key, updated)}
-                  onDelete={() => removeQuestion(q.key)}
-                />
-              ))}
+          <section className="rounded-[18px] bg-[#f6f8ff] p-6">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <h3 className="text-[16px] font-extrabold tracking-[-0.03em] text-[#1a2f51]">
+                Visibility
+              </h3>
+              <span
+                className={[
+                  "inline-flex items-center gap-2 rounded-full px-4 py-2 text-[13px] font-extrabold uppercase tracking-[0.08em]",
+                  visibility === "publish"
+                    ? "bg-[#e6f7ee] text-[#0f8751]"
+                    : "bg-[#fff0c8] text-[#d69008]",
+                ].join(" ")}
+              >
+                <span className="h-2.5 w-2.5 rounded-full bg-current" />
+                {visibility === "publish" ? "Published" : "Draft"}
+              </span>
+            </div>
+            <div className="mt-5">
+              <ModalSelect
+                label="Status"
+                value={visibility}
+                onChange={(e) => setVisibility(e.target.value)}
+                options={[
+                  { label: "Publish", value: "publish" },
+                  { label: "Draft", value: "draft" },
+                ]}
+              />
             </div>
           </section>
         </div>
@@ -1800,15 +1690,11 @@ function QuizSettingsModal({
 }
 
 // ---------------------------------------------------------------------------
-// QuizSidebar
+// QuizSidebar  (single definition)
 // ---------------------------------------------------------------------------
 function QuizSidebar({ modules }: { modules: CourseModule[] }) {
   const quizCount = modules.filter((m) => m.quiz).length;
   const withoutQuiz = modules.length - quizCount;
-  const totalQuestions = modules.reduce(
-    (sum, m) => sum + (m.quiz?.questions?.length ?? 0),
-    0
-  );
 
   return (
     <div className="space-y-6">
@@ -1825,10 +1711,6 @@ function QuizSidebar({ modules }: { modules: CourseModule[] }) {
             <dt>Quizzes Added</dt>
             <dd className="font-semibold text-[#22314c]">{quizCount}</dd>
           </div>
-          <div className="flex items-center justify-between gap-4">
-            <dt>Total Questions</dt>
-            <dd className="font-semibold text-[#22314c]">{totalQuestions}</dd>
-          </div>
           {withoutQuiz > 0 && (
             <div className="flex items-center justify-between gap-4 rounded-[12px] bg-[#fff8ec] px-3 py-2">
               <dt className="text-[#c87b00]">Modules without quiz</dt>
@@ -1843,12 +1725,11 @@ function QuizSidebar({ modules }: { modules: CourseModule[] }) {
           How quizzes work
         </h2>
         <ul className="mt-5 space-y-3 text-[14px] leading-6 text-[#576a88]">
-          <li>• One quiz per module — add multiple choice or theory questions.</li>
-          <li>• Questions are saved together with the quiz in one request.</li>
+          <li>• One quiz per module — set pass mark, time limit, and attempts.</li>
           <li>
             • Quizzes marked <strong>Draft</strong> are hidden from students.
           </li>
-          <li>• Use the edit (✏) icon to update quiz settings or questions.</li>
+          <li>• Use the edit (✏) icon to update quiz settings at any time.</li>
         </ul>
       </aside>
     </div>
@@ -1889,8 +1770,7 @@ function LiveQuizCard({
             </h2>
             <p className="mt-1 text-[13px] text-[#667792]">
               Pass mark: {quiz.passMark}% · {quiz.attempts} attempt
-              {quiz.attempts !== 1 ? "s" : ""} · {quiz.timeLimit} min ·{" "}
-              {quiz.questions.length} question{quiz.questions.length !== 1 ? "s" : ""}
+              {quiz.attempts !== 1 ? "s" : ""} · {quiz.timeLimit} min
             </p>
           </div>
         </div>
@@ -1941,36 +1821,6 @@ function LiveQuizCard({
             <StatCell icon={Clock3} label="Time Limit" value={`${quiz.timeLimit} min`} />
             <StatCell icon={RotateCcw} label="Attempts" value={String(quiz.attempts)} />
           </div>
-
-          {/* Question preview */}
-          {quiz.questions.length > 0 && (
-            <div className="mt-6">
-              <p className="text-[13px] font-extrabold uppercase tracking-[0.08em] text-[#7e8da6]">
-                Questions ({quiz.questions.length})
-              </p>
-              <div className="mt-3 space-y-2">
-                {quiz.questions.map((q, qi) => (
-                  <div
-                    key={q.id}
-                    className="flex items-start gap-3 rounded-[12px] border border-[#e8edf7] bg-[#f8faff] px-4 py-3"
-                  >
-                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#eef1fb] text-[11px] font-extrabold text-[#667792]">
-                      {qi + 1}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[14px] font-semibold text-[#22314c]">
-                        {q.question}
-                      </p>
-                      <p className="mt-0.5 text-[12px] text-[#7e8da6]">
-                        {q.type === "multiple_choice" ? "Multiple Choice" : "Theory"} · {q.marks} mark{q.marks !== 1 ? "s" : ""}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           <div className="mt-5 flex items-center gap-3">
             <span
               className={[
@@ -2017,7 +1867,7 @@ function EmptyQuizCard({
           No quiz for this module yet
         </h3>
         <p className="mx-auto mt-2 max-w-[380px] text-[14px] leading-6 text-[#71819d]">
-          Add a quiz with questions to test students on this module.
+          Add a quiz to test students on the content of this module.
         </p>
         <button
           type="button"
@@ -2141,11 +1991,11 @@ function ContentBuilderView({
               label="Lessons & Content"
               active
             />
-            <TabButton
-              href={buildHref({ tab: "quiz", courseId })}
-              label="Quiz Builder"
-              active={false}
-            />
+           <TabButton
+  href={buildHref({ tab: "quiz", courseId })}
+  label="Quiz Builder"
+  active={false}
+/>
           </div>
         </div>
 
@@ -2232,7 +2082,7 @@ function ContentBuilderView({
 }
 
 // ---------------------------------------------------------------------------
-// QuizBuilderView
+// QuizBuilderView  (single definition — state-driven, no URL modals)
 // ---------------------------------------------------------------------------
 export function QuizBuilderView({
   courseId,
@@ -2240,14 +2090,12 @@ export function QuizBuilderView({
   isLoadingModules,
   session,
   onRefresh,
-    setModules,
 }: {
   courseId?: string | null;
   modules: CourseModule[];
   isLoadingModules: boolean;
   session?: { token?: string } | null;
   onRefresh: () => Promise<void>;
-  setModules: React.Dispatch<React.SetStateAction<CourseModule[]>>; 
 }) {
   const [editingModule, setEditingModule] = useState<CourseModule | null>(null);
   const [isDeletingQuiz, setIsDeletingQuiz] = useState(false);
@@ -2272,53 +2120,19 @@ export function QuizBuilderView({
     }
   }
 
-  /**
-   * Handle both create and update in one function.
-   *
-   * Create: POST /courses/modules/:moduleId/quiz  with full questions[]
-   * Update: PUT  /courses/modules/:moduleId/quiz  with full questions[]
-   *
-   * Both payloads are identical in shape — the questions array replaces
-   * whatever was there before on update.
-   */
-async function handleSaveQuiz(
-  moduleId: string,
-  payload: CreateQuizPayload,
-  existingQuizId?: string
-) {
-  setQuizError(null);
-  try {
-    const savedQuiz = existingQuizId
-      ? await updateQuiz(moduleId, payload, session?.token)
-      : await createQuiz(moduleId, payload, session?.token);
-
-    // Refresh modules from server first
-    await onRefresh();
-
-    // fetchModules returns quiz metadata WITHOUT questions array.
-    // Patch the questions from the API save response back in after refresh.
-    if (savedQuiz) {
-      setModules((prev) =>
-        prev.map((m) => {
-          if (m.id !== moduleId) return m;
-          if (!m.quiz) return m;
-          return {
-            ...m,
-            quiz: {
-              ...m.quiz,
-              questions: savedQuiz.questions ?? [],
-            },
-          };
-        })
-      );
+  async function handleSaveQuiz(
+    moduleId: string,
+    payload: CreateQuizPayload,
+    existingQuizId?: string
+  ) {
+    if (existingQuizId) {
+      await updateQuiz(moduleId, payload, session?.token);
+    } else {
+      await createQuiz(moduleId, payload, session?.token);
     }
-  } catch (err) {
-    setQuizError(err instanceof Error ? err.message : "Unable to save quiz.");
-    throw err; // re-throw so QuizSettingsModal catches it and shows error
-  } finally {
+    await onRefresh();
     setEditingModule(null);
   }
-}
 
   return (
     <section className="mt-10 grid gap-8 xl:grid-cols-[minmax(0,1fr)_294px]">
@@ -2410,7 +2224,7 @@ async function handleSaveQuiz(
 }
 
 // ---------------------------------------------------------------------------
-// CourseContentUploadContent — main page
+// CourseContentUploadContent — main page, all state lives here
 // ---------------------------------------------------------------------------
 function CourseContentUploadContent() {
   const router = useRouter();
@@ -2433,6 +2247,12 @@ function CourseContentUploadContent() {
   const contentStateHref = buildHref({ tab: "content", courseId });
   const quizStateHref = buildHref({ tab: "quiz", courseId });
   const courseSettingsHref = buildHref({ tab: "content", modal: "course-settings", courseId });
+  const questionEditorHref = buildHref({
+    tab: "quiz",
+    modal: "question-editor",
+    courseId,
+    moduleId: selectedModuleId,
+  });
 
   async function loadCourseModules() {
     if (!courseId || !isHydrated) return;
@@ -2492,6 +2312,7 @@ function CourseContentUploadContent() {
       await loadCourseModules();
     } catch (err) {
       setModulesError(err instanceof Error ? err.message : "Unable to delete lesson.");
+      console.error(err);
     } finally {
       setIsDeletingLesson(false);
     }
@@ -2574,22 +2395,24 @@ function CourseContentUploadContent() {
     moduleId: string;
   }) {
     if (!courseId) throw new Error("Course ID is required to save a lesson.");
-    const instructorId = (session as any)?.user?.id;
+ // Remove the instructorId guard — it's optional
+  const instructorId = session?.user?.id;
+   
 
     setIsSaving(true);
     try {
       await createLesson(
-        {
-          title: payload.title,
-          content: payload.content,
-          videoUrl: payload.videoUrl,
-          type: payload.type,
-          order: payload.order,
-          moduleId: payload.moduleId,
-          estimatedReadingTime: payload.estimatedReadingTime,
-          accessLevel: payload.accessLevel,
-          ...(instructorId ? { instructorId } : {}),
-        },
+       {
+        title: payload.title,
+        content: payload.content,
+        videoUrl: payload.videoUrl,
+        type: payload.type,
+        order: payload.order,
+        moduleId: payload.moduleId,
+        estimatedReadingTime: payload.estimatedReadingTime,
+        accessLevel: payload.accessLevel,
+        ...(instructorId ? { instructorId } : {}),  // only include if present
+      },
         session?.token
       );
       await loadCourseModules();
@@ -2612,25 +2435,21 @@ function CourseContentUploadContent() {
       await loadCourseModules();
     } catch (err) {
       setModulesError(err instanceof Error ? err.message : "Unable to delete module.");
+      console.error(err);
     } finally {
       setIsDeletingModule(false);
     }
   }
 
   return (
-    <AppShell
-      title={
-        <CoursePageTitle
-          label="Create New Course"
-          backHref={
-            courseId
-              ? `/courses/create?courseId=${encodeURIComponent(courseId)}`
-              : "/courses/create"
-          }
-        />
-      }
-      activeSection="courses"
-    >
+    <AppShell title={<CoursePageTitle
+  label="Create New Course"
+  backHref={
+    courseId
+      ? `/courses/create?courseId=${encodeURIComponent(courseId)}`
+      : "/courses/create"
+  }
+/>} activeSection="courses">
       <div className="mx-auto ">
         <CourseFlowStepper currentStep={2} courseId={courseId} />
 
@@ -2692,14 +2511,13 @@ function CourseContentUploadContent() {
             onEditLesson={handleOpenEditLesson}
           />
         ) : (
-<QuizBuilderView
-  courseId={courseId}
-  modules={modules}
-  isLoadingModules={isLoadingModules}
-  session={session}
-  onRefresh={loadCourseModules}
-  setModules={setModules}   // ADD THIS
-/>
+          <QuizBuilderView
+            courseId={courseId}
+            modules={modules}
+            isLoadingModules={isLoadingModules}
+            session={session}
+            onRefresh={loadCourseModules}
+          />
         )}
       </div>
 
@@ -2710,7 +2528,7 @@ function CourseContentUploadContent() {
           courseId={courseId}
           nextModuleOrder={modules.length + 1}
           onSaveModule={handleSaveModule}
-          onClose={() => router.push(contentStateHref)}
+          onClose={() => router.push(contentStateHref)} 
           isSaving={isSaving}
         />
       ) : null}
@@ -2723,6 +2541,9 @@ function CourseContentUploadContent() {
           onSaveLesson={handleSaveLesson}
           isSaving={isSaving}
         />
+      ) : null}
+      {modal === "question-editor" ? (
+        <QuestionEditorModal closeHref={quizStateHref} />
       ) : null}
 
       {/* State-driven modals */}

@@ -1,29 +1,24 @@
+// ---------------------------------------------------------------------------
+// team-flow.ts  — shared types, role meta, and pure helpers
+// No mock data. No localStorage. All state comes from the API.
+// ---------------------------------------------------------------------------
+
 export type TeamView = "administrative" | "audit";
 export type MemberFilter = "all" | "active" | "deactivated";
 export type TeamModal = "deactivate" | "reactivate" | null;
-export type TeamRoleKey = "super-admin" | "content-manager" | "support" | "finance";
-export type TeamMemberStatus = "Active" | "In-Active";
-export type ClearanceLevel = "Level 2 - Standard Access" | "Level 3 - Elevated Access";
 
-export type PermissionSet = {
-  auditLogs: boolean;
-  systemConfigurations: boolean;
-  accessKeys: boolean;
-};
+// Maps backend role strings → UI keys
+export type TeamRoleKey = "super_admin" | "content_manager" | "support" | "finance";
 
-export type TeamMember = {
-  id: number;
-  initials: string;
-  name: string;
-  email: string;
-  roleKey: TeamRoleKey;
-  lastLogin: string;
-  status: TeamMemberStatus;
-  permissions: PermissionSet;
-  clearanceLevel: ClearanceLevel;
-  department: string;
-  deactivatedOn?: string;
-};
+// Maps backend permission strings
+export type TeamPermissionKey =
+  | "manage_school"
+  | "view_school"
+  | "view_analytics"
+  | "manage_subscriptions"
+  | "view_subscriptions";
+
+export type TeamMemberStatus = "active" | "inactive";
 
 export type AuditCategory =
   | "All Categories"
@@ -33,27 +28,9 @@ export type AuditCategory =
   | "User Activity"
   | "Authentication";
 
-export type AuditRow = {
-  id: number;
-  timestamp: string;
-  user: string;
-  adminRole: TeamRoleKey;
-  action: string;
-  actionClassName: string;
-  entity: string;
-  ip: string;
-  status: "Success" | "Alert";
-  statusClassName: string;
-  category: AuditCategory;
-  avatarClassName: string;
-};
-
-export const defaultPermissions: PermissionSet = {
-  auditLogs: true,
-  systemConfigurations: false,
-  accessKeys: false,
-};
-
+// ---------------------------------------------------------------------------
+// Role display metadata
+// ---------------------------------------------------------------------------
 export const roleMeta: Record<
   TeamRoleKey,
   {
@@ -66,7 +43,7 @@ export const roleMeta: Record<
     department: string;
   }
 > = {
-  "super-admin": {
+  super_admin: {
     label: "Super Admin",
     groupLabel: "Super Admins",
     badgeClassName: "bg-[#f0e5ff] text-[#8037f2]",
@@ -75,7 +52,7 @@ export const roleMeta: Record<
     formCopy: "Full system access & management",
     department: "Executive Administration",
   },
-  "content-manager": {
+  content_manager: {
     label: "Content Manager",
     groupLabel: "Content Managers",
     badgeClassName: "bg-[#eaf1ff] text-[#3567ff]",
@@ -104,184 +81,44 @@ export const roleMeta: Record<
   },
 };
 
-export const clearanceLevels: ClearanceLevel[] = [
-  "Level 2 - Standard Access",
-  "Level 3 - Elevated Access",
+// All valid backend permission strings shown in the invite form
+export const allPermissions: { key: TeamPermissionKey; label: string }[] = [
+  { key: "manage_school", label: "Manage School" },
+  { key: "view_school", label: "View School" },
+  { key: "view_analytics", label: "View Analytics" },
+  { key: "manage_subscriptions", label: "Manage Subscriptions" },
+  { key: "view_subscriptions", label: "View Subscriptions" },
 ];
 
-export const initialTeamMembers: TeamMember[] = [
-  {
-    id: 1,
-    initials: "CH",
-    name: "Courtney Henry",
-    email: "courtney@lms.com",
-    roleKey: "super-admin",
-    lastLogin: "2 mins ago",
-    status: "Active",
-    permissions: { auditLogs: true, systemConfigurations: true, accessKeys: true },
-    clearanceLevel: "Level 3 - Elevated Access",
-    department: "Executive Administration",
-  },
-  {
-    id: 2,
-    initials: "CH",
-    name: "Courtney Henry",
-    email: "courtney@lms.com",
-    roleKey: "content-manager",
-    lastLogin: "2 mins ago",
-    status: "Active",
-    permissions: { auditLogs: true, systemConfigurations: false, accessKeys: false },
-    clearanceLevel: "Level 2 - Standard Access",
-    department: "Learning Experience",
-  },
-  {
-    id: 3,
-    initials: "CH",
-    name: "Courtney Henry",
-    email: "courtney@lms.com",
-    roleKey: "support",
-    lastLogin: "2 mins ago",
-    status: "In-Active",
-    permissions: { auditLogs: true, systemConfigurations: false, accessKeys: false },
-    clearanceLevel: "Level 2 - Standard Access",
-    department: "Student Operations",
-    deactivatedOn: "Oct 12, 2023",
-  },
-  {
-    id: 4,
-    initials: "CH",
-    name: "Courtney Henry",
-    email: "courtney@lms.com",
-    roleKey: "finance",
-    lastLogin: "2 mins ago",
-    status: "In-Active",
-    permissions: { auditLogs: true, systemConfigurations: false, accessKeys: true },
-    clearanceLevel: "Level 2 - Standard Access",
-    department: "Audit & Compliance",
-    deactivatedOn: "Oct 12, 2023",
-  },
-];
+// Default permissions for a new member
+export const defaultPermissions: TeamPermissionKey[] = ["view_school", "view_analytics"];
 
-export const initialAuditRows: AuditRow[] = [
-  {
-    id: 1,
-    timestamp: "Oct 27, 2023 · 10:15 AM",
-    user: "Alex Johnson",
-    adminRole: "content-manager",
-    action: "Created Course",
-    actionClassName: "bg-[#e7f8ef] text-[#0f8751]",
-    entity: "Entrepreneurship 101",
-    ip: "192.168.1.45",
-    status: "Success",
-    statusClassName: "text-[#0f8751]",
-    category: "Course Activity",
-    avatarClassName: "bg-[radial-gradient(circle_at_top,#f7d7b8_12%,#c19b74_42%,#58739b_100%)]",
-  },
-  {
-    id: 2,
-    timestamp: "Oct 27, 2023 · 10:15 AM",
-    user: "Alex Johnson",
-    adminRole: "super-admin",
-    action: "Suspended School",
-    actionClassName: "bg-[#fff2cf] text-[#cf7a07]",
-    entity: "Entrepreneurship 101",
-    ip: "192.168.1.45",
-    status: "Success",
-    statusClassName: "text-[#0f8751]",
-    category: "School Activity",
-    avatarClassName: "bg-[radial-gradient(circle_at_top,#f7d7b8_12%,#c19b74_42%,#58739b_100%)]",
-  },
-  {
-    id: 3,
-    timestamp: "Oct 27, 2023 · 10:15 AM",
-    user: "Alex Johnson",
-    adminRole: "finance",
-    action: "Updated Subscription",
-    actionClassName: "bg-[#eaf1ff] text-[#3567ff]",
-    entity: "Entrepreneurship 101",
-    ip: "192.168.1.45",
-    status: "Success",
-    statusClassName: "text-[#0f8751]",
-    category: "Billing Activity",
-    avatarClassName: "bg-[radial-gradient(circle_at_top,#f7d7b8_12%,#c19b74_42%,#58739b_100%)]",
-  },
-  {
-    id: 4,
-    timestamp: "Oct 27, 2023 · 10:15 AM",
-    user: "Alex Johnson",
-    adminRole: "support",
-    action: "Deleted User",
-    actionClassName: "bg-[#ffe9ea] text-[#ef4b4b]",
-    entity: "Entrepreneurship 101",
-    ip: "192.168.1.45",
-    status: "Success",
-    statusClassName: "text-[#0f8751]",
-    category: "User Activity",
-    avatarClassName: "bg-[radial-gradient(circle_at_top,#f7d7b8_12%,#c19b74_42%,#58739b_100%)]",
-  },
-  {
-    id: 5,
-    timestamp: "Oct 27, 2023 · 10:15 AM",
-    user: "Alex Johnson",
-    adminRole: "super-admin",
-    action: "Admin Login",
-    actionClassName: "bg-[#edf1f7] text-[#697a94]",
-    entity: "Entrepreneurship 101",
-    ip: "192.168.1.45",
-    status: "Alert",
-    statusClassName: "text-[#ef4b4b]",
-    category: "Authentication",
-    avatarClassName: "bg-[radial-gradient(circle_at_top,#f7d7b8_12%,#c19b74_42%,#58739b_100%)]",
-  },
-];
+// ---------------------------------------------------------------------------
+// Pure helpers
+// ---------------------------------------------------------------------------
 
-const teamMembersStorageKey = "bmi-super-admin-team-members";
-
-export function getInitials(name: string) {
-  const [first = "", second = ""] = name.trim().split(/\s+/);
-  return `${first.charAt(0)}${second.charAt(0)}`.toUpperCase() || "TM";
+export function getInitials(firstName: string, lastName: string) {
+  return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || "TM";
 }
 
-export function getRoleLabel(roleKey: TeamRoleKey) {
-  return roleMeta[roleKey].label;
+export function getRoleLabel(role: string): string {
+  return roleMeta[role as TeamRoleKey]?.label ?? role;
+}
+
+export function normalizeRole(role: string): TeamRoleKey {
+  if (role in roleMeta) return role as TeamRoleKey;
+  // handle legacy hyphenated keys just in case
+  const mapped: Record<string, TeamRoleKey> = {
+    "super-admin": "super_admin",
+    "content-manager": "content_manager",
+  };
+  return mapped[role] ?? (role as TeamRoleKey);
 }
 
 export function buildTeamsHref(view: TeamView = "administrative") {
   return view === "audit" ? "/teams?view=audit" : "/teams";
 }
 
-export function buildInviteHref(memberId?: number) {
+export function buildInviteHref(memberId?: string) {
   return memberId ? `/teams/invite?member=${memberId}` : "/teams/invite";
-}
-
-export function loadStoredTeamMembers() {
-  if (typeof window === "undefined") {
-    return initialTeamMembers;
-  }
-
-  const storedValue = window.localStorage.getItem(teamMembersStorageKey);
-
-  if (!storedValue) {
-    return initialTeamMembers;
-  }
-
-  try {
-    const parsedValue = JSON.parse(storedValue);
-
-    if (!Array.isArray(parsedValue)) {
-      return initialTeamMembers;
-    }
-
-    return parsedValue as TeamMember[];
-  } catch {
-    return initialTeamMembers;
-  }
-}
-
-export function persistTeamMembers(members: TeamMember[]) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  window.localStorage.setItem(teamMembersStorageKey, JSON.stringify(members));
 }

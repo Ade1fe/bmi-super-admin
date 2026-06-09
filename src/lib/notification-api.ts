@@ -368,3 +368,6 @@ export function splitFullName(fullName: string) {
     lastName: rest.join(" "),
   };
 }
+
+// notification-api.ts — re-exports broadcast-api so both import paths work
+export * from "./broadcast-api";

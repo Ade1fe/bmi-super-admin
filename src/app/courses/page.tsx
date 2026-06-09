@@ -431,9 +431,9 @@ console.log("ROLE", session?.role);
           ))}
         </div>
 
-        <div className="hidden overflow-x-auto xl:block xl:overflow-visible">
+        <div className="overflow-x-auto">
           {activeTab === "drafts" ? (
-            <table className="min-w-[1120px] w-full table-fixed border-separate border-spacing-0">
+            <table className="w-full border-separate border-spacing-0">
               <colgroup>
                 <col className="w-[42%]" />
                 <col className="w-[16%]" />
@@ -494,7 +494,7 @@ console.log("ROLE", session?.role);
               </tbody>
             </table>
           ) : activeTab === "published" ? (
-            <table className="min-w-[1180px] w-full table-fixed border-separate border-spacing-0">
+            <table className="w-full border-separate border-spacing-0">
               <colgroup>
                 <col className="w-[32%]" />
                 <col className="w-[16%]" />
@@ -625,7 +625,7 @@ console.log("ROLE", session?.role);
               </tbody>
             </table>
           ) : (
-            <table className="min-w-[1180px] w-full table-fixed border-separate border-spacing-0">
+            <table className="w-full border-separate border-spacing-0">
               <colgroup>
                 <col className="w-[34%]" />
                 <col className="w-[16%]" />

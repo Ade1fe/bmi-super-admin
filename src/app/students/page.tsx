@@ -25,19 +25,20 @@ import {
   deactivateStudent,
   reactivateStudent,
   grantPremiumAccess,
+  getStudentStats,
   Student,
   FetchStudentsParams,
 } from "@/lib/students-api";
 import { useAuthSession } from "@/lib/auth-session";
 
-// ─── Auth token hook (swap with your real auth context) ───────────────────────
-// Remove the stub useAuth function at the bottom of the file entirely, then update:
+// ─── Auth token hook ───────────────────────────────────────────────────────
 
 function useAuthToken(): string {
   const { session } = useAuthSession();
   return session?.token ?? "";
 }
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+// ─── Helpers ──────────────────────────────────────────────────────────────
 
 function getInitials(firstName: string, lastName: string) {
   return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
@@ -64,13 +65,7 @@ function planStyle(plan: string) {
 
 const PAGE_SIZE = 10;
 
-// ─── Stat cards ───────────────────────────────────────────────────────────────
-
-const topStats = [
-  { label: "Total Individual Students", value: "12,840", delta: "+12%", icon: Users },
-  { label: "Active This Month", value: "8,420", delta: "+5%", icon: UserCheck },
-  { label: "New This Week", value: "156", delta: "+12%", icon: UserPlus },
-];
+// ─── Stat cards ───────────────────────────────────────────────────────────
 
 function StudentSummaryCard({
   label,
@@ -99,10 +94,7 @@ function StudentSummaryCard({
   );
 }
 
-// ─── Action menu ──────────────────────────────────────────────────────────────
-// Change the state from string | null to store position too:
-
-// ─── Action menu (portal-positioned) ─────────────────────────────────────────
+// ─── Action menu ──────────────────────────────────────────────────────────
 
 function StudentActionMenu({
   menuRef,
@@ -135,7 +127,7 @@ function StudentActionMenu({
     >
       <Link
         href={`/students/${studentId}`}
-         onMouseDown={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
         className="flex items-center gap-3 rounded-[10px] px-4 py-3 text-[15px] font-medium text-[#38455f] hover:bg-[#f6f8fd]"
       >
         <Eye className="h-[18px] w-[18px] text-[#56657f]" strokeWidth={2} />
@@ -169,7 +161,7 @@ function StudentActionMenu({
   );
 }
 
-// ─── Modal close button ───────────────────────────────────────────────────────
+// ─── Modal close button ───────────────────────────────────────────────────
 
 function ModalClose({ onClose, label }: { onClose: () => void; label: string }) {
   return (
@@ -184,7 +176,7 @@ function ModalClose({ onClose, label }: { onClose: () => void; label: string }) 
   );
 }
 
-// ─── Grant Access Modal ───────────────────────────────────────────────────────
+// ─── Grant Access Modal ───────────────────────────────────────────────────
 
 function GrantAccessModal({
   student,
@@ -316,7 +308,7 @@ function GrantAccessModal({
   );
 }
 
-// ─── Deactivate Modal ─────────────────────────────────────────────────────────
+// ─── Deactivate Modal ─────────────────────────────────────────────────────
 
 function DeactivateStudentModal({
   student,
@@ -421,7 +413,7 @@ function DeactivateStudentModal({
   );
 }
 
-// ─── Reactivate Modal ─────────────────────────────────────────────────────────
+// ─── Reactivate Modal ────────────────────────────────────────────────────
 
 function ReactivateStudentModal({
   student,
@@ -517,24 +509,34 @@ function ReactivateStudentModal({
   );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+// ─── Page ─────────────────────────────────────────────────────────────────
 
 type ActiveTab = "all" | "active" | "inactive";
 type ActiveDialog = "grant" | "deactivate" | "reactivate" | null;
 
 export default function StudentsPage() {
   const authToken = useAuthToken();
-const [openMenu, setOpenMenu] = useState<{
-  rowId: string;
-  top: number;
-  right: number;
-} | null>(null);
+  const [openMenu, setOpenMenu] = useState<{
+    rowId: string;
+    top: number;
+    right: number;
+  } | null>(null);
+  
   // Table state
   const [students, setStudents] = useState<Student[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+
+  // Stats state
+  const [stats, setStats] = useState<{
+    totalStudents: number;
+    activeStudents: number;
+    inactiveStudents: number;
+    newThisWeek: number;
+  } | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
 
   // Filters
   const [activeTab, setActiveTab] = useState<ActiveTab>("all");
@@ -558,8 +560,21 @@ const [openMenu, setOpenMenu] = useState<{
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
+  const fetchStats = useCallback(async () => {
+    if (!authToken) return;
+    setStatsLoading(true);
+    try {
+      const res = await getStudentStats(authToken);
+      setStats(res.data);
+    } catch (err) {
+      console.error("[v0] Failed to fetch student stats:", err);
+    } finally {
+      setStatsLoading(false);
+    }
+  }, [authToken]);
+
   const fetchStudents = useCallback(async () => {
-     if (!authToken) return;
+    if (!authToken) return;
     setLoading(true);
     setFetchError(null);
     try {
@@ -572,8 +587,7 @@ const [openMenu, setOpenMenu] = useState<{
       const res = await getSchoolStudents(authToken, params);
       setStudents(res.data);
       // Normalise pagination meta — handle both shapes
-      const t =
-        res.meta?.total ?? res.total ?? res.data.length;
+      const t = res.meta?.total ?? res.total ?? res.data.length;
       setTotal(t);
     } catch (err) {
       setFetchError(err instanceof Error ? err.message : "Failed to load students.");
@@ -583,39 +597,33 @@ const [openMenu, setOpenMenu] = useState<{
   }, [authToken, page, debouncedSearch, activeTab]);
 
   useEffect(() => {
+    fetchStats();
     fetchStudents();
-  }, [fetchStudents]);
+  }, [fetchStats, fetchStudents]);
 
   // Close menu on outside click
-const menuRef = useRef<HTMLDivElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
 
-useEffect(() => {
-  function handler(event: MouseEvent) {
-    if (!menuRef.current) return;
-
-    if (
-      event.target instanceof Node &&
-      menuRef.current.contains(event.target)
-    ) {
-      return;
+  useEffect(() => {
+    function handler(event: MouseEvent) {
+      if (!menuRef.current) return;
+      if (event.target instanceof Node && menuRef.current.contains(event.target)) {
+        return;
+      }
+      setOpenMenu(null);
     }
 
+    document.addEventListener("mousedown", handler);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+    };
+  }, []);
+
+  function openDialog(dialog: ActiveDialog, student: Student) {
+    setSelectedStudent(student);
     setOpenMenu(null);
+    setActiveDialog(dialog);
   }
-
-  document.addEventListener("mousedown", handler);
-
-  return () => {
-    document.removeEventListener("mousedown", handler);
-  };
-}, []);
-
-// openDialog:
-function openDialog(dialog: ActiveDialog, student: Student) {
-  setSelectedStudent(student);
-  setOpenMenu(null);       // ← was setOpenMenuRowId(null)
-  setActiveDialog(dialog);
-}
 
   function closeDialog() {
     setActiveDialog(null);
@@ -667,10 +675,36 @@ function openDialog(dialog: ActiveDialog, student: Student) {
         </Link>
       </section>
 
+      {/* Stats Section with Loading State */}
       <section className="mt-8 grid gap-4 xl:grid-cols-3">
-        {topStats.map((item) => (
-          <StudentSummaryCard key={item.label} {...item} />
-        ))}
+        {statsLoading || !stats ? (
+          <>
+            <div className="h-32 animate-pulse rounded-[14px] bg-[#f0f4f8]" />
+            <div className="h-32 animate-pulse rounded-[14px] bg-[#f0f4f8]" />
+            <div className="h-32 animate-pulse rounded-[14px] bg-[#f0f4f8]" />
+          </>
+        ) : (
+          <>
+                 <StudentSummaryCard
+              label="Total Individual Students"
+              value={(stats?.totalStudents ?? 0).toLocaleString()}
+              delta="+12%"
+              icon={Users}
+            />
+            <StudentSummaryCard
+              label="Active This Month"
+              value={(stats?.activeStudents ?? 0).toLocaleString()}
+              delta="+5%"
+              icon={UserCheck}
+            />
+            <StudentSummaryCard
+              label="New This Week"
+              value={(stats?.newThisWeek ?? 0).toLocaleString()}
+              delta="+12%"
+              icon={UserPlus}
+            />
+          </>
+        )}
       </section>
 
       {/* Tabs */}
@@ -681,7 +715,10 @@ function openDialog(dialog: ActiveDialog, student: Student) {
               <button
                 key={key}
                 type="button"
-                onClick={() => { setActiveTab(key); setPage(1); }}
+                onClick={() => {
+                  setActiveTab(key);
+                  setPage(1);
+                }}
                 className={[
                   "border-b-[3px] px-1 pb-3 text-[16px] font-bold transition-colors capitalize",
                   activeTab === key
@@ -728,7 +765,7 @@ function openDialog(dialog: ActiveDialog, student: Student) {
           </div>
         </div>
 
-        {/* Loading / Error */}
+        {/* Loading / Error States */}
         {loading && (
           <div className="flex items-center justify-center gap-3 py-20 text-[#6e7c98]">
             <Loader2 className="h-6 w-6 animate-spin" />
@@ -742,7 +779,7 @@ function openDialog(dialog: ActiveDialog, student: Student) {
           <p className="px-8 py-10 text-center text-[15px] text-[#6e7c98]">No students found.</p>
         )}
 
-        {/* Mobile cards */}
+        {/* Mobile Cards - Full Featured */}
         {!loading && !fetchError && students.length > 0 && (
           <div className="space-y-4 p-4 xl:hidden">
             {students.map((row) => (
@@ -755,7 +792,7 @@ function openDialog(dialog: ActiveDialog, student: Student) {
                     <div className="min-w-0">
                       <Link
                         href={`/students/${row.id}`}
-                          onClick={() => setOpenMenu(null)}
+                        onClick={() => setOpenMenu(null)}
                         className="block truncate text-[18px] font-extrabold tracking-[-0.03em] text-[#182c4e]"
                       >
                         {row.user.firstName} {row.user.lastName}
@@ -768,7 +805,9 @@ function openDialog(dialog: ActiveDialog, student: Student) {
                 <div className="mt-5 grid gap-3 rounded-[12px] bg-white p-4 text-[14px] text-[#61708b]">
                   <div className="flex items-center justify-between gap-4">
                     <span className="font-semibold text-[#8b97ad]">Status</span>
-                    <span className={`font-bold ${row.user.isActive ? "text-[#0b8c50]" : "text-[#76839b]"}`}>
+                    <span
+                      className={`font-bold ${row.user.isActive ? "text-[#0b8c50]" : "text-[#76839b]"}`}
+                    >
                       ● {row.user.isActive ? "ACTIVE" : "INACTIVE"}
                     </span>
                   </div>
@@ -782,47 +821,47 @@ function openDialog(dialog: ActiveDialog, student: Student) {
                   </div>
                 </div>
 
-               <div className="mt-4 grid gap-3">
-  <Link
-    href={`/students/${row.id}`}
-    onClick={() => setOpenMenu(null)}
-    className="inline-flex h-12 items-center justify-center rounded-[10px] border border-[#dce3f2] bg-white px-4 text-[14px] font-semibold text-[#5a6986]"
-  >
-    View Student
-  </Link>
+                <div className="mt-4 grid gap-3">
+                  <Link
+                    href={`/students/${row.id}`}
+                    onClick={() => setOpenMenu(null)}
+                    className="inline-flex h-12 items-center justify-center rounded-[10px] border border-[#dce3f2] bg-white px-4 text-[14px] font-semibold text-[#5a6986]"
+                  >
+                    View Student
+                  </Link>
 
-  <button
-    type="button"
-    onClick={() => openDialog("grant", row)}
-    className="inline-flex h-12 items-center justify-center rounded-[10px] bg-[#4b8a60] px-4 text-[14px] font-semibold text-white"
-  >
-    Grant Premium Access
-  </button>
+                  <button
+                    type="button"
+                    onClick={() => openDialog("grant", row)}
+                    className="inline-flex h-12 items-center justify-center rounded-[10px] bg-[#4b8a60] px-4 text-[14px] font-semibold text-white"
+                  >
+                    Grant Premium Access
+                  </button>
 
-  <button
-    type="button"
-    onClick={() => openDialog("deactivate", row)}
-    className="inline-flex h-12 items-center justify-center rounded-[10px] bg-[#ef1f4f] px-4 text-[14px] font-semibold text-white"
-  >
-    Deactivate Student
-  </button>
+                  <button
+                    type="button"
+                    onClick={() => openDialog("deactivate", row)}
+                    className="inline-flex h-12 items-center justify-center rounded-[10px] bg-[#ef1f4f] px-4 text-[14px] font-semibold text-white"
+                  >
+                    Deactivate Student
+                  </button>
 
-  <button
-    type="button"
-    onClick={() => openDialog("reactivate", row)}
-    className="inline-flex h-12 items-center justify-center rounded-[10px] border border-[#4b8a60] bg-white px-4 text-[14px] font-semibold text-[#4b8a60]"
-  >
-    Reactivate Student
-  </button>
-</div>
+                  <button
+                    type="button"
+                    onClick={() => openDialog("reactivate", row)}
+                    className="inline-flex h-12 items-center justify-center rounded-[10px] border border-[#4b8a60] bg-white px-4 text-[14px] font-semibold text-[#4b8a60]"
+                  >
+                    Reactivate Student
+                  </button>
+                </div>
               </article>
             ))}
           </div>
         )}
 
-        {/* Desktop table */}
+        {/* Desktop Table */}
         {!loading && !fetchError && students.length > 0 && (
-          <div className="overflow-x-auto">
+          <div className="hidden overflow-x-auto xl:block">
             <table className="w-full border-separate border-spacing-0">
               <colgroup>
                 <col className="w-[25%]" />
@@ -855,7 +894,7 @@ function openDialog(dialog: ActiveDialog, student: Student) {
                         <div className="min-w-0">
                           <Link
                             href={`/students/${row.id}`}
-                              onClick={() => setOpenMenu(null)}
+                            onClick={() => setOpenMenu(null)}
                             className="block truncate text-[16px] font-extrabold tracking-[-0.03em] text-[#182c4e]"
                           >
                             {row.user.firstName} {row.user.lastName}
@@ -872,11 +911,19 @@ function openDialog(dialog: ActiveDialog, student: Student) {
                       {row.class ?? "—"}
                     </td>
                     <td className="border-b border-[#edf0f7] px-6 py-7">
-                      <span className={`inline-flex min-h-10 items-center rounded-full px-4 py-1.5 text-[13px] font-bold ${planStyle("Enterprise")}`}>
+                      <span
+                        className={`inline-flex min-h-10 items-center rounded-full px-4 py-1.5 text-[13px] font-bold ${planStyle(
+                          "Enterprise"
+                        )}`}
+                      >
                         {row.admissionNumber ?? "—"}
                       </span>
                     </td>
-                    <td className={`border-b border-[#edf0f7] px-6 py-7 text-[13px] font-bold ${row.user.isActive ? "text-[#0b8c50]" : "text-[#76839b]"}`}>
+                    <td
+                      className={`border-b border-[#edf0f7] px-6 py-7 text-[13px] font-bold ${
+                        row.user.isActive ? "text-[#0b8c50]" : "text-[#76839b]"
+                      }`}
+                    >
                       <span className="inline-flex items-center gap-2">
                         <span className="h-2.5 w-2.5 rounded-full bg-current" />
                         {row.user.isActive ? "ACTIVE" : "INACTIVE"}
@@ -889,39 +936,39 @@ function openDialog(dialog: ActiveDialog, student: Student) {
                       className="relative border-b border-[#edf0f7] px-4 py-7 text-center"
                       onMouseDown={(e) => e.stopPropagation()}
                     >
-                  <button
-  type="button"
-  className="rounded-full p-1.5 text-[#a0aac0] transition-colors hover:bg-[#f5f7fb] hover:text-[#70809d]"
-onClick={(e) => {
-  e.stopPropagation();
+                      <button
+                        type="button"
+                        className="rounded-full p-1.5 text-[#a0aac0] transition-colors hover:bg-[#f5f7fb] hover:text-[#70809d]"
+                        onClick={(e) => {
+                          e.stopPropagation();
 
-  if (openMenu?.rowId === row.id) {
-    setOpenMenu(null);
-    return;
-  }
+                          if (openMenu?.rowId === row.id) {
+                            setOpenMenu(null);
+                            return;
+                          }
 
-  const rect = e.currentTarget.getBoundingClientRect();
+                          const rect = e.currentTarget.getBoundingClientRect();
 
-  setOpenMenu({
-    rowId: row.id,
-    top: rect.bottom + 8,
-    right: window.innerWidth - rect.right,
-  });
-}}
->
-  <MoreVertical className="h-5 w-5" strokeWidth={2.25} />
-</button>
+                          setOpenMenu({
+                            rowId: row.id,
+                            top: rect.bottom + 8,
+                            right: window.innerWidth - rect.right,
+                          });
+                        }}
+                      >
+                        <MoreVertical className="h-5 w-5" strokeWidth={2.25} />
+                      </button>
 
-{openMenu?.rowId === row.id && (
-<StudentActionMenu
-  menuRef={menuRef}
-  position={{ top: openMenu.top, right: openMenu.right }}
-  studentId={row.id}
-  onDeactivate={() => openDialog("deactivate", row)}
-  onReactivate={() => openDialog("reactivate", row)}
-  onGrantAccess={() => openDialog("grant", row)}
-/>
-)}
+                      {openMenu?.rowId === row.id && (
+                        <StudentActionMenu
+                          menuRef={menuRef}
+                          position={{ top: openMenu.top, right: openMenu.right }}
+                          studentId={row.id}
+                          onDeactivate={() => openDialog("deactivate", row)}
+                          onReactivate={() => openDialog("reactivate", row)}
+                          onGrantAccess={() => openDialog("grant", row)}
+                        />
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -946,7 +993,10 @@ onClick={(e) => {
             </button>
             {visiblePages().map((p, idx) =>
               p === "…" ? (
-                <span key={`ellipsis-${idx}`} className="flex h-10 w-10 items-center justify-center text-[#93a0b7]">
+                <span
+                  key={`ellipsis-${idx}`}
+                  className="flex h-10 w-10 items-center justify-center text-[#93a0b7]"
+                >
                   …
                 </span>
               ) : (
@@ -955,9 +1005,7 @@ onClick={(e) => {
                   onClick={() => setPage(p as number)}
                   className={[
                     "flex h-10 w-10 items-center justify-center rounded-[8px] text-[15px] font-bold",
-                    page === p
-                      ? "button-primary bg-[#0f8751] text-white"
-                      : "text-[#22314c]",
+                    page === p ? "button-primary bg-[#0f8751] text-white" : "text-[#22314c]",
                   ].join(" ")}
                 >
                   {p}
@@ -977,5 +1025,3 @@ onClick={(e) => {
     </AppShell>
   );
 }
-
-// on small screen , view student is working but on large screen it is not working , on small screen i didnt add the activate or deactivate and so on , pleaase look into it can you generate the complete code?

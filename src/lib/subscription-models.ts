@@ -56,7 +56,16 @@ export type SubscriptionRecord = {
   plan: SubscriptionPlan | null;
   school: SubscriptionSchool | null;
 };
+const DEBUG = true;
 
+function log(tag: string, data?: unknown) {
+  if (!DEBUG) return;
+  console.log(`[subscription-parser] ${tag}`, data ?? "");
+}
+
+function logError(tag: string, error: unknown) {
+  console.error(`[subscription-parser ERROR] ${tag}`, error);
+}
 function isRecord(value: unknown): value is JsonRecord {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -146,59 +155,60 @@ function parsePlanFeature(
     updatedAt: readOptionalString(value.updatedAt),
   };
 }
+export function parseSubscriptionPlan(value: unknown): SubscriptionPlan | null {
+  log("parseSubscriptionPlan() input", value);
 
-export function parseSubscriptionPlan(
-  value: unknown
-): SubscriptionPlan | null {
-  if (!isRecord(value)) {
+  try {
+    if (!isRecord(value)) {
+      log("parseSubscriptionPlan() skipped - not a record");
+      return null;
+    }
+
+    const id = readString(value.id);
+    const name = readString(value.name);
+
+    if (!id && !name) {
+      log("parseSubscriptionPlan() skipped - missing id & name", value);
+      return null;
+    }
+
+    const result: SubscriptionPlan = {
+      id,
+      name,
+      description: readOptionalString(value.description),
+      price: readNumber(value.price) ?? 0,
+      interval: readString(value.interval) || "monthly",
+      paystackPlanCode: readOptionalString(value.paystackPlanCode),
+      maxStudents: readNumber(value.maxStudents),
+      maxCourses: readNumber(value.maxCourses),
+      maxTeamMembers: readNumber(value.maxTeamMembers),
+      trialDurationDays: readNumber(value.trialDurationDays),
+      isActive: readBoolean(value.isActive),
+      createdAt: readOptionalString(value.createdAt),
+      updatedAt: readOptionalString(value.updatedAt),
+      features: Array.isArray(value.features)
+        ? value.features
+            .map(parsePlanFeature)
+            .filter(
+              (f): f is SubscriptionPlanFeature => Boolean(f)
+            )
+        : [],
+    };
+
+    log("parseSubscriptionPlan() success", result);
+
+    return result;
+  } catch (err) {
+    logError("parseSubscriptionPlan() failed", err);
     return null;
   }
-
-  const id = readString(value.id);
-  const name = readString(value.name);
-
-  if (!id && !name) {
-    return null;
-  }
-
-  return {
-    id,
-    name,
-    description: readOptionalString(value.description),
-    price: readNumber(value.price) ?? 0,
-    interval:
-      readString(value.interval) || "monthly",
-    paystackPlanCode: readOptionalString(
-      value.paystackPlanCode
-    ),
-    maxStudents: readNumber(value.maxStudents),
-    maxCourses: readNumber(value.maxCourses),
-    maxTeamMembers: readNumber(value.maxTeamMembers),
-    trialDurationDays: readNumber(
-      value.trialDurationDays
-    ),
-    isActive: readBoolean(value.isActive),
-    createdAt: readOptionalString(value.createdAt),
-    updatedAt: readOptionalString(value.updatedAt),
-    features: Array.isArray(value.features)
-      ? value.features
-          .map((feature) =>
-            parsePlanFeature(feature)
-          )
-          .filter(
-            (
-              feature
-            ): feature is SubscriptionPlanFeature =>
-              Boolean(feature)
-          )
-      : [],
-  };
 }
 
-function parseSubscriptionSchool(
-  value: unknown
-): SubscriptionSchool | null {
+function parseSubscriptionSchool(value: unknown): SubscriptionSchool | null {
+  log("parseSubscriptionSchool() input", value);
+
   if (!isRecord(value)) {
+    log("parseSubscriptionSchool() skipped - not record");
     return null;
   }
 
@@ -207,80 +217,97 @@ function parseSubscriptionSchool(
   const email = readString(value.email);
 
   if (!id && !name && !email) {
+    log("parseSubscriptionSchool() skipped - missing identifiers");
     return null;
   }
 
-  return {
+  const result: SubscriptionSchool = {
     id,
     name,
     email,
-    logoUrl:
-      readOptionalString(value.logoUrl) ?? null,
+    logoUrl: readOptionalString(value.logoUrl) ?? null,
     phone: readOptionalString(value.phone),
     address: readOptionalString(value.address),
     country: readOptionalString(value.country),
   };
+
+  log("parseSubscriptionSchool() success", result);
+
+  return result;
 }
 
-function parseSubscriptionRecord(
-  value: unknown
-): SubscriptionRecord | null {
-  if (!isRecord(value)) {
+function parseSubscriptionRecord(value: unknown): SubscriptionRecord | null {
+  log("parseSubscriptionRecord() input", value);
+
+  try {
+    if (!isRecord(value)) {
+      log("parseSubscriptionRecord() skipped - not record");
+      return null;
+    }
+
+    const id = readString(value.id);
+    const schoolId = readString(value.schoolId);
+    const planId = readString(value.planId);
+    const status = readString(value.status);
+
+    if (!id && !schoolId && !planId && !status) {
+      log("parseSubscriptionRecord() skipped - missing required fields");
+      return null;
+    }
+
+    const result: SubscriptionRecord = {
+      id,
+      schoolId,
+      planId,
+      status,
+      isTrial: readBoolean(value.isTrial),
+      trialEndsAt: readOptionalString(value.trialEndsAt),
+      currentPeriodStart: readOptionalString(value.currentPeriodStart),
+      currentPeriodEnd: readOptionalString(value.currentPeriodEnd),
+      paystackSubscriptionCode: readOptionalString(value.paystackSubscriptionCode),
+      paystackCustomerCode: readOptionalString(value.paystackCustomerCode),
+      createdAt: readOptionalString(value.createdAt),
+      updatedAt: readOptionalString(value.updatedAt),
+      plan: parseSubscriptionPlan(value.plan),
+      school: parseSubscriptionSchool(value.school),
+    };
+
+    log("parseSubscriptionRecord() success", result);
+
+    return result;
+  } catch (err) {
+    logError("parseSubscriptionRecord() failed", err);
     return null;
   }
+}
+export function parseSubscriptionPlanList(payload: unknown) {
+  log("parseSubscriptionPlanList() raw payload", payload);
 
-  const id = readString(value.id);
-  const schoolId = readString(value.schoolId);
-  const planId = readString(value.planId);
-  const status = readString(value.status);
+  const list = unwrapCollection(payload);
 
-  if (!id && !schoolId && !planId && !status) {
-    return null;
-  }
+  log("parseSubscriptionPlanList() unwrapped", list);
 
-  return {
-    id,
-    schoolId,
-    planId,
-    status,
-    isTrial: readBoolean(value.isTrial),
-    trialEndsAt: readOptionalString(value.trialEndsAt),
-    currentPeriodStart: readOptionalString(
-      value.currentPeriodStart
-    ),
-    currentPeriodEnd: readOptionalString(
-      value.currentPeriodEnd
-    ),
-    paystackSubscriptionCode: readOptionalString(
-      value.paystackSubscriptionCode
-    ),
-    paystackCustomerCode: readOptionalString(
-      value.paystackCustomerCode
-    ),
-    createdAt: readOptionalString(value.createdAt),
-    updatedAt: readOptionalString(value.updatedAt),
-    plan: parseSubscriptionPlan(value.plan),
-    school: parseSubscriptionSchool(value.school),
-  };
+  const parsed = list
+    .map(parseSubscriptionPlan)
+    .filter((item): item is SubscriptionPlan => Boolean(item));
+
+  log("parseSubscriptionPlanList() result count", parsed.length);
+
+  return parsed;
 }
 
-export function parseSubscriptionPlanList(
-  payload: unknown
-) {
-  return unwrapCollection(payload)
-    .map((item) => parseSubscriptionPlan(item))
-    .filter(
-      (item): item is SubscriptionPlan => Boolean(item)
-    );
-}
+export function parseSubscriptionList(payload: unknown) {
+  log("parseSubscriptionList() raw payload", payload);
 
-export function parseSubscriptionList(
-  payload: unknown
-) {
-  return unwrapCollection(payload)
-    .map((item) => parseSubscriptionRecord(item))
-    .filter(
-      (item): item is SubscriptionRecord =>
-        Boolean(item)
-    );
+  const list = unwrapCollection(payload);
+
+  log("parseSubscriptionList() unwrapped", list);
+
+  const parsed = list
+    .map(parseSubscriptionRecord)
+    .filter((item): item is SubscriptionRecord => Boolean(item));
+
+  log("parseSubscriptionList() result count", parsed.length);
+
+  return parsed;
 }
