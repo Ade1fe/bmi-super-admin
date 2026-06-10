@@ -667,11 +667,11 @@ export default function StudentsPage() {
 
       <section className="flex justify-stretch sm:justify-end">
         <Link
-          href="/schools/create-school"
+          href=""
           className="button-primary inline-flex h-14 w-full items-center justify-center gap-3 rounded-[10px] bg-[#4b8a60] px-6 text-[15px] font-semibold text-white shadow-[0_20px_38px_rgba(75,138,96,0.18)] sm:w-auto"
         >
           <Plus className="h-5 w-5" strokeWidth={2.4} />
-          Add New School
+          Add New Student
         </Link>
       </section>
 
