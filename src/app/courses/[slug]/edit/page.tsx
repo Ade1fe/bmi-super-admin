@@ -264,14 +264,6 @@ setCourseStatus(fetchedCourse.status ?? "");
                         >
                           <Settings2 className="h-5 w-5" strokeWidth={2.1} />
                         </Link>
-                        {/* {!isEmpty ? (
-                          <button
-                            type="button"
-                            className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-white"
-                          >
-                            <PenSquare className="h-5 w-5" strokeWidth={2.1} />
-                          </button>
-                        ) : null} */}
                         <button
                           type="button"
                           disabled={isDeletingModule}
