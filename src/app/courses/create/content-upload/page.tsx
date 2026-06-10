@@ -1464,19 +1464,24 @@ function QuestionRow({
                 Correct Answer
               </span>
               <div className="relative flex h-[46px] items-center rounded-[12px] border border-[#d7deee] bg-[#f8faff] px-3">
+
                 <select
-                  value={q.correctOption}
-                  onChange={(e) =>
-                    onChange({ ...q, correctOption: Number(e.target.value) })
-                  }
-                  className="h-full w-full appearance-none bg-transparent pr-8 text-[14px] text-[#264267] outline-none"
-                >
-                  {q.options.map((opt, i) => (
-                    <option key={i} value={i}>
-                      Option {i + 1}{opt ? ` – ${opt.slice(0, 20)}` : ""}
-                    </option>
-                  ))}
-                </select>
+  value={q.correctOption}
+  onChange={(e) =>
+    onChange({
+      ...q,
+      correctOption: Number(e.target.value),
+    })
+  }
+  className="h-full w-full appearance-none bg-transparent pr-8 text-[14px] text-[#264267] outline-none"
+>
+  {q.options.map((opt, i) => (
+    <option key={i} value={i}>
+      Option {String.fromCharCode(65 + i)}
+      {opt ? ` – ${opt.slice(0, 20)}` : ""}
+    </option>
+  ))}
+</select>
                 <ChevronDown className="pointer-events-none absolute right-3 h-4 w-4 text-[#8c98b1]" strokeWidth={2.1} />
               </div>
             </div>
