@@ -196,10 +196,20 @@ export default function StudentDetailPage() {
                   <h1 className="text-[24px] font-extrabold tracking-[-0.04em] text-[#182c4e]">
                     {fullName}
                   </h1>
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[#e6f7ef] px-3 py-1 text-[13px] font-bold text-[#0f8751]">
-                    <span className="h-1.5 w-1.5 rounded-full bg-[#0f8751]" />
-                    {student.user.isActive ? "Active" : "Inactive"}
-                  </span>
+                <span
+  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[13px] font-bold ${
+    student.user.isActive !== false
+      ? "bg-[#e6f7ef] text-[#0f8751]"
+      : "bg-[#f0f3f9] text-[#76839b]"
+  }`}
+>
+  <span
+    className={`h-1.5 w-1.5 rounded-full ${
+      student.user.isActive !== false ? "bg-[#0f8751]" : "bg-[#76839b]"
+    }`}
+  />
+  {student.user.isActive !== false ? "Active" : "Inactive"}
+</span>
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[14px] text-[#7f8cab]">
                   <span className="flex items-center gap-1.5">
@@ -210,10 +220,10 @@ export default function StudentDetailPage() {
                     <Mail className="h-4 w-4" strokeWidth={1.8} />
                     {student.user.email}
                   </span>
-                  <span className="flex items-center gap-1.5">
-                    <MapPin className="h-4 w-4" strokeWidth={1.8} />
-                    {student.user.email}
-                  </span>
+<span className="flex items-center gap-1.5">
+  <MapPin className="h-4 w-4" strokeWidth={1.8} />
+  {student.school?.name ?? "—"}
+</span>
                 </div>
               </div>
             </div>

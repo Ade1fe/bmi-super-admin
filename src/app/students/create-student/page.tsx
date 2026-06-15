@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -9,6 +8,7 @@ import {
   Download,
   Eye,
   Filter,
+  Loader2,
   MoreVertical,
   Plus,
   Search,
@@ -17,19 +17,21 @@ import {
   UserPlus,
   Users,
   X,
-  Loader2,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import {
-  getSchoolStudents,
+  adminCreateStudent,
   deactivateStudent,
-  reactivateStudent,
-  grantPremiumAccess,
+  getSchoolStudents,
   getStudentStats,
-  Student,
-  FetchStudentsParams,
+  grantPremiumAccess,
+  reactivateStudent,
+  type AdminCreateStudentResponse,
+  type FetchStudentsParams,
+  type Student,
 } from "@/lib/students-api";
 import { useAuthSession } from "@/lib/auth-session";
+import { apiRequest, endpoints } from "@/lib/endpoints";
 
 // ─── Auth token hook ───────────────────────────────────────────────────────
 
@@ -105,10 +107,7 @@ function StudentActionMenu({
   onGrantAccess,
 }: {
   menuRef: React.RefObject<HTMLDivElement | null>;
-  position: {
-    top: number;
-    right: number;
-  };
+  position: { top: number; right: number };
   studentId: string;
   onDeactivate: () => void;
   onReactivate: () => void;
@@ -117,12 +116,7 @@ function StudentActionMenu({
   return (
     <div
       ref={menuRef}
-      style={{
-        position: "fixed",
-        top: position.top,
-        right: position.right,
-        zIndex: 9999,
-      }}
+      style={{ position: "fixed", top: position.top, right: position.right, zIndex: 9999 }}
       className="w-[228px] rounded-[12px] border border-[#e4e8f4] bg-white p-2 shadow-[0_24px_44px_rgba(166,178,214,0.22)]"
     >
       <Link
@@ -161,8 +155,6 @@ function StudentActionMenu({
   );
 }
 
-// ─── Modal close button ───────────────────────────────────────────────────
-
 function ModalClose({ onClose, label }: { onClose: () => void; label: string }) {
   return (
     <button
@@ -173,6 +165,246 @@ function ModalClose({ onClose, label }: { onClose: () => void; label: string }) 
     >
       <X className="h-5 w-5" strokeWidth={2.4} />
     </button>
+  );
+}
+
+// ─── Add Student Modal ────────────────────────────────────────────────────
+
+function AddStudentModal({
+  onClose,
+  onSuccess,
+  authToken,
+}: {
+  onClose: () => void;
+  onSuccess: () => void;
+  authToken: string;
+}) {
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+//   const [selectedSchoolId, setSelectedSchoolId] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+//   const [schools, setSchools] = useState<{ id: string; name: string }[]>([]);
+//   const [schoolsLoading, setSchoolsLoading] = useState(false);
+  const [createdResult, setCreatedResult] = useState<AdminCreateStudentResponse | null>(null);
+
+const [schools, setSchools] = useState<{ id: string; name: string }[]>([]);
+const [selectedSchoolId, setSelectedSchoolId] = useState("");
+const [schoolsLoading, setSchoolsLoading] = useState(false);
+
+useEffect(() => {
+  async function loadSchools() {
+    if (!authToken) return;
+    setSchoolsLoading(true);
+    try {
+      const response = await apiRequest<{ data: { id: string; name: string }[] }>(
+        endpoints.admin.schools,
+        { method: "GET", authToken }
+      );
+      setSchools(Array.isArray(response.data) ? response.data : []);
+    } catch (err) {
+      console.error("Failed to load schools:", err);
+    } finally {
+      setSchoolsLoading(false);
+    }
+  }
+  loadSchools();
+}, [authToken]);
+
+  async function handleSubmit() {
+    if (!firstName.trim() || !lastName.trim() || !email.trim() || !selectedSchoolId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await adminCreateStudent(
+        {
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          email: email.trim().toLowerCase(),
+          school_id: selectedSchoolId,
+        },
+        authToken,
+      );
+      setCreatedResult(res);
+      onSuccess();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Success screen
+  if (createdResult) {
+    return (
+      <>
+        <div className="fixed inset-0 z-40 bg-[#1f2430]/55 backdrop-blur-[1.5px]" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="relative w-full max-w-[500px] overflow-hidden rounded-[16px] bg-white shadow-[0_34px_90px_rgba(15,25,51,0.24)]">
+            <ModalClose onClose={onClose} label="Close" />
+            <div className="px-6 py-8 pr-20 sm:px-8">
+              <div className="flex items-center gap-4">
+                <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#dff6eb] text-[#0f8751]">
+                  <UserPlus className="h-7 w-7" strokeWidth={2.2} />
+                </span>
+                <div>
+                  <h2 className="text-[22px] font-extrabold tracking-[-0.04em] text-[#182c4e]">
+                    Student Created!
+                  </h2>
+                  <p className="mt-1 text-[14px] text-[#6b7894]">
+                    {createdResult.user.firstName} {createdResult.user.lastName} has been registered.
+                  </p>
+                </div>
+              </div>
+              <div className="mt-6 rounded-[12px] border border-[#d5ede0] bg-[#f3fbf7] px-5 py-5">
+                <p className="text-[13px] font-extrabold uppercase tracking-[0.1em] text-[#258861]">
+                  Login Credentials
+                </p>
+                <div className="mt-4 space-y-3">
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-[14px] font-semibold text-[#4b6278]">Email</span>
+                    <span className="text-[14px] font-bold text-[#182c4e]">
+                      {createdResult.user.email}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-[14px] font-semibold text-[#4b6278]">Temporary Password</span>
+                    <code className="rounded-[6px] bg-[#e7f5ee] px-3 py-1 text-[14px] font-bold text-[#0f8751]">
+                      {createdResult.password}
+                    </code>
+                  </div>
+                </div>
+                <p className="mt-4 text-[13px] text-[#7a8fa5]">
+                  Share these credentials with the student. They should change their password after first login.
+                </p>
+              </div>
+            </div>
+            <div className="border-t border-[#edf0f7] bg-[#f7fbff] px-6 py-4 sm:px-8">
+              <button
+                type="button"
+                onClick={onClose}
+                className="inline-flex h-12 w-full items-center justify-center rounded-[10px] bg-[#0f8751] text-[16px] font-semibold text-white"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // Create form
+  return (
+    <>
+      <div className="fixed inset-0 z-40 bg-[#1f2430]/55 backdrop-blur-[1.5px]" />
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="relative w-full max-w-[520px] overflow-hidden rounded-[16px] bg-white shadow-[0_34px_90px_rgba(15,25,51,0.24)]">
+          <ModalClose onClose={onClose} label="Close add student modal" />
+
+          <div className="border-b border-[#edf0f7] px-6 py-6 pr-20 sm:px-8">
+            <h2 className="text-[22px] font-extrabold tracking-[-0.04em] text-[#182c4e]">
+              Add New Student
+            </h2>
+            <p className="mt-1 text-[14px] text-[#6b7894]">
+              Register a student under a specific school. A password will be auto-generated.
+            </p>
+          </div>
+
+          <div className="space-y-5 px-6 py-6 sm:px-8">
+            {error && (
+              <p className="rounded-[10px] bg-[#fff0f3] px-4 py-3 text-[14px] text-[#c52c50]">
+                {error}
+              </p>
+            )}
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block">
+                <span className="mb-2 block text-[14px] font-bold text-[#2f4365]">First Name</span>
+                <input
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  placeholder="e.g. Michael"
+                  className="h-12 w-full rounded-[10px] border border-[#dce3f2] px-4 text-[15px] text-[#274267] outline-none focus:border-[#0f8751] placeholder:text-[#98a2b6]"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-[14px] font-bold text-[#2f4365]">Last Name</span>
+                <input
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  placeholder="e.g. Smith"
+                  className="h-12 w-full rounded-[10px] border border-[#dce3f2] px-4 text-[15px] text-[#274267] outline-none focus:border-[#0f8751] placeholder:text-[#98a2b6]"
+                />
+              </label>
+            </div>
+
+            <label className="block">
+              <span className="mb-2 block text-[14px] font-bold text-[#2f4365]">Email Address</span>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="e.g. michael.smith@school.edu"
+                className="h-12 w-full rounded-[10px] border border-[#dce3f2] px-4 text-[15px] text-[#274267] outline-none focus:border-[#0f8751] placeholder:text-[#98a2b6]"
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-2 block text-[14px] font-bold text-[#2f4365]">School</span>
+              <div className="relative">
+                <select
+                  value={selectedSchoolId}
+                  onChange={(e) => setSelectedSchoolId(e.target.value)}
+                  disabled={schoolsLoading}
+                  className="h-12 w-full appearance-none rounded-[10px] border border-[#dce3f2] bg-white px-4 text-[15px] text-[#274267] outline-none focus:border-[#0f8751] disabled:opacity-60"
+                >
+                  <option value="">
+                    {schoolsLoading ? "Loading schools…" : "Select a school"}
+                  </option>
+                  {schools.map((school) => (
+                    <option key={school.id} value={school.id}>
+                      {school.name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#7c88a0]" />
+              </div>
+              <p className="mt-1.5 text-[13px] text-[#8b97ad]">
+                The school this student will be registered under.
+              </p>
+            </label>
+          </div>
+
+          <div className="grid gap-3 border-t border-[#edf0f7] bg-[#f7fbff] px-6 py-4 sm:grid-cols-2 sm:px-8">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={loading}
+              className="inline-flex h-12 items-center justify-center rounded-[10px] border border-[#dce3f2] bg-white px-6 text-[15px] font-semibold text-[#3e5172]"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={
+                loading ||
+                !firstName.trim() ||
+                !lastName.trim() ||
+                !email.trim() ||
+                !selectedSchoolId
+              }
+              className="button-primary inline-flex h-12 items-center justify-center gap-2 rounded-[10px] bg-[#0f8751] px-6 text-[15px] font-semibold text-white disabled:opacity-60"
+            >
+              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+              {loading ? "Creating…" : "Create Student"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -203,7 +435,7 @@ function GrantAccessModal({
       await grantPremiumAccess(
         student.id,
         { plan, durationMonths: Number(duration), reason },
-        authToken
+        authToken,
       );
       onSuccess();
       onClose();
@@ -230,7 +462,6 @@ function GrantAccessModal({
               </p>
             )}
           </div>
-
           <div className="space-y-6 px-6 py-7">
             {error && (
               <p className="rounded-[10px] bg-[#fff0f3] px-4 py-3 text-[14px] text-[#c52c50]">
@@ -252,7 +483,6 @@ function GrantAccessModal({
                 <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#7c88a0]" />
               </div>
             </label>
-
             <label className="block">
               <span className="mb-2 block text-[15px] font-bold text-[#2f4365]">Select Duration</span>
               <div className="relative">
@@ -269,7 +499,6 @@ function GrantAccessModal({
                 <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#7c88a0]" />
               </div>
             </label>
-
             <label className="block">
               <span className="mb-2 block text-[15px] font-bold text-[#2f4365]">
                 Reason for Granting Access
@@ -282,7 +511,6 @@ function GrantAccessModal({
               />
             </label>
           </div>
-
           <div className="grid gap-4 border-t border-[#edf0f7] bg-[#f7fbff] px-4 py-4 sm:grid-cols-2 sm:px-5">
             <button
               type="button"
@@ -362,19 +590,14 @@ function DeactivateStudentModal({
                 )}
               </div>
             </div>
-
             {error && (
               <p className="mt-4 rounded-[10px] bg-[#fff0f3] px-4 py-3 text-[14px] text-[#c52c50]">
                 {error}
               </p>
             )}
-
             <div className="mt-7 rounded-[12px] border border-[#ffd7df] bg-[#fff0f3] px-5 py-5 text-[15px] leading-8 text-[#c52c50]">
-              Warning: Deactivating this account will block all access to the student portal. No
-              data will be deleted, but the student will not be able to log in until the account
-              is reactivated.
+              Warning: Deactivating this account will block all access to the student portal.
             </div>
-
             <label className="mt-6 block">
               <span className="mb-2 block text-[15px] font-bold text-[#2f4365]">
                 Reason for Deactivation
@@ -387,7 +610,6 @@ function DeactivateStudentModal({
               />
             </label>
           </div>
-
           <div className="grid gap-4 border-t border-[#edf0f7] bg-[#f7fbff] px-4 py-4 sm:grid-cols-2 sm:px-5">
             <button
               type="button"
@@ -460,7 +682,6 @@ function ReactivateStudentModal({
               </p>
             )}
           </div>
-
           <div className="space-y-6 px-6 py-7">
             {error && (
               <p className="rounded-[10px] bg-[#fff0f3] px-4 py-3 text-[14px] text-[#c52c50]">
@@ -472,8 +693,7 @@ function ReactivateStudentModal({
                 <CircleAlert className="h-5 w-5" strokeWidth={2.2} />
               </span>
               <div className="text-[16px] leading-8 text-[#46556f]">
-                Restoring access will allow the student to log in using their previous
-                credentials. All course progress and profile data will be immediately available.
+                Restoring access will allow the student to log in using their previous credentials.
               </div>
             </div>
             {student && (
@@ -483,7 +703,6 @@ function ReactivateStudentModal({
               </p>
             )}
           </div>
-
           <div className="grid gap-4 border-t border-[#edf0f7] bg-[#f7fbff] px-4 py-4 sm:grid-cols-2 sm:px-5">
             <button
               type="button"
@@ -512,7 +731,7 @@ function ReactivateStudentModal({
 // ─── Page ─────────────────────────────────────────────────────────────────
 
 type ActiveTab = "all" | "active" | "inactive";
-type ActiveDialog = "grant" | "deactivate" | "reactivate" | null;
+type ActiveDialog = "add" | "grant" | "deactivate" | "reactivate" | null;
 
 export default function StudentsPage() {
   const authToken = useAuthToken();
@@ -521,15 +740,13 @@ export default function StudentsPage() {
     top: number;
     right: number;
   } | null>(null);
-  
-  // Table state
+
   const [students, setStudents] = useState<Student[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
-  // Stats state
   const [stats, setStats] = useState<{
     totalStudents: number;
     activeStudents: number;
@@ -538,18 +755,14 @@ export default function StudentsPage() {
   } | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
 
-  // Filters
   const [activeTab, setActiveTab] = useState<ActiveTab>("all");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
-  // UI state
   const [activeDialog, setActiveDialog] = useState<ActiveDialog>(null);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
   
-
-  // Debounce search input
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   function handleSearchChange(value: string) {
     setSearch(value);
@@ -588,7 +801,6 @@ export default function StudentsPage() {
       };
       const res = await getSchoolStudents(authToken, params);
       setStudents(res.data);
-      // Normalise pagination meta — handle both shapes
       const t = res.meta?.total ?? res.total ?? res.data.length;
       setTotal(t);
     } catch (err) {
@@ -603,26 +815,19 @@ export default function StudentsPage() {
     fetchStudents();
   }, [fetchStats, fetchStudents]);
 
-  // Close menu on outside click
   const menuRef = useRef<HTMLDivElement | null>(null);
-
   useEffect(() => {
     function handler(event: MouseEvent) {
       if (!menuRef.current) return;
-      if (event.target instanceof Node && menuRef.current.contains(event.target)) {
-        return;
-      }
+      if (event.target instanceof Node && menuRef.current.contains(event.target)) return;
       setOpenMenu(null);
     }
-
     document.addEventListener("mousedown", handler);
-    return () => {
-      document.removeEventListener("mousedown", handler);
-    };
+    return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  function openDialog(dialog: ActiveDialog, student: Student) {
-    setSelectedStudent(student);
+  function openDialog(dialog: ActiveDialog, student?: Student) {
+    if (student) setSelectedStudent(student);
     setOpenMenu(null);
     setActiveDialog(dialog);
   }
@@ -632,7 +837,6 @@ export default function StudentsPage() {
     setSelectedStudent(null);
   }
 
-  // Pagination helpers
   function visiblePages(): (number | "…")[] {
     if (totalPages <= 5) return Array.from({ length: totalPages }, (_, i) => i + 1);
     if (page <= 3) return [1, 2, 3, "…", totalPages];
@@ -642,6 +846,18 @@ export default function StudentsPage() {
 
   return (
     <AppShell title="Individual Students" activeSection="student">
+      {/* ── Add Student Modal ── */}
+      {activeDialog === "add" && (
+        <AddStudentModal
+          onClose={closeDialog}
+          onSuccess={() => {
+            fetchStudents();
+            fetchStats();
+          }}
+          authToken={authToken}
+        />
+      )}
+
       {activeDialog === "grant" && (
         <GrantAccessModal
           student={selectedStudent}
@@ -667,17 +883,19 @@ export default function StudentsPage() {
         />
       )}
 
+      {/* ── Header action ── */}
       <section className="flex justify-stretch sm:justify-end">
-        <Link
-           href="/students/create-student"
+        <button
+          type="button"
+          onClick={() => openDialog("add")}
           className="button-primary inline-flex h-14 w-full items-center justify-center gap-3 rounded-[10px] bg-[#4b8a60] px-6 text-[15px] font-semibold text-white shadow-[0_20px_38px_rgba(75,138,96,0.18)] sm:w-auto"
         >
           <Plus className="h-5 w-5" strokeWidth={2.4} />
           Add New Student
-        </Link>
+        </button>
       </section>
 
-      {/* Stats Section with Loading State */}
+      {/* ── Stats ── */}
       <section className="mt-8 grid gap-4 xl:grid-cols-3">
         {statsLoading || !stats ? (
           <>
@@ -687,7 +905,7 @@ export default function StudentsPage() {
           </>
         ) : (
           <>
-                 <StudentSummaryCard
+            <StudentSummaryCard
               label="Total Individual Students"
               value={(stats?.totalStudents ?? 0).toLocaleString()}
               delta="+12%"
@@ -709,7 +927,7 @@ export default function StudentsPage() {
         )}
       </section>
 
-      {/* Tabs */}
+      {/* ── Tabs ── */}
       <section className="mt-8 border-b border-[#e4e8f4]">
         <div className="-mx-2 overflow-x-auto px-2">
           <div className="flex min-w-max gap-10">
@@ -717,10 +935,7 @@ export default function StudentsPage() {
               <button
                 key={key}
                 type="button"
-                onClick={() => {
-                  setActiveTab(key);
-                  setPage(1);
-                }}
+                onClick={() => { setActiveTab(key); setPage(1); }}
                 className={[
                   "border-b-[3px] px-1 pb-3 text-[16px] font-bold transition-colors capitalize",
                   activeTab === key
@@ -767,7 +982,6 @@ export default function StudentsPage() {
           </div>
         </div>
 
-        {/* Loading / Error States */}
         {loading && (
           <div className="flex items-center justify-center gap-3 py-20 text-[#6e7c98]">
             <Loader2 className="h-6 w-6 animate-spin" />
@@ -778,10 +992,23 @@ export default function StudentsPage() {
           <p className="px-8 py-10 text-center text-[15px] text-[#c52c50]">{fetchError}</p>
         )}
         {!loading && !fetchError && students.length === 0 && (
-          <p className="px-8 py-10 text-center text-[15px] text-[#6e7c98]">No students found.</p>
+          <div className="flex flex-col items-center gap-4 px-8 py-16 text-center">
+            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-[#eef1ff] text-[#5065e3]">
+              <Users className="h-8 w-8" strokeWidth={1.8} />
+            </span>
+            <p className="text-[16px] font-semibold text-[#6e7c98]">No students found.</p>
+            <button
+              type="button"
+              onClick={() => openDialog("add")}
+              className="button-primary inline-flex h-11 items-center gap-2 rounded-[10px] bg-[#4b8a60] px-6 text-[14px] font-semibold text-white"
+            >
+              <Plus className="h-4 w-4" strokeWidth={2.4} />
+              Add First Student
+            </button>
+          </div>
         )}
 
-        {/* Mobile Cards - Full Featured */}
+        {/* Mobile Cards */}
         {!loading && !fetchError && students.length > 0 && (
           <div className="space-y-4 p-4 xl:hidden">
             {students.map((row) => (
@@ -803,13 +1030,10 @@ export default function StudentsPage() {
                     </div>
                   </div>
                 </div>
-
                 <div className="mt-5 grid gap-3 rounded-[12px] bg-white p-4 text-[14px] text-[#61708b]">
                   <div className="flex items-center justify-between gap-4">
                     <span className="font-semibold text-[#8b97ad]">Status</span>
-                    <span
-                      className={`font-bold ${row.user.isActive ? "text-[#0b8c50]" : "text-[#76839b]"}`}
-                    >
+                    <span className={`font-bold ${row.user.isActive ? "text-[#0b8c50]" : "text-[#76839b]"}`}>
                       ● {row.user.isActive ? "ACTIVE" : "INACTIVE"}
                     </span>
                   </div>
@@ -822,16 +1046,13 @@ export default function StudentsPage() {
                     <span className="text-[#40516f]">{row.class ?? "—"}</span>
                   </div>
                 </div>
-
                 <div className="mt-4 grid gap-3">
                   <Link
                     href={`/students/${row.id}`}
-                    onClick={() => setOpenMenu(null)}
                     className="inline-flex h-12 items-center justify-center rounded-[10px] border border-[#dce3f2] bg-white px-4 text-[14px] font-semibold text-[#5a6986]"
                   >
                     View Student
                   </Link>
-
                   <button
                     type="button"
                     onClick={() => openDialog("grant", row)}
@@ -839,7 +1060,6 @@ export default function StudentsPage() {
                   >
                     Grant Premium Access
                   </button>
-
                   <button
                     type="button"
                     onClick={() => openDialog("deactivate", row)}
@@ -847,7 +1067,6 @@ export default function StudentsPage() {
                   >
                     Deactivate Student
                   </button>
-
                   <button
                     type="button"
                     onClick={() => openDialog("reactivate", row)}
@@ -913,19 +1132,11 @@ export default function StudentsPage() {
                       {row.class ?? "—"}
                     </td>
                     <td className="border-b border-[#edf0f7] px-6 py-7">
-                      <span
-                        className={`inline-flex min-h-10 items-center rounded-full px-4 py-1.5 text-[13px] font-bold ${planStyle(
-                          "Enterprise"
-                        )}`}
-                      >
+                      <span className={`inline-flex min-h-10 items-center rounded-full px-4 py-1.5 text-[13px] font-bold ${planStyle("Enterprise")}`}>
                         {row.admissionNumber ?? "—"}
                       </span>
                     </td>
-                    <td
-                      className={`border-b border-[#edf0f7] px-6 py-7 text-[13px] font-bold ${
-                        row.user.isActive ? "text-[#0b8c50]" : "text-[#76839b]"
-                      }`}
-                    >
+                    <td className={`border-b border-[#edf0f7] px-6 py-7 text-[13px] font-bold ${row.user.isActive ? "text-[#0b8c50]" : "text-[#76839b]"}`}>
                       <span className="inline-flex items-center gap-2">
                         <span className="h-2.5 w-2.5 rounded-full bg-current" />
                         {row.user.isActive ? "ACTIVE" : "INACTIVE"}
@@ -943,24 +1154,13 @@ export default function StudentsPage() {
                         className="rounded-full p-1.5 text-[#a0aac0] transition-colors hover:bg-[#f5f7fb] hover:text-[#70809d]"
                         onClick={(e) => {
                           e.stopPropagation();
-
-                          if (openMenu?.rowId === row.id) {
-                            setOpenMenu(null);
-                            return;
-                          }
-
+                          if (openMenu?.rowId === row.id) { setOpenMenu(null); return; }
                           const rect = e.currentTarget.getBoundingClientRect();
-
-                          setOpenMenu({
-                            rowId: row.id,
-                            top: rect.bottom + 8,
-                            right: window.innerWidth - rect.right,
-                          });
+                          setOpenMenu({ rowId: row.id, top: rect.bottom + 8, right: window.innerWidth - rect.right });
                         }}
                       >
                         <MoreVertical className="h-5 w-5" strokeWidth={2.25} />
                       </button>
-
                       {openMenu?.rowId === row.id && (
                         <StudentActionMenu
                           menuRef={menuRef}
@@ -995,20 +1195,12 @@ export default function StudentsPage() {
             </button>
             {visiblePages().map((p, idx) =>
               p === "…" ? (
-                <span
-                  key={`ellipsis-${idx}`}
-                  className="flex h-10 w-10 items-center justify-center text-[#93a0b7]"
-                >
-                  …
-                </span>
+                <span key={`ellipsis-${idx}`} className="flex h-10 w-10 items-center justify-center text-[#93a0b7]">…</span>
               ) : (
                 <button
                   key={p}
                   onClick={() => setPage(p as number)}
-                  className={[
-                    "flex h-10 w-10 items-center justify-center rounded-[8px] text-[15px] font-bold",
-                    page === p ? "button-primary bg-[#0f8751] text-white" : "text-[#22314c]",
-                  ].join(" ")}
+                  className={["flex h-10 w-10 items-center justify-center rounded-[8px] text-[15px] font-bold", page === p ? "button-primary bg-[#0f8751] text-white" : "text-[#22314c]"].join(" ")}
                 >
                   {p}
                 </button>

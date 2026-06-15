@@ -103,7 +103,11 @@ export const endpoints = {
     reactivateStudent: (studentId: string) =>
       buildEndpoint(apiBaseUrl, `/admin/students/${studentId}/reactivate`),
     
-
+    // Inside the admin object, after reactivateStudent:
+courses: {
+  delete: (courseId: string) =>
+    buildEndpoint(apiBaseUrl, `/admin/courses/${courseId}`),
+},
     // ─────────────────────────────────────────────────────────────────────────────
 // ADD this `support` block inside the `admin` object in endpoints.ts
 // (place it after the existing `reactivateStudent` entry)

@@ -134,6 +134,106 @@ export interface GrantPremiumAccessResponse {
     grantedAt: string;
   };
 }
+
+
+// ─── Create School (Admin) ─────────────────────────────────────
+
+export interface AdminCreateSchoolPayload {
+  school_name: string;
+  admin_first_name: string;
+  admin_last_name: string;
+  admin_email: string;
+  password: string;
+  country: string;
+  studentLimit?: number;
+}
+
+export interface AdminCreateSchoolResponse {
+  message: string;
+  school: {
+    id: string;
+    name: string;
+    email: string;
+    country: string;
+    population: number;
+    status: string;
+    studentLimit: number;
+    createdAt: string;
+    updatedAt: string;
+  };
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+  };
+}
+
+export async function adminCreateSchool(
+  payload: AdminCreateSchoolPayload,
+  authToken: string
+): Promise<AdminCreateSchoolResponse> {
+  log("adminCreateSchool() called", { school_name: payload.school_name });
+  try {
+    const res = await apiRequest<AdminCreateSchoolResponse>(
+      endpoints.admin.schools,          // POST /admin/schools
+      { method: "POST", authToken, body: payload }
+    );
+    log("adminCreateSchool() response", res);
+    return res;
+  } catch (err) {
+    logError("adminCreateSchool() failed", err);
+    throw err;
+  }
+}
+
+// ─── Create Student (Admin) ────────────────────────────────────
+
+export interface AdminCreateStudentPayload {
+  first_name: string;
+  last_name: string;
+  email: string;
+  school_id: string;
+}
+
+export interface AdminCreateStudentResponse {
+  message: string;
+  token: string;
+  password: string;         // auto-generated password returned by backend
+  student: {
+    id: string;
+    userId: string;
+    schoolId: string;
+    createdAt: string;
+    updatedAt: string;
+  };
+  user: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+}
+
+export async function adminCreateStudent(
+  payload: AdminCreateStudentPayload,
+  authToken: string
+): Promise<AdminCreateStudentResponse> {
+  log("adminCreateStudent() called", { email: payload.email, school_id: payload.school_id });
+  try {
+    const res = await apiRequest<AdminCreateStudentResponse>(
+      endpoints.admin.students,         // POST /admin/students
+      { method: "POST", authToken, body: payload }
+    );
+    log("adminCreateStudent() response", res);
+    return res;
+  } catch (err) {
+    logError("adminCreateStudent() failed", err);
+    throw err;
+  }
+}
+
+
 const DEBUG = true;
 
 function log(tag: string, data?: unknown) {

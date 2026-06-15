@@ -53,6 +53,10 @@ const [courseName, setCourseName] = useState("");
 const [courseDescription, setCourseDescription] = useState("");
 const [courseStatus, setCourseStatus] = useState("");
 
+// Add this state near the other state declarations:
+const [isDeletingCourse, setIsDeletingCourse] = useState(false);
+
+
   useEffect(() => {
     if (!isHydrated) {
       return;
@@ -175,6 +179,26 @@ setCourseStatus(fetchedCourse.status ?? "");
     : "/courses/create/content-upload?modal=module-settings";
 
 
+
+// Add this handler near handleUpdateCourse:
+async function handleDeleteCourse() {
+  if (!course?.id) return;
+  if (!window.confirm(`Permanently delete "${course.name}"? This cannot be undone.`)) return;
+
+  setIsDeletingCourse(true);
+  try {
+    await apiRequest(
+      endpoints.admin.courses.delete(course.id),
+      { method: "DELETE", authToken: session?.token }
+    );
+    window.location.href = "/courses";
+  } catch (error) {
+    alert(error instanceof Error ? error.message : "Failed to delete course.");
+  } finally {
+    setIsDeletingCourse(false);
+  }
+}
+
     
   return (
     <AppShell
@@ -193,11 +217,19 @@ setCourseStatus(fetchedCourse.status ?? "");
           </div>
 
 <div className="flex gap-2 flex-end">
+    <button
+  onClick={handleDeleteCourse}
+  disabled={isDeletingCourse}
+  className="flex h-12 items-center rounded-xl bg-[#ef1f4f] px-5 text-white transition hover:bg-[#c91840] disabled:opacity-60"
+>
+  {isDeletingCourse ? "Deleting…" : "Delete Course"}
+</button>
+
         <button
   onClick={() => setIsEditCourseOpen(true)}
   className="flex h-12 items-center rounded-xl bg-[#16345d] px-5 text-white transition hover:bg-[#102846]"
 >
-  Edit Course
+  Edit Course 
 </button>
 
           <CourseActionLink href={addModuleHref} className="min-w-[220px]">
