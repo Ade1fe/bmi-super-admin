@@ -19,11 +19,11 @@ import { parseSchoolList, type SchoolSummary } from "@/lib/backend-models";
 import { useAuthSession } from "@/lib/auth-session";
 import { apiRequest, endpoints } from "@/lib/endpoints";
 
-const tabs = [
-  { label: "School Setting", active: true },
-  { label: "Support Center" },
-  { label: "Pricing" },
-];
+// const tabs = [
+//   { label: "School Setting", active: true },
+//   { label: "Support Center" },
+//   { label: "Pricing" },
+// ];
 
 function formatCompactNumber(value: number) {
   return new Intl.NumberFormat("en-US", {
@@ -464,7 +464,7 @@ const handleActivateSchool = async (schoolId: string) => {
     }}
   />
 ) : null}
-
+{/* 
       <section className="rounded-[14px] bg-[#f2f4fb] p-3 sm:p-4">
         <div className="-mx-3 overflow-x-auto px-3 sm:mx-0 sm:px-0">
           <div className="flex min-w-max items-center gap-3 sm:flex-wrap sm:gap-10">
@@ -484,7 +484,7 @@ const handleActivateSchool = async (schoolId: string) => {
             ))}
           </div>
         </div>
-      </section>
+      </section> */}
 
       <section className="mt-8 flex justify-stretch sm:justify-end">
         <Link

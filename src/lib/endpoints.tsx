@@ -102,7 +102,55 @@ export const endpoints = {
 
     reactivateStudent: (studentId: string) =>
       buildEndpoint(apiBaseUrl, `/admin/students/${studentId}/reactivate`),
-  },
+    
+
+    // ─────────────────────────────────────────────────────────────────────────────
+// ADD this `support` block inside the `admin` object in endpoints.ts
+// (place it after the existing `reactivateStudent` entry)
+// ─────────────────────────────────────────────────────────────────────────────
+
+ support: {
+  // GET  /admin/support/metrics
+  metrics: buildEndpoint(apiBaseUrl, "/admin/support/metrics"),
+
+  // GET  /admin/support/tickets?category=&status=&search=&page=&limit=
+  tickets: buildEndpoint(apiBaseUrl, "/admin/support/tickets"),
+
+  // GET  /admin/support/tickets/:ticketId
+  ticketById: (ticketId: string) =>
+    buildEndpoint(apiBaseUrl, `/admin/support/tickets/${ticketId}`),
+
+  // PUT  /admin/support/tickets/:ticketId/assign
+  assignAgent: (ticketId: string) =>
+    buildEndpoint(apiBaseUrl, `/admin/support/tickets/${ticketId}/assign`),
+
+  // GET  /admin/support/agents
+  agents: buildEndpoint(apiBaseUrl, "/admin/support/agents"),
+
+  // GET  /admin/support/chats/threads
+  chatThreads: buildEndpoint(apiBaseUrl, "/admin/support/chats/threads"),
+
+  // GET  /admin/support/chats/threads/:threadId/messages
+  chatThreadMessages: (threadId: string) =>
+    buildEndpoint(apiBaseUrl, `/admin/support/chats/threads/${threadId}/messages`),
+
+  // POST /admin/support/chats/threads/:threadId/messages
+  sendMessage: (threadId: string) =>
+    buildEndpoint(apiBaseUrl, `/admin/support/chats/threads/${threadId}/messages`),
+
+  // POST /admin/support/chats/threads
+  createThread: buildEndpoint(apiBaseUrl, "/admin/support/chats/threads"),
+
+  // ✅ ADD THESE TWO HERE — inside support, before the closing },
+  // PUT  /admin/support/tickets/:ticketId/status
+  updateTicketStatus: (ticketId: string) =>
+    buildEndpoint(apiBaseUrl, `/admin/support/tickets/${ticketId}/status`),
+
+  // POST /admin/support/tickets/:ticketId/activities
+  addTicketActivity: (ticketId: string) =>
+    buildEndpoint(apiBaseUrl, `/admin/support/tickets/${ticketId}/activities`),
+},   // ← this closes support
+},   // ← this closes admin
 
   schools: {
     verifyEmail: buildEndpoint(apiBaseUrl, "/schools/verify-email"),

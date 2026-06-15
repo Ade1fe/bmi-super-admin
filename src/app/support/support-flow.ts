@@ -1,552 +1,539 @@
+/**
+ * support-flow.ts
+ *
+ * Single source of truth for all Support-related types, API↔UI mappers,
+ * local-storage helpers, and static display data.
+ *
+ * Backend types live in support-api.ts.
+ * This file converts between them and the richer UI shape the pages consume.
+ */
+
+import type {
+  SupportTicket as ApiTicket,
+  SupportAgent as ApiAgent,
+  ChatThread as ApiChatThread,
+  ChatMessage as ApiChatMessage,
+  SupportMetrics as ApiSupportMetrics,
+} from "@/lib/support-api";
+
+// ─────────────────────────────────────────────────────────────────
+// Re-export API-level enums so pages can use a single import path
+// ─────────────────────────────────────────────────────────────────
+
+export type { ApiTicket, ApiAgent, ApiChatThread, ApiChatMessage };
+
+// ─────────────────────────────────────────────────────────────────
+// UI-side primitive types
+// ─────────────────────────────────────────────────────────────────
+
+/** Display-friendly ticket status (used in selects / badges). */
 export type SupportStatus = "Open" | "In Progress" | "Resolved" | "On Hold";
-export type SupportPriority = "Urgent" | "High" | "Medium" | "Low";
+
+/** Display-friendly ticket priority. */
+export type SupportPriority = "Low" | "Medium" | "High" | "Urgent";
+
+/** Category filter tabs shown across the tickets page. */
 export type SupportCategory =
   | "All Tickets"
   | "Technical"
   | "Payment"
   | "Course Access"
   | "Onboarding";
-export type SupportView = "tickets" | "chat";
-export type SupportDetailMode = "activity" | "execution";
+
+/** Reply-editor mode on the ticket activity page. */
 export type ReplyMode = "public" | "internal";
 
-export type TicketAttachment = {
+/** Tone drives the visual style of an activity card. */
+export type ActivityTone = "requester" | "agent" | "internal";
+
+// ─────────────────────────────────────────────────────────────────
+// Rich UI-side ticket shape
+// ─────────────────────────────────────────────────────────────────
+
+export interface TicketAttachment {
   id: string;
   name: string;
   size?: string;
-  type: "image" | "sheet" | "document";
-};
+  type: "sheet" | "image";
+}
 
-export type TicketActivity = {
+export interface ExecutionStep {
+  id: string;
+  state: "done" | "current" | "pending";
+  timestamp: string;
+  title: string;
+  description: string;
+}
+
+export interface TicketActivity {
   id: string;
   author: string;
   timestamp: string;
   badge: string;
-  tone: "requester" | "internal" | "agent";
+  tone: ActivityTone;
   body: string[];
-  attachment?: TicketAttachment;
-};
+  attachment?: { name: string };
+}
 
-export type ExecutionStep = {
-  id: string;
-  title: string;
-  description: string;
-  state: "current" | "pending" | "complete";
-  timestamp?: string;
-};
+export interface TechnicalDetails {
+  ipAddress: string;
+  sessionId: string;
+  orgCode: string;
+  language: string;
+}
 
-export type SupportTicket = {
-  id: string;
-  ticketNumber: string;
+export interface RequesterHealth {
+  score: string;
+  statement: string;
+  relatedTo: string;
+}
+
+/**
+ * The full UI ticket shape consumed by every support page.
+ * Fields that the API does not yet return are given sensible fallbacks
+ * inside `mapApiTicketToUi`.
+ */
+export interface SupportTicket {
+  // ── identity ──────────────────────────────────────────────────
+  id: string;           // UUID from API
+  ticketNumber: string; // human-readable e.g. "TK-8942"
+  from: string;         // requester display name
+  category: string;     // TECHNICAL → mapped to display value
+
+  // ── status / priority ─────────────────────────────────────────
+  status: SupportStatus;
+  priority: SupportPriority;
+  lastUpdated: string;
+
+  // ── list-view fields ──────────────────────────────────────────
+  title: string;        // derived from subject
+
+  // ── detail-view fields ────────────────────────────────────────
   caseCode: string;
-  title: string;
-  from: string;
+  summary: string;
+  assignedAgent: string;
+  submittedBy: string;
+
+  // ── requester display ─────────────────────────────────────────
   requesterName: string;
   requesterRole: string;
-  requesterAvatar: string;
-  requesterTone: string;
-  category: Exclude<SupportCategory, "All Tickets">;
-  priority: SupportPriority;
-  status: SupportStatus;
-  lastUpdated: string;
-  assignedAgent: string;
-  summary: string;
-  submittedBy: string;
+  requesterAvatar: string;   // 2-letter initials
+  requesterTone: string;     // Tailwind class string for avatar bg/text
+
+  // ── rich content ──────────────────────────────────────────────
+  description: string[];     // paragraphs
+  attachments: TicketAttachment[];
+  executionTimeline: ExecutionStep[];
+  activity: TicketActivity[];
+
+  // ── metadata panels ───────────────────────────────────────────
   environment: string;
   environmentMeta: string;
   identity: string;
   identityMeta: string;
   slaDeadline: string;
   tags: string[];
-  technicalDetails: {
-    ipAddress: string;
-    sessionId: string;
-    orgCode: string;
-    language: string;
-  };
-  requesterHealth: {
-    score: string;
-    statement: string;
-    relatedTo: string;
-  };
-  description: string[];
-  attachments: TicketAttachment[];
-  detailMode: SupportDetailMode;
-  activity: TicketActivity[];
-  executionTimeline: ExecutionStep[];
+  technicalDetails: TechnicalDetails;
+  requesterHealth: RequesterHealth;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// API → UI mappers
+// ─────────────────────────────────────────────────────────────────
+
+const API_TO_UI_STATUS: Record<string, SupportStatus> = {
+  OPEN: "Open",
+  IN_PROGRESS: "In Progress",
+  RESOLVED: "Resolved",
+  CLOSED: "On Hold",
+  ON_HOLD: "On Hold",
 };
 
-export type LiveChatMessage = {
+const API_TO_UI_PRIORITY: Record<string, SupportPriority> = {
+  LOW: "Low",
+  MEDIUM: "Medium",
+  HIGH: "High",
+  URGENT: "High", // "Urgent" maps to "High" in the 3-button UI
+};
+
+const UI_TO_API_STATUS: Record<SupportStatus, string> = {
+  Open: "OPEN",
+  "In Progress": "IN_PROGRESS",
+  Resolved: "RESOLVED",
+  "On Hold": "ON_HOLD",
+};
+
+const UI_TO_API_PRIORITY: Record<SupportPriority, string> = {
+  Low: "LOW",
+  Medium: "MEDIUM",
+  High: "HIGH",
+  Urgent: "URGENT",
+};
+
+export { UI_TO_API_STATUS, UI_TO_API_PRIORITY };
+
+const CATEGORY_MAP: Record<string, string> = {
+  TECHNICAL: "Technical",
+  PAYMENT: "Payment",
+  BILLING: "Payment",
+  COURSE_ACCESS: "Course Access",
+  ONBOARDING: "Onboarding",
+  GENERAL: "Technical",
+};
+
+/** Avatar background + text colour pairs cycling through a palette. */
+const AVATAR_TONES = [
+  "bg-[#e4f7ee] text-[#0f8751]",
+  "bg-[#efe4ff] text-[#6f44ff]",
+  "bg-[#fff2dc] text-[#bd7700]",
+  "bg-[#fde8e8] text-[#d94040]",
+  "bg-[#e0f0ff] text-[#1a7ac8]",
+];
+
+function avatarTone(index: number): string {
+  return AVATAR_TONES[index % AVATAR_TONES.length];
+}
+
+function initials(name: string): string {
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
+function relativeTime(isoString: string): string {
+  const diff = Date.now() - new Date(isoString).getTime();
+  const minutes = Math.floor(diff / 60_000);
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+/**
+ * Maps a raw API ticket to the rich UI shape.
+ * Fields the API doesn't provide yet are filled with sensible placeholders
+ * so every page renders without crashing while the backend catches up.
+ */
+export function mapApiTicketToUi(
+  apiTicket: ApiTicket,
+  index = 0
+): SupportTicket {
+  const displayName = apiTicket.requesterName;
+  const category =
+    CATEGORY_MAP[apiTicket.category?.toUpperCase?.()] ?? apiTicket.category;
+
+  return {
+    // identity
+    id: apiTicket.id,
+    ticketNumber: (apiTicket as ApiTicket & { ticketId?: string }).ticketId ?? `TK-${apiTicket.id.slice(0, 4).toUpperCase()}`,
+    from: displayName,
+    category,
+
+    // status / priority
+    status: API_TO_UI_STATUS[apiTicket.status] ?? "Open",
+    priority: API_TO_UI_PRIORITY[apiTicket.priority] ?? "Medium",
+    lastUpdated: relativeTime(apiTicket.updatedAt),
+
+    // list view
+    title: apiTicket.subject,
+
+    // detail header
+    caseCode: (apiTicket as ApiTicket & { ticketId?: string }).ticketId ?? apiTicket.id.slice(0, 8).toUpperCase(),
+    summary: apiTicket.description.slice(0, 160),
+    assignedAgent: apiTicket.assignedAgentId
+      ? `Agent #${apiTicket.assignedAgentId.slice(0, 6)}`
+      : "Unassigned",
+    submittedBy: apiTicket.requesterEmail,
+
+    // requester display
+    requesterName: displayName,
+    requesterEmail: apiTicket.requesterEmail,
+    requesterRole: "School Admin",
+    requesterAvatar: initials(displayName),
+    requesterTone: avatarTone(index),
+
+    // rich content — API doesn't yet return these; use description as first paragraph
+    description: [apiTicket.description],
+    attachments: [],
+    executionTimeline: [
+      {
+        id: "step-1",
+        state: "done",
+        timestamp: relativeTime(apiTicket.createdAt),
+        title: "Ticket Created",
+        description: "Support request submitted by requester.",
+      },
+      {
+        id: "step-2",
+        state: apiTicket.assignedAgentId ? "done" : "current",
+        timestamp: apiTicket.assignedAgentId
+          ? relativeTime(apiTicket.updatedAt)
+          : "",
+        title: "Agent Assignment",
+        description: apiTicket.assignedAgentId
+          ? `Assigned to agent ${apiTicket.assignedAgentId.slice(0, 6)}.`
+          : "Awaiting agent assignment.",
+      },
+      {
+        id: "step-3",
+        state: ["RESOLVED", "CLOSED"].includes(apiTicket.status) ? "done" : "pending",
+        timestamp: ["RESOLVED", "CLOSED"].includes(apiTicket.status)
+          ? relativeTime(apiTicket.updatedAt)
+          : "",
+        title: "Resolution",
+        description: "Issue addressed and ticket closed.",
+      },
+    ],
+    activity: [],
+
+    // metadata panels — API doesn't expose these yet
+    environment: "Production",
+    environmentMeta: "LMS Web Client",
+    identity: displayName,
+    identityMeta: apiTicket.requesterEmail,
+    slaDeadline: "Within 24 hours",
+    tags: [category.toUpperCase(), apiTicket.priority],
+    technicalDetails: {
+      ipAddress: "—",
+      sessionId: "—",
+      orgCode: "—",
+      language: "en-US",
+    },
+    requesterHealth: {
+      score: "—",
+      statement: "No historical data available.",
+      relatedTo: category,
+    },
+  } as SupportTicket;
+}
+
+/**
+ * Maps a raw API ChatThread to the UI LiveChatThread shape.
+ */
+export function mapApiThreadToUi(
+  apiThread: ApiChatThread,
+  index = 0
+): LiveChatThread {
+  const linked = apiThread.ticket;
+
+  return {
+    id: apiThread.id,
+    participant: apiThread.requesterName,
+    lastSeen: relativeTime(apiThread.updatedAt),
+    unread: apiThread.isNew,
+    preview: linked?.subject ?? "New support thread",
+    badge: linked
+      ? CATEGORY_MAP[linked.category?.toUpperCase?.()] ?? linked.category
+      : "General",
+    avatarTone: avatarTone(index),
+    messages: [],
+  };
+}
+
+/**
+ * Maps a raw API ChatMessage to the UI LiveChatMessage shape.
+ */
+export function mapApiMessageToUi(apiMessage: ApiChatMessage): LiveChatMessage {
+  return {
+    id: apiMessage.id,
+    sender: apiMessage.senderType === "SUPPORT_AGENT" ? "assistant" : "user",
+    body: apiMessage.content,
+    timestamp: relativeTime(apiMessage.createdAt),
+    attachment:
+      apiMessage.attachments.length > 0
+        ? { name: apiMessage.attachments[0], size: "" }
+        : undefined,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Live-chat UI types
+// ─────────────────────────────────────────────────────────────────
+
+export interface LiveChatMessage {
   id: string;
-  sender: "assistant" | "requester";
+  sender: "assistant" | "user";
   body: string;
   timestamp: string;
-  attachment?: TicketAttachment;
-};
+  attachment?: { name: string; size: string };
+}
 
-export type LiveChatThread = {
+export interface LiveChatThread {
   id: string;
   participant: string;
-  avatarTone: string;
   lastSeen: string;
+  unread: boolean;
   preview: string;
   badge: string;
-  unread: boolean;
-  caseCode: string;
+  avatarTone: string;
   messages: LiveChatMessage[];
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Metric display data (driven by API response at runtime;
+// these are static fallbacks used before the first fetch)
+// ─────────────────────────────────────────────────────────────────
+
+export type SupportMetricItem = {
+  key: keyof ApiSupportMetrics;
+  label: string;
+  accentClassName: string;
+  noteClassName: string;
+  value: string | number;
+  suffix?: string;
+  note: string;
 };
 
-export const supportAgents = [
-  "Mark Thompson",
-  "Marcus Vance",
-  "Elena Rossi",
-  "Julian Thorne",
-];
-
-export const supportMetrics = [
-  {
-    label: "Open Tickets",
-    value: "128",
-    note: "+5.2%",
-    noteClassName: "bg-[#e8fbf0] text-[#14a467]",
-    accentClassName: "bg-[#f0ebff] text-[#6b43ff]",
-  },
-  {
-    label: "Pending Schools",
-    value: "14",
-    note: "-5%",
-    noteClassName: "bg-[#fff0f2] text-[#ef4b6a]",
-    accentClassName: "bg-[#eef8f1] text-[#2d8a59]",
-  },
-  {
-    label: "Avg. Response Time",
-    value: "2h 15m",
-    note: "-10%",
-    noteClassName: "bg-[#fff0f2] text-[#ef4b6a]",
-    accentClassName: "bg-[#eef4ff] text-[#3567ff]",
-  },
-  {
-    label: "Satisfaction Score",
-    value: "4.8",
-    suffix: "/5",
-    note: "+2%",
-    noteClassName: "bg-[#e8fbf0] text-[#14a467]",
-    accentClassName: "bg-[#f3ebff] text-[#45304e]",
-  },
-];
-
-export const initialSupportTickets: SupportTicket[] = [
-  {
-    id: "tk-8942",
-    ticketNumber: "#TK-8942",
-    caseCode: "CASE #EDU-2024-8842",
-    title: "Student Grades Sync Timeout Error",
-    from: "Greenwood Academy",
-    requesterName: "Sarah Jenkins",
-    requesterRole: "Requester",
-    requesterAvatar: "SJ",
-    requesterTone: "bg-[#efe4ff] text-[#6f44ff]",
-    category: "Technical",
-    priority: "Urgent",
-    status: "Open",
-    lastUpdated: "12 mins ago",
-    assignedAgent: "Mark Thompson",
-    summary:
-      "Difficulty observed while pushing Q1 student grades to the LMS. Sync request times out after several seconds.",
-    submittedBy: "Greenfield Academy",
-    environment: "macOS v14.2.1",
-    environmentMeta: "Chrome 122.0.X",
-    identity: "Portal ID: EP-9921-X",
-    identityMeta: "Chrome 122.0.x",
-    slaDeadline: "2h 14m remaining",
-    tags: ["LMS_SYNC", "GRADEBOOK"],
-    technicalDetails: {
-      ipAddress: "192.168.1.45",
-      sessionId: "sess_44921xX",
-      orgCode: "OAK_HS_TX",
-      language: "en-US",
+export function buildMetrics(data: ApiSupportMetrics): SupportMetricItem[] {
+  return [
+    {
+      key: "openTickets",
+      label: "Open Tickets",
+      accentClassName: "bg-[#e9eeff] text-[#4b65e0]",
+      noteClassName: "bg-[#eef8f2] text-[#2d8c5c]",
+      value: data.openTickets.value,
+      note: data.openTickets.trend,
     },
-    requesterHealth: {
-      score: "4.8",
-      statement: "Sarah has opened 12 tickets in the last 30 days.",
-      relatedTo: "Integration Sync",
+    {
+      key: "pendingSchools",
+      label: "Pending Schools",
+      accentClassName: "bg-[#fff3e5] text-[#d97706]",
+      noteClassName: "bg-[#fef9ec] text-[#b45309]",
+      value: data.pendingSchools.value,
+      note: data.pendingSchools.trend,
     },
-    description: [
-      "I am unable to sync the student grades for the Q1 \"Advanced Algebra\" course.",
-      "Every time I click the 'Push to LMS' button, it spins for 10 seconds and then gives a \"Timeout Exception\" error. This is critical as the deadline is tomorrow.",
-    ],
-    attachments: [{ id: "error-log", name: "error_log.png", type: "image" }],
-    detailMode: "activity",
-    activity: [
-      {
-        id: "a1",
-        author: "Sarah Jenkins",
-        timestamp: "yesterday at 4:32 PM",
-        badge: "REQUESTER",
-        tone: "requester",
-        body: [
-          "I am unable to sync the student grades for the Q1 \"Advanced Algebra\" course. Every time I click the 'Push to LMS' button, it spins for 10 seconds and then gives a \"Timeout Exception\" error.",
-          "This is critical as the deadline is tomorrow.",
-        ],
-        attachment: { id: "log-one", name: "error_log.png", type: "image" },
-      },
-      {
-        id: "a2",
-        author: "Mark Thompson",
-        timestamp: "today at 9:15 AM",
-        badge: "INTERNAL NOTE",
-        tone: "internal",
-        body: [
-          "Checking the server logs for school OAK-122. Looks like a database deadlock on the grades export table.",
-          "Notifying the DevOps team. @DevTeam - can we look at the transaction isolation levels for this school?",
-        ],
-      },
-      {
-        id: "a3",
-        author: "Mark Thompson",
-        timestamp: "today at 10:45 AM",
-        badge: "SUPPORT AGENT",
-        tone: "agent",
-        body: [
-          "Hello Sarah, thank you for bringing this to our attention. Our engineering team has identified a sync conflict in your account.",
-          "We are currently applying a manual patch to the \"Advanced Algebra\" section. You should see the grades sync correctly within the next hour.",
-        ],
-      },
-    ],
-    executionTimeline: [
-      {
-        id: "e1",
-        title: "Analysis & Testing",
-        description: "LMS Engineering Team is validating patch #492.",
-        state: "current",
-      },
-      {
-        id: "e2",
-        title: "Deployment",
-        description: "Patch queued for the affected tenant.",
-        state: "pending",
-      },
-      {
-        id: "e3",
-        title: "Final Verification",
-        description: "Post-deployment grade sync confirmation.",
-        state: "pending",
-      },
-      {
-        id: "e4",
-        title: "Ticket Initiated",
-        description: "Initial school report received.",
-        state: "complete",
-        timestamp: "Oct 24, 08:00 AM",
-      },
-    ],
-  },
-  {
-    id: "tk-8943",
-    ticketNumber: "#TK-8943",
-    caseCode: "CASE #EDU-2024-8843",
-    title: "Batch LMS Enrollment Synchronization Error",
-    from: "Sarah Jenkins",
-    requesterName: "Greenfield Academy",
-    requesterRole: "Oakwood school Admin",
-    requesterAvatar: "GA",
-    requesterTone: "bg-[#eaf7df] text-[#486f2b]",
-    category: "Technical",
-    priority: "High",
-    status: "In Progress",
-    lastUpdated: "12 mins ago",
-    assignedAgent: "Marcus Vance",
-    summary:
-      "Difficulty observed during the bulk import of 2nd Quarter Student Data from SIS to the LMS platform.",
-    submittedBy: "Greenfield Academy",
-    environment: "Windows 11",
-    environmentMeta: "Edge 122.0",
-    identity: "Portal ID: SIS-1013-TX",
-    identityMeta: "SIS Connector v4.2",
-    slaDeadline: "5h 08m remaining",
-    tags: ["ENROLLMENT", "CSV_IMPORT"],
-    technicalDetails: {
-      ipAddress: "192.168.1.45",
-      sessionId: "sess_66491cK",
-      orgCode: "GRN_FLD_TX",
-      language: "en-US",
+    {
+      key: "avgResponseTime",
+      label: "Avg. Response Time",
+      accentClassName: "bg-[#eef2f7] text-[#536781]",
+      noteClassName: "bg-[#eef8f2] text-[#2d8c5c]",
+      value: data.avgResponseTime.value,
+      note: data.avgResponseTime.trend,
     },
-    requesterHealth: {
-      score: "4.2",
-      statement: "Greenfield Academy has logged 8 cases this semester.",
-      relatedTo: "Enrollment Imports",
+    {
+      key: "satisfactionScore",
+      label: "Satisfaction Score",
+      accentClassName: "bg-[#fffbeb] text-[#d97706]",
+      noteClassName: "bg-[#eef8f2] text-[#2d8c5c]",
+      value: String(data.satisfactionScore.value).split("/")[0],
+      suffix: "/5",
+      note: data.satisfactionScore.trend,
     },
-    description: [
-      "I am unable to sync the student grades for the Q1 \"Advanced Algebra\" course. Every time I click the 'Push to LMS' button, it spins for 10 seconds and then gives a \"Timeout Exception\" error.",
-      "This is critical as the deadline is tomorrow.",
-    ],
-    attachments: [
-      { id: "error-log-2", name: "error_log.png", type: "image" },
-      { id: "source-file", name: "SOURCE_ENROLLMENT_Q2.CSV", size: "(1.2 MB)", type: "sheet" },
-    ],
-    detailMode: "execution",
-    activity: [],
-    executionTimeline: [
-      {
-        id: "x1",
-        title: "Analysis & Testing",
-        description: "LMS Engineering Team is validating patch #492.",
-        state: "current",
-      },
-      {
-        id: "x2",
-        title: "Deployment",
-        description: "Patch will be applied after validation.",
-        state: "pending",
-      },
-      {
-        id: "x3",
-        title: "Final Verification",
-        description: "Cross-check import records with SIS output.",
-        state: "pending",
-      },
-      {
-        id: "x4",
-        title: "Ticket Initiated",
-        description: "Bulk enrollment import error logged by school admin.",
-        state: "complete",
-        timestamp: "Oct 24, 08:00 AM",
-      },
-    ],
-  },
-  {
-    id: "tk-8944",
-    ticketNumber: "#TK-8944",
-    caseCode: "CASE #EDU-2024-8844",
-    title: "Course Thumbnail Not Updating",
-    from: "Emerald High School",
-    requesterName: "Emerald High School",
-    requesterRole: "Curriculum Admin",
-    requesterAvatar: "EH",
-    requesterTone: "bg-[#eaf7df] text-[#486f2b]",
-    category: "Technical",
-    priority: "Low",
-    status: "Resolved",
-    lastUpdated: "12 mins ago",
-    assignedAgent: "Elena Rossi",
-    summary: "Thumbnail cache retained outdated artwork after course metadata update.",
-    submittedBy: "Emerald High School",
-    environment: "macOS v14.1",
-    environmentMeta: "Safari 17.2",
-    identity: "Portal ID: ART-2201",
-    identityMeta: "CMS Node 7",
-    slaDeadline: "Resolved",
-    tags: ["CATALOG", "MEDIA"],
-    technicalDetails: {
-      ipAddress: "192.168.1.62",
-      sessionId: "sess_1137xaQ",
-      orgCode: "EMR_HS_TX",
-      language: "en-US",
-    },
-    requesterHealth: {
-      score: "4.9",
-      statement: "Emerald High School rarely opens requests.",
-      relatedTo: "Media Library",
-    },
-    description: ["Resolved by clearing the tenant cache and regenerating the course asset bundle."],
-    attachments: [],
-    detailMode: "activity",
-    activity: [],
-    executionTimeline: [],
-  },
-  {
-    id: "tk-8945",
-    ticketNumber: "#TK-8945",
-    caseCode: "CASE #EDU-2024-8845",
-    title: "Parent Access Reset Request",
-    from: "Oakland Private School",
-    requesterName: "Oakland Private School",
-    requesterRole: "Operations Desk",
-    requesterAvatar: "OP",
-    requesterTone: "bg-[#e9f1ff] text-[#3567ff]",
-    category: "Onboarding",
-    priority: "Medium",
-    status: "Open",
-    lastUpdated: "12 mins ago",
-    assignedAgent: "Julian Thorne",
-    summary: "Multiple parent accounts require onboarding link regeneration after SSO migration.",
-    submittedBy: "Oakland Private School",
-    environment: "Windows 11",
-    environmentMeta: "Chrome 121.0",
-    identity: "Portal ID: OPS-4481",
-    identityMeta: "SSO Migration Batch",
-    slaDeadline: "9h 20m remaining",
-    tags: ["ONBOARDING", "SSO"],
-    technicalDetails: {
-      ipAddress: "192.168.4.42",
-      sessionId: "sess_99244bd",
-      orgCode: "OAK_PS_TX",
-      language: "en-US",
-    },
-    requesterHealth: {
-      score: "4.7",
-      statement: "Oakland Private School has stable support usage.",
-      relatedTo: "Parent Access",
-    },
-    description: ["The onboarding emails were not received after the parent directory sync was completed."],
-    attachments: [],
-    detailMode: "activity",
-    activity: [],
-    executionTimeline: [],
-  },
-];
-
-export const initialLiveChatThreads: LiveChatThread[] = [
-  {
-    id: "chat-1",
-    participant: "Sarah Jenkins",
-    avatarTone: "bg-[#efe4ff] text-[#6f44ff]",
-    lastSeen: "yesterday at 4:32 PM",
-    preview: "I am unable to sync the student...",
-    badge: "CASE #EDU-2024-8842",
-    unread: true,
-    caseCode: "CASE #EDU-2024-8842",
-    messages: [
-      {
-        id: "m1",
-        sender: "assistant",
-        body: "Hi, Ada, just a reminder that our zonal meeting is scheduled for this Saturday at 10 AM. Hope you can make it.",
-        timestamp: "May 25, 2025, 11:44am",
-      },
-      {
-        id: "m2",
-        sender: "requester",
-        body: "Thanks, Chairman! Yes, I’ll be there. Will the meeting link be shared here?",
-        timestamp: "May 25, 2025, 11:44am",
-      },
-      {
-        id: "m3",
-        sender: "assistant",
-        body: "Yes, I’ll drop the link here by Friday evening. Also, don’t forget to review the agenda shared earlier this weekend for this Saturday at 10 AM. Hope you can make it.",
-        timestamp: "May 25, 2025, 11:44am",
-        attachment: { id: "pdf-1", name: "Order of meeting.pdf", size: "1.2 MB", type: "document" },
-      },
-      {
-        id: "m4",
-        sender: "requester",
-        body: "Got it. I’ve gone through it. Looking forward to the discussion on dues restructuring.",
-        timestamp: "May 25, 2025, 11:44am",
-      },
-      {
-        id: "m5",
-        sender: "assistant",
-        body: "Perfect. See you then!",
-        timestamp: "May 25, 2025, 11:44am",
-      },
-    ],
-  },
-  {
-    id: "chat-2",
-    participant: "Greenfield Academy",
-    avatarTone: "bg-[#eaf7df] text-[#486f2b]",
-    lastSeen: "15 min ago",
-    preview: "I am unable to sync the student...",
-    badge: "CASE #EDU-2024-8842",
-    unread: true,
-    caseCode: "CASE #EDU-2024-8842",
-    messages: [],
-  },
-  {
-    id: "chat-3",
-    participant: "Greenfield Academy",
-    avatarTone: "bg-[#eaf7df] text-[#486f2b]",
-    lastSeen: "15 min ago",
-    preview: "I am unable to sync the student...",
-    badge: "CASE #EDU-2024-8842",
-    unread: true,
-    caseCode: "CASE #EDU-2024-8842",
-    messages: [],
-  },
-  {
-    id: "chat-4",
-    participant: "Sarah Jenkins",
-    avatarTone: "bg-[#efe4ff] text-[#6f44ff]",
-    lastSeen: "yesterday at 4:32 PM",
-    preview: "I am unable to sync the student...",
-    badge: "CASE #EDU-2024-8842",
-    unread: true,
-    caseCode: "CASE #EDU-2024-8842",
-    messages: [],
-  },
-];
-
-const supportTicketsStorageKey = "bmi-super-admin-support-tickets";
-
-export function buildSupportHref(view: SupportView = "tickets") {
-  return view === "chat" ? "/support/live-chat" : "/support";
+  ];
 }
 
-export function buildSupportTicketHref(ticket: SupportTicket) {
-  return ticket.detailMode === "execution"
-    ? `/support/${ticket.id}/execution`
-    : `/support/${ticket.id}`;
+/** Static fallback metrics rendered before the API responds. */
+export const supportMetrics: SupportMetricItem[] = buildMetrics({
+  openTickets: { value: "—", trend: "…" },
+  pendingSchools: { value: "—", trend: "…" },
+  avgResponseTime: { value: "—", trend: "…" },
+  satisfactionScore: { value: "—/5", trend: "…" },
+});
+
+// ─────────────────────────────────────────────────────────────────
+// Static agent list (used as fallback; replace with API response)
+// ─────────────────────────────────────────────────────────────────
+
+export const supportAgents: string[] = ["Unassigned"];
+
+/** Merges real agents from the API into the agents list. */
+export function buildAgentOptions(agents: ApiAgent[]): string[] {
+  return [
+    "Unassigned",
+    ...agents.map((a) => `${a.firstName} ${a.lastName}`),
+  ];
 }
 
-export function loadStoredSupportTickets() {
-  if (typeof window === "undefined") {
-    return initialSupportTickets;
+// ─────────────────────────────────────────────────────────────────
+// Routing helpers
+// ─────────────────────────────────────────────────────────────────
+
+export function buildSupportHref(tab: "tickets" | "chat"): string {
+  return tab === "tickets" ? "/support" : "/support/live-chat";
+}
+
+export function buildSupportTicketHref(ticket: SupportTicket): string {
+  return `/support/${ticket.id}`;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Tailwind class helpers
+// ─────────────────────────────────────────────────────────────────
+
+export function ticketPriorityClassName(priority: SupportPriority): string {
+  switch (priority) {
+    case "Urgent":
+    case "High":
+      return "text-[#e53e3e]";
+    case "Medium":
+      return "text-[#d97706]";
+    case "Low":
+      return "text-[#2d8c5c]";
   }
+}
 
-  const storedValue = window.localStorage.getItem(supportTicketsStorageKey);
-
-  if (!storedValue) {
-    return initialSupportTickets;
+export function ticketStatusClassName(status: SupportStatus): string {
+  switch (status) {
+    case "Open":
+      return "text-[#5a43ff]";
+    case "In Progress":
+      return "text-[#d97706]";
+    case "Resolved":
+      return "text-[#2d8c5c]";
+    case "On Hold":
+      return "text-[#8391a8]";
   }
+}
 
+// ─────────────────────────────────────────────────────────────────
+// LocalStorage persistence
+// (keeps the UI functional when the user navigates between pages
+//  without re-fetching; overwritten by real API data on mount)
+// ─────────────────────────────────────────────────────────────────
+
+const TICKETS_KEY = "support:tickets:v2";
+const THREADS_KEY = "support:threads:v2";
+
+export const initialSupportTickets: SupportTicket[] = [];
+export const initialLiveChatThreads: LiveChatThread[] = [];
+
+export function persistSupportTickets(tickets: SupportTicket[]): void {
+  if (typeof window === "undefined") return;
   try {
-    const parsedValue = JSON.parse(storedValue);
-
-    if (!Array.isArray(parsedValue)) {
-      return initialSupportTickets;
-    }
-
-    return parsedValue as SupportTicket[];
+    window.localStorage.setItem(TICKETS_KEY, JSON.stringify(tickets));
   } catch {
-    return initialSupportTickets;
+    // storage full or unavailable — silently ignore
   }
 }
 
-export function persistSupportTickets(tickets: SupportTicket[]) {
-  if (typeof window === "undefined") {
-    return;
+export function loadStoredSupportTickets(): SupportTicket[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(TICKETS_KEY);
+    return raw ? (JSON.parse(raw) as SupportTicket[]) : [];
+  } catch {
+    return [];
   }
-
-  window.localStorage.setItem(supportTicketsStorageKey, JSON.stringify(tickets));
 }
 
-export function ticketStatusClassName(status: SupportStatus) {
-  if (status === "Open") {
-    return "text-[#14b96b]";
-  }
-
-  if (status === "In Progress") {
-    return "text-[#ffb71c]";
-  }
-
-  if (status === "Resolved") {
-    return "text-[#a4adc7]";
-  }
-
-  return "text-[#426d50]";
+export function persistLiveChatThreads(threads: LiveChatThread[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(THREADS_KEY, JSON.stringify(threads));
+  } catch {}
 }
 
-export function ticketPriorityClassName(priority: SupportPriority) {
-  if (priority === "Urgent") {
-    return "text-[#ff4a4a]";
+export function loadStoredLiveChatThreads(): LiveChatThread[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(THREADS_KEY);
+    return raw ? (JSON.parse(raw) as LiveChatThread[]) : [];
+  } catch {
+    return [];
   }
-
-  if (priority === "High") {
-    return "text-[#ff8b12]";
-  }
-
-  if (priority === "Medium") {
-    return "text-[#4564ff]";
-  }
-
-  return "text-[#9caac5]";
 }
