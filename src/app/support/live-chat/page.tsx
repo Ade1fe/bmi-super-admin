@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Bot, EllipsisVertical, Link2, Loader2, SendHorizontal } from "lucide-react";
+import { Bot, EllipsisVertical, Link2, Loader2, Plus, SendHorizontal } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import {
   buildSupportHref,
@@ -15,6 +15,8 @@ import {
   type LiveChatThread,
 } from "@/app/support/support-flow";
 import {
+  ChatMessage,
+  createChatThread,
   getChatThreadMessages,
   getChatThreads,
   sendChatMessage,
@@ -186,18 +188,58 @@ export default function SupportLiveChatPage() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [threads, activeThreadId]);
 
+
+  // ── new thread modal ──────────────────────────────────────────
+const [showNewThread, setShowNewThread] = useState(false);
+const [newThreadForm, setNewThreadForm] = useState({
+  requesterName: "",
+  requesterEmail: "",
+  initialMessage: "",
+});
+const [creating, setCreating] = useState(false);
+
+const handleCreateThread = async () => {
+  const { requesterName, requesterEmail, initialMessage } = newThreadForm;
+  if (!requesterName.trim() || !requesterEmail.trim() || !initialMessage.trim()) return;
+  if (!authToken) return;
+
+  setCreating(true);
+  try {
+    const newThread = await createChatThread(
+      { requesterName, requesterEmail, initialMessage },
+      authToken,
+    );
+
+    // Re-fetch all threads from backend
+    const apiThreads = await getChatThreads(authToken);
+    const uiThreads = apiThreads.map((t, i) => mapApiThreadToUi(t, i));
+    setThreads(uiThreads);
+    persistLiveChatThreads(uiThreads);
+
+    // Activate the newly created thread
+    setActiveThreadId(newThread.id);
+
+    setShowNewThread(false);
+    setNewThreadForm({ requesterName: "", requesterEmail: "", initialMessage: "" });
+  } catch (err) {
+    console.error("[create thread failed]", err);
+  } finally {
+    setCreating(false);
+  }
+};
+
   // ── send message ──────────────────────────────────────────────
   const handleSend = async () => {
     const trimmed = draft.trim();
     if (!trimmed || !activeThreadId || !authToken) return;
 
     // optimistic update
-    const optimisticMsg: LiveChatMessage = {
-      id: `optimistic-${Date.now()}`,
-      sender: "assistant",
-      body: trimmed,
-      timestamp: "Just now",
-    };
+const optimisticMsg: LiveChatMessage = {
+  id: `optimistic-${Date.now()}`,
+  sender: "user",        // ← was "assistant" — admin sends from the right side
+  body: trimmed,
+  timestamp: "Just now",
+};
     setThreads((prev) =>
       prev.map((t) =>
         t.id === activeThreadId
@@ -214,32 +256,35 @@ export default function SupportLiveChatPage() {
     setDraft("");
     setSending(true);
 
-    try {
-      const res = await sendChatMessage(
-        activeThreadId,
-        { content: trimmed, attachments: [] },
-        authToken,
-      );
+try {
+  const res = await sendChatMessage(
+    activeThreadId,
+    { content: trimmed, attachments: [] },
+    authToken,
+  );
 
-      // Replace optimistic message with real one if API returns it
-      const realMsg = res.data ?? res;
-      if (realMsg && (realMsg as { id?: string }).id) {
-        setThreads((prev) =>
-          prev.map((t) =>
-            t.id === activeThreadId
-              ? {
-                  ...t,
-                  messages: t.messages.map((m) =>
-                    m.id === optimisticMsg.id
-                      ? mapApiMessageToUi(realMsg as Parameters<typeof mapApiMessageToUi>[0])
-                      : m,
-                  ),
-                }
-              : t,
-          ),
-        );
-      }
-    } catch {
+  // Backend returns message directly: { id, content, senderType, ... }
+  const realMsg = (res as { id?: string }).id
+    ? res
+    : (res as { data?: ChatMessage }).data;
+
+  if (realMsg && (realMsg as { id?: string }).id) {
+    setThreads((prev) =>
+      prev.map((t) =>
+        t.id === activeThreadId
+          ? {
+              ...t,
+              messages: t.messages.map((m) =>
+                m.id === optimisticMsg.id
+                  ? mapApiMessageToUi(realMsg as Parameters<typeof mapApiMessageToUi>[0])
+                  : m,
+              ),
+            }
+          : t,
+      ),
+    );
+  }
+} catch {
       // leave the optimistic message in place; consider showing a retry UI
     } finally {
       setSending(false);
@@ -272,11 +317,27 @@ export default function SupportLiveChatPage() {
         <div className="grid min-h-0 flex-1 lg:grid-cols-[406px_minmax(0,1fr)]">
           {/* ── thread sidebar ── */}
           <aside className="border-r border-[#e7ebf7] bg-white">
-            <div className="border-b border-[#edf1f7] px-6 py-8">
-              <h2 className="text-[24px] font-extrabold tracking-[-0.04em] text-[#172f54]">
-                Live Chat Support Centre
-              </h2>
-            </div>
+       <div className="border-b border-[#edf1f7] px-6 py-8">
+  <div className="flex items-center justify-between gap-3">
+    <h2 className="text-[24px] font-extrabold tracking-[-0.04em] text-[#172f54]">
+      Live Chat Support Centre
+    </h2>
+ <div className="flex">
+       <h2 className="text-[24px] font-extrabold tracking-[-0.04em] text-[#172f54]">
+      New chat
+    </h2>
+     <button
+      type="button"
+      onClick={() => setShowNewThread(true)}
+      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[#0f8751] text-white shadow-sm"
+      title="New Chat"
+    >
+  
+      <Plus className="h-5 w-5" strokeWidth={2.2} />
+    </button>
+ </div>
+  </div>
+</div>
 
             <div className="overflow-y-auto">
               {threadsLoading && threads.length === 0 ? (
@@ -380,6 +441,9 @@ export default function SupportLiveChatPage() {
                 )}
               </div>
 
+
+              
+
               {/* composer */}
               <div className="border-t border-[#edf1f7] px-6 py-5 lg:px-8">
                 <div className="flex items-center gap-4 rounded-[18px] border border-[#dfe6f7] bg-white px-4 py-3 shadow-[0_12px_26px_rgba(185,194,224,0.08)]">
@@ -422,6 +486,75 @@ export default function SupportLiveChatPage() {
               Select a conversation
             </section>
           )}
+
+          {showNewThread && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+    <div className="w-full max-w-md rounded-[20px] bg-white p-8 shadow-xl">
+      <h3 className="text-[20px] font-extrabold tracking-[-0.04em] text-[#172f54]">
+        New Chat Thread
+      </h3>
+      <p className="mt-1 text-[14px] text-[#7a879e]">
+        Start a support thread with a requester.
+      </p>
+
+      <div className="mt-6 space-y-4">
+        <div>
+          <label className="mb-1.5 block text-[14px] font-bold text-[#2f405d]">
+            Requester Name
+          </label>
+          <input
+            value={newThreadForm.requesterName}
+            onChange={(e) => setNewThreadForm((f) => ({ ...f, requesterName: e.target.value }))}
+            placeholder="e.g. Mizza Davis"
+            className="w-full rounded-[12px] border border-[#dfe6f7] px-4 py-3 text-[15px] text-[#172f54] outline-none focus:border-[#0f8751]"
+          />
+        </div>
+        <div>
+          <label className="mb-1.5 block text-[14px] font-bold text-[#2f405d]">
+            Requester Email
+          </label>
+          <input
+            type="email"
+            value={newThreadForm.requesterEmail}
+            onChange={(e) => setNewThreadForm((f) => ({ ...f, requesterEmail: e.target.value }))}
+            placeholder="e.g. mizza@school.com"
+            className="w-full rounded-[12px] border border-[#dfe6f7] px-4 py-3 text-[15px] text-[#172f54] outline-none focus:border-[#0f8751]"
+          />
+        </div>
+        <div>
+          <label className="mb-1.5 block text-[14px] font-bold text-[#2f405d]">
+            Initial Message
+          </label>
+          <textarea
+            rows={3}
+            value={newThreadForm.initialMessage}
+            onChange={(e) => setNewThreadForm((f) => ({ ...f, initialMessage: e.target.value }))}
+            placeholder="Describe the support issue…"
+            className="w-full resize-none rounded-[12px] border border-[#dfe6f7] px-4 py-3 text-[15px] text-[#172f54] outline-none focus:border-[#0f8751]"
+          />
+        </div>
+      </div>
+
+      <div className="mt-6 flex gap-3">
+        <button
+          type="button"
+          onClick={() => setShowNewThread(false)}
+          className="flex-1 rounded-[12px] border border-[#dfe6f7] py-3 text-[15px] font-bold text-[#5f7290]"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={handleCreateThread}
+          disabled={creating || !newThreadForm.requesterName.trim() || !newThreadForm.requesterEmail.trim() || !newThreadForm.initialMessage.trim()}
+          className="flex-1 rounded-[12px] bg-[#0f8751] py-3 text-[15px] font-bold text-white disabled:opacity-60"
+        >
+          {creating ? "Creating…" : "Create Thread"}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
         </div>
       </div>
     </AppShell>

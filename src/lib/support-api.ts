@@ -155,17 +155,22 @@ function logError(tag: string, error: unknown) {
 export async function getSupportMetrics(authToken: string) {
   log("getSupportMetrics() called");
   try {
-    const res = await apiRequest<SupportMetrics>(
+    const res = await apiRequest<SupportMetrics | { data: SupportMetrics }>(
       endpoints.admin.support.metrics,
       { method: "GET", authToken }
     );
     log("getSupportMetrics() response", res);
-    return res;
+    // Unwrap { data: {...} } if present
+    if (res && typeof res === "object" && "data" in res && !("openTickets" in res)) {
+      return (res as { data: SupportMetrics }).data;
+    }
+    return res as SupportMetrics;
   } catch (err) {
     logError("getSupportMetrics() failed", err);
     throw err;
   }
 }
+
 
 /**
  * GET /admin/support/tickets?category=&status=&search=&page=&limit=
@@ -319,15 +324,23 @@ export async function addTicketActivity(
  * GET /admin/support/chats/threads
  * Fetch all live-chat threads.
  */
-export async function getChatThreads(authToken: string) {
+/**
+ * GET /admin/support/chats/threads
+ * Backend returns either ChatThread[] directly OR { data: ChatThread[] }
+ */
+export async function getChatThreads(authToken: string): Promise<ChatThread[]> {
   log("getChatThreads() called");
   try {
-    const res = await apiRequest<ChatThread[]>(
+    const res = await apiRequest<ChatThread[] | { data: ChatThread[] }>(
       endpoints.admin.support.chatThreads,
       { method: "GET", authToken }
     );
     log("getChatThreads() response", res);
-    return res;
+    if (Array.isArray(res)) return res;
+    if (res && typeof res === "object" && Array.isArray((res as { data: ChatThread[] }).data)) {
+      return (res as { data: ChatThread[] }).data;
+    }
+    return [];
   } catch (err) {
     logError("getChatThreads() failed", err);
     throw err;
@@ -336,35 +349,38 @@ export async function getChatThreads(authToken: string) {
 
 /**
  * GET /admin/support/chats/threads/:threadId/messages
- * Fetch all messages belonging to a chat thread.
+ * Backend returns either ChatMessage[] directly OR { data: ChatMessage[] }
  */
 export async function getChatThreadMessages(
   threadId: string,
   authToken: string
-) {
+): Promise<ChatMessage[]> {
   log("getChatThreadMessages() called", { threadId });
   try {
-    const res = await apiRequest<ChatMessage[]>(
+    const res = await apiRequest<ChatMessage[] | { data: ChatMessage[] }>(
       endpoints.admin.support.chatThreadMessages(threadId),
       { method: "GET", authToken }
     );
     log("getChatThreadMessages() response", res);
-    return res;
+    if (Array.isArray(res)) return res;
+    if (res && typeof res === "object" && Array.isArray((res as { data: ChatMessage[] }).data)) {
+      return (res as { data: ChatMessage[] }).data;
+    }
+    return [];
   } catch (err) {
     logError("getChatThreadMessages() failed", err);
     throw err;
   }
 }
-
 /**
  * POST /admin/support/chats/threads/:threadId/messages
- * Send a message to an existing chat thread.
+ * Backend returns the message directly (no wrapper): { id, content, ... }
  */
 export async function sendChatMessage(
   threadId: string,
   payload: SendChatMessagePayload,
   authToken: string
-) {
+): Promise<SendChatMessageResponse> {
   log("sendChatMessage() called", { threadId, payload });
   try {
     const res = await apiRequest<SendChatMessageResponse>(
@@ -388,20 +404,23 @@ export async function sendChatMessage(
 
 /**
  * POST /admin/support/chats/threads
- * Create a new support chat thread.
+ * Backend returns the thread directly (no wrapper): { id, requesterName, ... }
  */
 export async function createChatThread(
   payload: CreateChatThreadPayload,
   authToken: string
-) {
+): Promise<ChatThread> {
   log("createChatThread() called", payload);
   try {
-    const res = await apiRequest<CreateChatThreadResponse>(
+    const res = await apiRequest<ChatThread | { data: ChatThread }>(
       endpoints.admin.support.createThread,
       { method: "POST", authToken, body: payload }
     );
     log("createChatThread() response", res);
-    return res;
+    // Your API returns the thread directly (confirmed from Postman)
+    if (res && (res as ChatThread).id) return res as ChatThread;
+    if (res && (res as { data: ChatThread }).data?.id) return (res as { data: ChatThread }).data;
+    return res as ChatThread;
   } catch (err) {
     logError("createChatThread() failed", err);
     throw err;
