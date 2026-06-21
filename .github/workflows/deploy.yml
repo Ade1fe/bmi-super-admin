@@ -1,0 +1,106 @@
+name: Deploy Next.js to cPanel
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout repository
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # Install dependencies
+      - name: Install dependencies
+        run: npm install
+
+      # Clean previous build
+      - name: Clean previous build
+        run: rm -rf .next
+
+      # Build Next.js app
+      - name: Build application
+        run: npm run build
+
+      # Create deployment archive
+      - name: Create deployment zip
+        run: |
+          zip -r deploy.zip \
+            .next \
+            public \
+            package.json \
+            package-lock.json \
+            next.config.js \
+            server.js \
+            src \
+            app \
+            pages \
+            prisma \
+            .env.production \
+            -x "node_modules/*" \
+            -x ".git/*"
+
+      # Upload archive
+      - name: Upload files to cPanel
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.CPANEL_HOST }}
+          username: ${{ secrets.CPANEL_USERNAME }}
+          password: ${{ secrets.CPANEL_PASSWORD }}
+          port: 21098
+          source: "deploy.zip"
+          target: "/home/arayghrf/admin.bmilms.ng"
+
+      # Deploy on server
+      - name: Deploy application
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.CPANEL_HOST }}
+          username: ${{ secrets.CPANEL_USERNAME }}
+          password: ${{ secrets.CPANEL_PASSWORD }}
+          port: 21098
+          script: |
+            set -e
+
+            APP_DIR="/home/arayghrf/admin.bmilms.ng"
+
+            echo "Changing directory..."
+            cd $APP_DIR
+
+            echo "Activating cPanel Node virtual environment..."
+            # The path is based on your error trace: /home/arayghrf/nodevenv/admin.bmilms.ng/20
+            source /home/arayghrf/nodevenv/admin.bmilms.ng/20/bin/activate || true
+
+            echo "Cleaning old build and dependencies..."
+            rm -rf .next node_modules package-lock.json
+
+            echo "Extracting deployment..."
+            unzip -oq deploy.zip
+
+            echo "Removing zip..."
+            rm -f deploy.zip
+
+            echo "Installing dependencies..."
+            npm install --production
+
+            # echo "Running Prisma generate..."
+            # if [ -f "prisma/schema.prisma" ]; then
+            #   npx prisma generate
+            # fi
+
+            echo "Restarting Passenger app..."
+            mkdir -p tmp
+            touch tmp/restart.txt
+
+            echo "Deployment completed successfully."

@@ -61,9 +61,6 @@ const authSessionStorageKey = "bmi-super-admin-session";
 
 const AuthSessionContext = createContext<AuthSessionContextValue | null>(null);
 
-
-
-
 function isRecord(value: unknown): value is AuthRecord {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }

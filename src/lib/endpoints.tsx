@@ -6,10 +6,10 @@ type JsonValue =
   | JsonValue[]
   | { [key: string]: JsonValue };
 
-  type ApiObject = { [key: string]: JsonValue };
+type ApiObject = { [key: string]: JsonValue };
 
-export interface RegisterStudentPayload extends ApiObject {}
-export interface StudentLoginPayload extends ApiObject {}
+export interface RegisterStudentPayload extends ApiObject { }
+export interface StudentLoginPayload extends ApiObject { }
 
 
 type ApiRequestOptions = Omit<RequestInit, "body"> & {
@@ -65,7 +65,7 @@ function logApiEvent(label: string, details: Record<string, unknown>) {
 }
 
 const apiBaseUrl = normalizeBaseUrl(
-  process.env.NEXT_PUBLIC_API_BASE_URL
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://api.bmilms.ng/api/v1"
 );
 
 export const apiConfig = {
@@ -102,59 +102,59 @@ export const endpoints = {
 
     reactivateStudent: (studentId: string) =>
       buildEndpoint(apiBaseUrl, `/admin/students/${studentId}/reactivate`),
-    
+
     // Inside the admin object, after reactivateStudent:
-courses: {
-  delete: (courseId: string) =>
-    buildEndpoint(apiBaseUrl, `/admin/courses/${courseId}`),
-},
+    courses: {
+      delete: (courseId: string) =>
+        buildEndpoint(apiBaseUrl, `/admin/courses/${courseId}`),
+    },
     // ─────────────────────────────────────────────────────────────────────────────
-// ADD this `support` block inside the `admin` object in endpoints.ts
-// (place it after the existing `reactivateStudent` entry)
-// ─────────────────────────────────────────────────────────────────────────────
+    // ADD this `support` block inside the `admin` object in endpoints.ts
+    // (place it after the existing `reactivateStudent` entry)
+    // ─────────────────────────────────────────────────────────────────────────────
 
- support: {
-  // GET  /admin/support/metrics
-  metrics: buildEndpoint(apiBaseUrl, "/admin/support/metrics"),
+    support: {
+      // GET  /admin/support/metrics
+      metrics: buildEndpoint(apiBaseUrl, "/admin/support/metrics"),
 
-  // GET  /admin/support/tickets?category=&status=&search=&page=&limit=
-  tickets: buildEndpoint(apiBaseUrl, "/admin/support/tickets"),
+      // GET  /admin/support/tickets?category=&status=&search=&page=&limit=
+      tickets: buildEndpoint(apiBaseUrl, "/admin/support/tickets"),
 
-  // GET  /admin/support/tickets/:ticketId
-  ticketById: (ticketId: string) =>
-    buildEndpoint(apiBaseUrl, `/admin/support/tickets/${ticketId}`),
+      // GET  /admin/support/tickets/:ticketId
+      ticketById: (ticketId: string) =>
+        buildEndpoint(apiBaseUrl, `/admin/support/tickets/${ticketId}`),
 
-  // PUT  /admin/support/tickets/:ticketId/assign
-  assignAgent: (ticketId: string) =>
-    buildEndpoint(apiBaseUrl, `/admin/support/tickets/${ticketId}/assign`),
+      // PUT  /admin/support/tickets/:ticketId/assign
+      assignAgent: (ticketId: string) =>
+        buildEndpoint(apiBaseUrl, `/admin/support/tickets/${ticketId}/assign`),
 
-  // GET  /admin/support/agents
-  agents: buildEndpoint(apiBaseUrl, "/admin/support/agents"),
+      // GET  /admin/support/agents
+      agents: buildEndpoint(apiBaseUrl, "/admin/support/agents"),
 
-  // GET  /admin/support/chats/threads
-  chatThreads: buildEndpoint(apiBaseUrl, "/admin/support/chats/threads"),
+      // GET  /admin/support/chats/threads
+      chatThreads: buildEndpoint(apiBaseUrl, "/admin/support/chats/threads"),
 
-  // GET  /admin/support/chats/threads/:threadId/messages
-  chatThreadMessages: (threadId: string) =>
-    buildEndpoint(apiBaseUrl, `/admin/support/chats/threads/${threadId}/messages`),
+      // GET  /admin/support/chats/threads/:threadId/messages
+      chatThreadMessages: (threadId: string) =>
+        buildEndpoint(apiBaseUrl, `/admin/support/chats/threads/${threadId}/messages`),
 
-  // POST /admin/support/chats/threads/:threadId/messages
-  sendMessage: (threadId: string) =>
-    buildEndpoint(apiBaseUrl, `/admin/support/chats/threads/${threadId}/messages`),
+      // POST /admin/support/chats/threads/:threadId/messages
+      sendMessage: (threadId: string) =>
+        buildEndpoint(apiBaseUrl, `/admin/support/chats/threads/${threadId}/messages`),
 
-  // POST /admin/support/chats/threads
-  createThread: buildEndpoint(apiBaseUrl, "/admin/support/chats/threads"),
+      // POST /admin/support/chats/threads
+      createThread: buildEndpoint(apiBaseUrl, "/admin/support/chats/threads"),
 
-  // ✅ ADD THESE TWO HERE — inside support, before the closing },
-  // PUT  /admin/support/tickets/:ticketId/status
-  updateTicketStatus: (ticketId: string) =>
-    buildEndpoint(apiBaseUrl, `/admin/support/tickets/${ticketId}/status`),
+      // ✅ ADD THESE TWO HERE — inside support, before the closing },
+      // PUT  /admin/support/tickets/:ticketId/status
+      updateTicketStatus: (ticketId: string) =>
+        buildEndpoint(apiBaseUrl, `/admin/support/tickets/${ticketId}/status`),
 
-  // POST /admin/support/tickets/:ticketId/activities
-  addTicketActivity: (ticketId: string) =>
-    buildEndpoint(apiBaseUrl, `/admin/support/tickets/${ticketId}/activities`),
-},   // ← this closes support
-},   // ← this closes admin
+      // POST /admin/support/tickets/:ticketId/activities
+      addTicketActivity: (ticketId: string) =>
+        buildEndpoint(apiBaseUrl, `/admin/support/tickets/${ticketId}/activities`),
+    },   // ← this closes support
+  },   // ← this closes admin
 
   schools: {
     verifyEmail: buildEndpoint(apiBaseUrl, "/schools/verify-email"),
@@ -298,42 +298,42 @@ courses: {
   },
 
   managementTeam: {
-  // GET  /admin/audit-logs
-  auditLogs: buildEndpoint(apiBaseUrl, "/admin/audit-logs"),
- 
-  // GET  /admin/team
-  all: buildEndpoint(apiBaseUrl, "/admin/team"),
- 
-  // POST /admin/team
-  add: buildEndpoint(apiBaseUrl, "/admin/team"),
- 
-  // PUT  /admin/team/:memberId
-  update: (memberId: string) =>
-    buildEndpoint(apiBaseUrl, `/admin/team/${memberId}`),
- 
-  // PUT  /admin/team/:memberId/deactivate
-  deactivate: (memberId: string) =>
-    buildEndpoint(apiBaseUrl, `/admin/team/${memberId}/deactivate`),
- 
-  // PUT  /admin/team/:memberId/reactivate
-  reactivate: (memberId: string) =>
-    buildEndpoint(apiBaseUrl, `/admin/team/${memberId}/reactivate`),
-},
+    // GET  /admin/audit-logs
+    auditLogs: buildEndpoint(apiBaseUrl, "/admin/audit-logs"),
+
+    // GET  /admin/team
+    all: buildEndpoint(apiBaseUrl, "/admin/team"),
+
+    // POST /admin/team
+    add: buildEndpoint(apiBaseUrl, "/admin/team"),
+
+    // PUT  /admin/team/:memberId
+    update: (memberId: string) =>
+      buildEndpoint(apiBaseUrl, `/admin/team/${memberId}`),
+
+    // PUT  /admin/team/:memberId/deactivate
+    deactivate: (memberId: string) =>
+      buildEndpoint(apiBaseUrl, `/admin/team/${memberId}/deactivate`),
+
+    // PUT  /admin/team/:memberId/reactivate
+    reactivate: (memberId: string) =>
+      buildEndpoint(apiBaseUrl, `/admin/team/${memberId}/reactivate`),
+  },
 
   notifications: {
-  // GET  /admin/broadcasts
-  all: buildEndpoint(apiBaseUrl, "/admin/broadcasts"),
+    // GET  /admin/broadcasts
+    all: buildEndpoint(apiBaseUrl, "/admin/broadcasts"),
 
-  // GET  /admin/broadcasts/stats
-  stats: buildEndpoint(apiBaseUrl, "/admin/broadcasts/stats"),
+    // GET  /admin/broadcasts/stats
+    stats: buildEndpoint(apiBaseUrl, "/admin/broadcasts/stats"),
 
-  // POST /admin/broadcasts
-  create: buildEndpoint(apiBaseUrl, "/admin/broadcasts"),
+    // POST /admin/broadcasts
+    create: buildEndpoint(apiBaseUrl, "/admin/broadcasts"),
 
-  // POST /admin/broadcasts/:broadcastId/resend
-  resend: (broadcastId: string) =>
-    buildEndpoint(apiBaseUrl, `/admin/broadcasts/${broadcastId}/resend`),
-},
+    // POST /admin/broadcasts/:broadcastId/resend
+    resend: (broadcastId: string) =>
+      buildEndpoint(apiBaseUrl, `/admin/broadcasts/${broadcastId}/resend`),
+  },
 
 };
 
