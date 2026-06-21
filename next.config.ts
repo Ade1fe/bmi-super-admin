@@ -10,7 +10,7 @@ const nextConfig = {
   turbopack: {
     root: __dirname,
   },
-  output: 'standalone',
+  // output: 'standalone',
   productionBrowserSourceMaps: false,
   outputFileTracingRoot: path.join(__dirname),
   images: {
