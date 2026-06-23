@@ -156,7 +156,7 @@ export default function EditCoursePage({
   }
 
   // ═══════════════════════════════════════════════════════════════════════
-  // OBJECTIVES HANDLERS --
+  // OBJECTIVES HANDLERS -- --
   // ═══════════════════════════════════════════════════════════════════════
 
   async function handleSaveObjective() {
