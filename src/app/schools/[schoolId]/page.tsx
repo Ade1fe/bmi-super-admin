@@ -983,4 +983,4 @@ export default function SchoolDetailsPage() {
     </AppShell>
   );
 }
-// a complete flow
+// a complete flow.
