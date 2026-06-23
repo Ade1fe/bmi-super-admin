@@ -277,6 +277,25 @@ courses: {
       deleteQuestion: (questionId: string) =>
         buildEndpoint(apiBaseUrl, `/courses/quizzes/questions/${questionId}`),
     },
+
+    // ✅ ADD THIS AFTER the quizzes block:
+  objectives: {
+      // POST /courses/courses/:courseId/objectives
+      create: (courseId: string) =>
+        buildEndpoint(apiBaseUrl, `/courses/courses/${courseId}/objectives`),
+ 
+      // PATCH /courses/courses/objectives/:objectiveId
+      update: (objectiveId: string) =>
+        buildEndpoint(apiBaseUrl, `/courses/courses/objectives/${objectiveId}`),
+ 
+      // DELETE /courses/courses/objectives/:objectiveId
+      delete: (objectiveId: string) =>
+        buildEndpoint(apiBaseUrl, `/courses/courses/objectives/${objectiveId}`),
+ 
+      // GET /courses/:courseId/objectives
+      fetchByCourse: (courseId: string) =>
+        buildEndpoint(apiBaseUrl, `/courses/${courseId}/objectives`),
+    },
   },
 
   subscriptions: {

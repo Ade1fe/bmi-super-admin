@@ -59,6 +59,9 @@ function parseCategory(value: unknown): ApiCourseCategory | null {
   return { id, name };
 }
 
+// ✅ REPLACE THIS FUNCTION in your course-api.ts
+// This version includes learningObjectives extraction from the API response
+
 function parseCourse(value: unknown): Course | null {
   if (!isRecord(value)) return null;
 
@@ -73,6 +76,9 @@ function parseCourse(value: unknown): Course | null {
         name: readString(value.category.name) || readString(value.category.title),
       }
     : undefined;
+
+  // ✅ Extract learning objectives from course response
+  const rawObjectives = Array.isArray(value.learningObjectives) ? value.learningObjectives : [];
 
   return {
     id,
@@ -95,6 +101,10 @@ function parseCourse(value: unknown): Course | null {
       typeof value.totalQuizzes === "number" ? value.totalQuizzes : 0,
     createdAt: readString(value.createdAt),
     updatedAt: readString(value.updatedAt),
+    // ✅ Include parsed objectives from API response
+    learningObjectives: rawObjectives
+      .map((item) => parseObjective(item))
+      .filter((item): item is CourseObjective => Boolean(item)),
   };
 }
 
@@ -232,6 +242,33 @@ function parseModule(value: unknown): CourseModule | null {
   };
 }
 
+
+function parseObjective(value: unknown): CourseObjective | null {
+  if (!isRecord(value)) return null;
+
+  const id = readString(value.id);
+  const courseId = readString(value.courseId);
+const objective =
+  readString(value.objective) ||
+  readString(value.title) ||
+  readString(value.description);
+
+if (!id || !courseId || !objective) return null;
+
+return {
+  id,
+  courseId,
+  objective,
+  order:
+    typeof value.order === "number"
+      ? value.order
+      : undefined,
+  createdAt: readString(value.createdAt),
+  updatedAt: readString(value.updatedAt),
+};
+}
+
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -260,6 +297,7 @@ export type Course = {
   totalQuizzes?: number;
   createdAt?: string;
   updatedAt?: string;
+   learningObjectives?: CourseObjective[];
 };
 
 export type CourseLesson = {
@@ -444,6 +482,23 @@ export type LessonPrerequisite = {
   completionRequired: boolean;
 };
 
+
+export type CourseObjective = {
+  id: string;
+  courseId: string;
+  objective: string;  // ✅ Changed from 'title'
+  order?: number;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type CreateObjectivePayload = {
+  objective: string;  // ✅ Single field
+};
+
+export type UpdateObjectivePayload = {
+  objective?: string;  // ✅ Single field
+};
 // ---------------------------------------------------------------------------
 // API functions
 // ---------------------------------------------------------------------------
@@ -824,6 +879,95 @@ export async function deleteQuizQuestion(questionId: string, authToken?: string)
 
   console.log("[QUIZ deleteQuizQuestion] response:", response);
   return response;
+}
+
+
+/**
+ * POST /courses/:courseId/objectives
+ * Create a new course objective
+ */
+export async function createObjective(
+  courseId: string,
+  payload: CreateObjectivePayload,
+  authToken?: string
+) {
+  console.log("[v0] createObjective() called with courseId:", courseId);
+
+  const response = await apiRequest<unknown>(
+    endpoints.courses.objectives.create(courseId),
+    { method: "POST", body: payload, authToken }
+  );
+
+  const data = unwrapData(response);
+  const objective = parseObjective(data);
+  console.log("[v0] createObjective() parsed:", objective);
+  return objective;
+}
+
+/**
+ * PATCH /courses/objectives/:objectiveId
+ * Update an existing course objective
+ */
+export async function updateObjective(
+  objectiveId: string,
+  payload: UpdateObjectivePayload,
+  authToken?: string
+) {
+  console.log("[v0] updateObjective() called with objectiveId:", objectiveId);
+
+  const response = await apiRequest<unknown>(
+    endpoints.courses.objectives.update(objectiveId),
+    { method: "PATCH", body: payload, authToken }
+  );
+
+  const data = unwrapData(response);
+  const objective = parseObjective(data);
+  console.log("[v0] updateObjective() parsed:", objective);
+  return objective;
+}
+
+/**
+ * DELETE /courses/objectives/:objectiveId
+ * Delete a course objective
+ */
+export async function deleteObjective(
+  objectiveId: string,
+  authToken?: string
+) {
+  console.log("[v0] deleteObjective() called with objectiveId:", objectiveId);
+
+  return apiRequest<{ message: string }>(
+    endpoints.courses.objectives.delete(objectiveId),
+    { method: "DELETE", authToken }
+  );
+}
+
+/**
+ * GET /courses/:courseId/objectives
+ * Fetch all objectives for a course
+ */
+export async function fetchObjectives(
+  courseId: string,
+  authToken?: string
+) {
+  console.log("[v0] fetchObjectives() called with courseId:", courseId);
+
+  const response = await apiRequest<unknown>(
+    endpoints.courses.objectives.fetchByCourse(courseId),
+    { authToken }
+  );
+
+  const items = unwrapCollection(response);
+  const objectives = items
+    .map((item) => parseObjective(item))
+    .filter((item): item is CourseObjective => Boolean(item));
+
+  console.log("[v0] fetchObjectives() parsed:", {
+    courseId,
+    objectiveCount: objectives.length,
+  });
+
+  return objectives;
 }
 
 // ---------------------------------------------------------------------------
