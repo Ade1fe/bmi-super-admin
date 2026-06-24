@@ -43,7 +43,19 @@ function ActivationCard({
   );
 }
 
-function WorkspaceActiveModal({ onClose }: { onClose: () => void }) {
+function WorkspaceActiveModal({
+  onClose,
+  schoolName,
+  workspaceUrl,
+}: {
+  onClose: () => void;
+  schoolName: string;
+  workspaceUrl: string;
+}) {
+   function copyToClipboard() {
+    navigator.clipboard.writeText(workspaceUrl);
+  }
+
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px]" />
@@ -71,7 +83,7 @@ function WorkspaceActiveModal({ onClose }: { onClose: () => void }) {
             </div>
 
             <h2 className="text-center text-[22px] font-extrabold tracking-[-0.04em] text-[#152f56] sm:text-[26px]">
-              School Workspace Active
+              {schoolName} Workspace Active 
             </h2>
             <p className="mt-3 max-w-[430px] text-center text-[16px] leading-7 text-[#667792]">
               Congratulations! Your school&apos;s digital environment is ready to use. You can now start adding teachers, students, and courses.
@@ -83,15 +95,16 @@ function WorkspaceActiveModal({ onClose }: { onClose: () => void }) {
             <div className="mt-3 flex flex-col gap-3 rounded-[12px] border-2 border-dashed border-[#7f8cff] bg-[#fbfcff] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex min-w-0 items-center gap-3 text-[#4659d8]">
                 <Lock className="h-5 w-5" strokeWidth={2.2} />
-                <span className="truncate text-[16px] font-bold sm:text-[18px]">greenfield.lms.com</span>
+                <span className="truncate text-[16px] font-bold sm:text-[18px]"> {workspaceUrl} </span>
               </div>
-              <button
-                type="button"
-                className="inline-flex items-center justify-center gap-2 rounded-[10px] bg-white px-4 py-2 text-[14px] font-semibold text-[#627492]"
-              >
-                <Copy className="h-4 w-4" strokeWidth={2.1} />
-                Copy
-              </button>
+           <button
+        type="button"
+        onClick={copyToClipboard}  
+        className="inline-flex items-center justify-center gap-2 rounded-[10px] bg-white px-4 py-2 text-[14px] font-semibold text-[#627492] hover:bg-[#f8f9fc]"
+      >
+        <Copy className="h-4 w-4" strokeWidth={2.1} />
+        Copy
+      </button>
             </div>
           </div>
 
@@ -118,7 +131,7 @@ function WorkspaceActiveModal({ onClose }: { onClose: () => void }) {
               onClick={onClose}
               className="button-primary flex h-[62px] items-center justify-center gap-3 rounded-[10px] bg-[#4b8a60] text-[16px] font-semibold text-white"
             >
-              Continue to Step 2
+              Continue to Step 3
             </button>
           </div>
         </div>
@@ -128,24 +141,44 @@ function WorkspaceActiveModal({ onClose }: { onClose: () => void }) {
 }
 
 export default function CreateSchoolActivationPage() {
-  const [showSuccessModal, setShowSuccessModal] = useState(true);
-  const [selectedPlanLabel] = useState(() => {
-    const plan =
-      typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("plan");
-
-    return (
-      {
-        basic: "School Basic",
-        premium: "School Premium",
-        monthly: "Individual Monthly",
-        annual: "Individual Annual",
-      }[plan ?? ""]
-    ) ?? "School Premium";
-  });
-  const [schoolName] = useState(
-    () => loadSchoolOnboardingDraft()?.schoolName ?? "Greenwood International Academy",
+const [showSuccessModal, setShowSuccessModal] = useState(false); // ← CHANGE FROM true TO false
+  const [isActivating, setIsActivating] = useState(false);
+  const [activationError, setActivationError] = useState<string | null>(null);
+  
+  const [selectedPlanLabel] = useState(
+    () => loadSchoolOnboardingDraft()?.planName ?? "Selected Plan"
   );
-  const [adminEmail] = useState(() => loadSchoolOnboardingDraft()?.adminEmail ?? "admin@greenwood.edu");
+  const [schoolName] = useState(
+    () => loadSchoolOnboardingDraft()?.schoolName ?? "-"
+  );
+  const [adminEmail] = useState(
+    () => loadSchoolOnboardingDraft()?.adminEmail ?? "-"
+  );
+
+  const workspaceUrl = `${schoolName.toLowerCase().replace(/\s+/g, "-")}.lms.bmilms.ng`;
+
+  async function handleActivateSchool() {
+    setIsActivating(true);
+    setActivationError(null);
+
+    try {
+      // TODO: Call your activation API endpoint here
+      // const response = await apiRequest(endpoints.schools.activate, {
+      //   body: { schoolId, planId: draft?.planId },
+      //   authToken: session?.token,
+      // });
+
+      // For now, simulate a delay and show the modal
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      setShowSuccessModal(true);
+    } catch (err) {
+      setActivationError(
+        err instanceof Error ? err.message : "Failed to activate school"
+      );
+    } finally {
+      setIsActivating(false);
+    }
+  }
 
   return (
     <AppShell
@@ -159,7 +192,13 @@ export default function CreateSchoolActivationPage() {
       }
       activeSection="schools"
     >
-      {showSuccessModal ? <WorkspaceActiveModal onClose={() => setShowSuccessModal(false)} /> : null}
+     {showSuccessModal ? (
+        <WorkspaceActiveModal
+          onClose={() => setShowSuccessModal(false)}
+          schoolName={schoolName}
+          workspaceUrl={workspaceUrl}
+        />
+      ) : null}
 
       <div className="mx-auto max-w-[980px]">
         <CreateSchoolStepper currentStep={3} />
@@ -237,22 +276,33 @@ export default function CreateSchoolActivationPage() {
             Once activated, the school instance will be deployed to the production environment instantly.
           </div>
 
-          <div className="flex flex-col justify-end gap-4 sm:flex-row">
-            <Link
-              href="/schools/create-school/subscription"
-              className="inline-flex h-[62px] w-full items-center justify-center rounded-[10px] border border-[#cadfd5] bg-[#edf5f1] px-10 text-[16px] font-semibold text-[#4a8a60] sm:w-auto"
-            >
-              Back to subscription
-            </Link>
-            <button
-              type="button"
-              onClick={() => setShowSuccessModal(true)}
-              className="button-primary inline-flex h-[62px] w-full items-center justify-center gap-3 rounded-[10px] bg-[#4b8a60] px-10 text-[16px] font-semibold text-white sm:w-auto"
-            >
-              Complete Setup & Activate
-              <span className="text-[18px]">⚡</span>
-            </button>
+           <div className="flex flex-col justify-end gap-4 sm:flex-row"> 
+
+
+             
+          <Link
+            href="/schools/create-school/subscription"
+            className="inline-flex h-[62px] w-full items-center justify-center rounded-[10px] border border-[#cadfd5] bg-[#edf5f1] px-10 text-[16px] font-semibold text-[#4a8a60] sm:w-auto"
+          >
+            Back to subscription
+          </Link>
+  <button
+            type="button"
+            onClick={handleActivateSchool}  
+            disabled={isActivating} 
+            className="button-primary inline-flex h-[62px] w-full items-center justify-center gap-3 rounded-[10px] bg-[#4b8a60] px-10 text-[16px] font-semibold text-white disabled:opacity-50 sm:w-auto"
+          >
+            {isActivating ? "Activating..." : "Complete Setup & Activate"}
+            <span className="text-[18px]">⚡</span>
+          </button>
+
+           </div>
+
+            {activationError && (
+          <div className="mt-4 rounded-[10px] border border-[#d14343] bg-[#fef2f2] p-4 text-[16px] text-[#d14343]">
+            {activationError}
           </div>
+        )}
         </section>
       </div>
     </AppShell>
