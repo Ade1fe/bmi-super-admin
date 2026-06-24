@@ -311,3 +311,25 @@ export function parseSubscriptionList(payload: unknown) {
 
   return parsed;
 }
+
+export function parseAdminPlanCatalog(payload: unknown): SubscriptionPlan[] {
+  log("parseAdminPlanCatalog() raw payload", payload);
+
+  const list = unwrapCollection(payload);
+  const seen = new Set<string>();
+  const plans: SubscriptionPlan[] = [];
+
+  for (const entry of list) {
+    const candidate = isRecord(entry) && isRecord(entry.plan) ? entry.plan : entry;
+    const parsed = parseSubscriptionPlan(candidate);
+    const key = parsed?.id || parsed?.name;
+
+    if (parsed && key && !seen.has(key)) {
+      seen.add(key);
+      plans.push(parsed);
+    }
+  }
+
+  log("parseAdminPlanCatalog() result count", plans.length);
+  return plans;
+}

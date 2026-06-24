@@ -1,9 +1,12 @@
+// school-onboarding.ts
 export type SchoolOnboardingDraft = {
   schoolName: string;
   country: string;
   adminFirstName: string;
   adminLastName: string;
   adminEmail: string;
+  planId?: string;
+  planName?: string;  // ← ADD THIS
 };
 
 const schoolOnboardingStorageKey = "bmi-super-admin-school-onboarding";
