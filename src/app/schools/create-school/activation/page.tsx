@@ -279,7 +279,7 @@ const [showSuccessModal, setShowSuccessModal] = useState(false); // ← CHANGE F
            <div className="flex flex-col justify-end gap-4 sm:flex-row"> 
 
 
-             {/* 1 */}
+             {/* 12 */}
           <Link
             href="/schools/create-school/subscription"
             className="inline-flex h-[62px] w-full items-center justify-center rounded-[10px] border border-[#cadfd5] bg-[#edf5f1] px-10 text-[16px] font-semibold text-[#4a8a60] sm:w-auto"
