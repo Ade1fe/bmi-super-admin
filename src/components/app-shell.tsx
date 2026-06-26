@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import {
+  AlarmCheckIcon,
   Bell,
   BookOpen,
   BriefcaseBusiness,
@@ -44,7 +45,8 @@ export type AppSection =
   | "reports"
   | "teams"
   | "support"
-  | "settings";
+  | "settings"
+  | "achievements";
 
 type NavItem = {
   key: AppSection;
@@ -73,6 +75,7 @@ const primaryNav: NavItem[] = [
   { key: "analytics", label: "Analytics", icon: ChartBar, href: "/analytics" },
   { key: "subscriptions", label: "Subscriptions", icon: TicketCheck, href: "/subscriptions" },
   { key: "payments", label: "Payments", icon: CreditCard, href: "/payments" },
+  { key: "achievements", label: "Achievements", icon: AlarmCheckIcon, href: "/achievements" },
 ];
 
 const adminNav: NavItem[] = [

@@ -154,6 +154,53 @@ courses: {
   addTicketActivity: (ticketId: string) =>
     buildEndpoint(apiBaseUrl, `/admin/support/tickets/${ticketId}/activities`),
 },   // ← this closes support
+
+// // Inside endpoints.admin object, add:
+//     certificates: {
+//       // GET /admin/certificates
+//       all: buildEndpoint(apiBaseUrl, "/admin/certificates"),
+
+//       // GET /admin/certificates/pending
+//       pending: buildEndpoint(apiBaseUrl, "/admin/certificates/pending"),
+
+//       // GET /admin/certificates/:certificateId
+//       byId: (certificateId: string) =>
+//         buildEndpoint(apiBaseUrl, `/admin/certificates/${certificateId}`),
+
+//       // PUT /admin/certificates/:certificateId/approve
+//       approve: (certificateId: string) =>
+//         buildEndpoint(apiBaseUrl, `/admin/certificates/${certificateId}/approve`),
+
+//       // PUT /admin/certificates/:certificateId/reject
+//       reject: (certificateId: string) =>
+//         buildEndpoint(apiBaseUrl, `/admin/certificates/${certificateId}/reject`),
+
+//       // PUT /admin/certificates/:certificateId/revoke
+//       revoke: (certificateId: string) =>
+//         buildEndpoint(apiBaseUrl, `/admin/certificates/${certificateId}/revoke`),
+
+//       // PUT /admin/certificates/:certificateId/reissue
+//       reissue: (certificateId: string) =>
+//         buildEndpoint(apiBaseUrl, `/admin/certificates/${certificateId}/reissue`),
+//     },
+certificates: {
+  // Reads (admin viewing student certs)
+  all: buildEndpoint(apiBaseUrl, "/students/certificates/all"),
+  pending: buildEndpoint(apiBaseUrl, "/students/certificates/pending"),
+  byId: (certificateId: string) =>
+    buildEndpoint(apiBaseUrl, `/students/certificates/${certificateId}`),
+
+  // Writes (admin actions)
+  approve: (certificateId: string) =>
+    buildEndpoint(apiBaseUrl, `/admin/certificates/${certificateId}/approve`),
+  reject: (certificateId: string) =>
+    buildEndpoint(apiBaseUrl, `/admin/certificates/${certificateId}/reject`),
+  revoke: (certificateId: string) =>
+    buildEndpoint(apiBaseUrl, `/admin/certificates/${certificateId}/revoke`),
+  reissue: (certificateId: string) =>
+    buildEndpoint(apiBaseUrl, `/admin/certificates/${certificateId}/reissue`),
+}
+
 },   // ← this closes admin
 
   schools: {
@@ -188,6 +235,8 @@ courses: {
     resetPassword: buildEndpoint(apiBaseUrl, "/schools/reset-school-password"),
   },
 
+
+  
   students: {
     login: buildEndpoint(apiBaseUrl, "/students/login"),
 
