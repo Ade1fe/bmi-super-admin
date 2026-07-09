@@ -102,6 +102,8 @@ export const endpoints = {
 
     reactivateStudent: (studentId: string) =>
       buildEndpoint(apiBaseUrl, `/admin/students/${studentId}/reactivate`),
+
+
     
     // Inside the admin object, after reactivateStudent:
 courses: {
@@ -113,7 +115,8 @@ courses: {
 // (place it after the existing `reactivateStudent` entry)
 // ─────────────────────────────────────────────────────────────────────────────
 
- support: {
+
+support: {
   // GET  /admin/support/metrics
   metrics: buildEndpoint(apiBaseUrl, "/admin/support/metrics"),
 
@@ -154,7 +157,80 @@ courses: {
   addTicketActivity: (ticketId: string) =>
     buildEndpoint(apiBaseUrl, `/admin/support/tickets/${ticketId}/activities`),
 },   // ← this closes support
-},   // ← this closes admin
+
+// // Inside endpoints.admin object, add:
+//     certificates: {
+//       // GET /admin/certificates
+//       all: buildEndpoint(apiBaseUrl, "/admin/certificates"),
+
+//       // GET /admin/certificates/pending
+//       pending: buildEndpoint(apiBaseUrl, "/admin/certificates/pending"),
+
+//       // GET /admin/certificates/:certificateId
+//       byId: (certificateId: string) =>
+//         buildEndpoint(apiBaseUrl, `/admin/certificates/${certificateId}`),
+
+//       // PUT /admin/certificates/:certificateId/approve
+//       approve: (certificateId: string) =>
+//         buildEndpoint(apiBaseUrl, `/admin/certificates/${certificateId}/approve`),
+
+//       // PUT /admin/certificates/:certificateId/reject
+//       reject: (certificateId: string) =>
+//         buildEndpoint(apiBaseUrl, `/admin/certificates/${certificateId}/reject`),
+
+//       // PUT /admin/certificates/:certificateId/revoke
+//       revoke: (certificateId: string) =>
+//         buildEndpoint(apiBaseUrl, `/admin/certificates/${certificateId}/revoke`),
+
+//       // PUT /admin/certificates/:certificateId/reissue
+//       reissue: (certificateId: string) =>
+//         buildEndpoint(apiBaseUrl, `/admin/certificates/${certificateId}/reissue`),
+//     },
+certificates: {
+  // Reads (admin viewing student certs)
+  all: buildEndpoint(apiBaseUrl, "/students/certificates/all"),
+  pending: buildEndpoint(apiBaseUrl, "/students/certificates/pending"),
+  byId: (certificateId: string) =>
+    buildEndpoint(apiBaseUrl, `/students/certificates/${certificateId}`),
+
+  // Writes (admin actions)
+  approve: (certificateId: string) =>
+    buildEndpoint(apiBaseUrl, `/admin/certificates/${certificateId}/approve`),
+  reject: (certificateId: string) =>
+    buildEndpoint(apiBaseUrl, `/admin/certificates/${certificateId}/reject`),
+  revoke: (certificateId: string) =>
+    buildEndpoint(apiBaseUrl, `/admin/certificates/${certificateId}/revoke`),
+  reissue: (certificateId: string) =>
+    buildEndpoint(apiBaseUrl, `/admin/certificates/${certificateId}/reissue`),
+}
+
+  },
+
+  achievements: {
+    badges: {
+      // GET /achievements/badges?category=
+      all: (category?: string) =>
+        buildEndpoint(
+          apiBaseUrl,
+          `/achievements/badges${category ? `?category=${encodeURIComponent(category)}` : ""}`
+        ),
+
+      // POST /achievements/badges
+      create: buildEndpoint(apiBaseUrl, "/achievements/badges"),
+
+      // GET /achievements/badges/:badgeId
+      byId: (badgeId: string) =>
+        buildEndpoint(apiBaseUrl, `/achievements/badges/${badgeId}`),
+
+      // PUT /achievements/badges/:badgeId
+      update: (badgeId: string) =>
+        buildEndpoint(apiBaseUrl, `/achievements/badges/${badgeId}`),
+
+      // DELETE /achievements/badges/:badgeId
+      delete: (badgeId: string) =>
+        buildEndpoint(apiBaseUrl, `/achievements/badges/${badgeId}`),
+    },
+  },
 
   schools: {
     verifyEmail: buildEndpoint(apiBaseUrl, "/schools/verify-email"),
@@ -188,6 +264,8 @@ courses: {
     resetPassword: buildEndpoint(apiBaseUrl, "/schools/reset-school-password"),
   },
 
+
+  
   students: {
     login: buildEndpoint(apiBaseUrl, "/students/login"),
 
