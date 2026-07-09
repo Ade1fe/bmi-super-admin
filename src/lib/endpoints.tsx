@@ -102,6 +102,8 @@ export const endpoints = {
 
     reactivateStudent: (studentId: string) =>
       buildEndpoint(apiBaseUrl, `/admin/students/${studentId}/reactivate`),
+
+
     
     // Inside the admin object, after reactivateStudent:
 courses: {
@@ -113,7 +115,8 @@ courses: {
 // (place it after the existing `reactivateStudent` entry)
 // ─────────────────────────────────────────────────────────────────────────────
 
- support: {
+
+support: {
   // GET  /admin/support/metrics
   metrics: buildEndpoint(apiBaseUrl, "/admin/support/metrics"),
 
@@ -201,7 +204,33 @@ certificates: {
     buildEndpoint(apiBaseUrl, `/admin/certificates/${certificateId}/reissue`),
 }
 
-},   // ← this closes admin
+  },
+
+  achievements: {
+    badges: {
+      // GET /achievements/badges?category=
+      all: (category?: string) =>
+        buildEndpoint(
+          apiBaseUrl,
+          `/achievements/badges${category ? `?category=${encodeURIComponent(category)}` : ""}`
+        ),
+
+      // POST /achievements/badges
+      create: buildEndpoint(apiBaseUrl, "/achievements/badges"),
+
+      // GET /achievements/badges/:badgeId
+      byId: (badgeId: string) =>
+        buildEndpoint(apiBaseUrl, `/achievements/badges/${badgeId}`),
+
+      // PUT /achievements/badges/:badgeId
+      update: (badgeId: string) =>
+        buildEndpoint(apiBaseUrl, `/achievements/badges/${badgeId}`),
+
+      // DELETE /achievements/badges/:badgeId
+      delete: (badgeId: string) =>
+        buildEndpoint(apiBaseUrl, `/achievements/badges/${badgeId}`),
+    },
+  },
 
   schools: {
     verifyEmail: buildEndpoint(apiBaseUrl, "/schools/verify-email"),

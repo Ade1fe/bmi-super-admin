@@ -1,199 +1,336 @@
 'use client'
 
 import { AppShell } from '@/components/app-shell'
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
+import { apiRequest, endpoints } from '@/lib/endpoints'
+import { useAuthSession } from '@/lib/auth-session'
 import {
   AchievementTabs,
   BadgeSection,
   CreateBadgeModal,
+  EditBadgeModal,
   Badge,
   Tab,
 } from './components'
 
 const AchievementsPage = () => {
+  const { session, isHydrated } = useAuthSession()
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [selectedBadge, setSelectedBadge] = useState<Badge | null>(null)
+  const [isFetchingBadge, setIsFetchingBadge] = useState(false)
   const [activeTab, setActiveTab] = useState('all')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [badgeSections, setBadgeSections] = useState<{
+    course_milestones: Badge[]
+    learning_streaks: Badge[]
+    skill_mastery: Badge[]
+  }>({
+    course_milestones: [],
+    learning_streaks: [],
+    skill_mastery: [],
+  })
 
-  // Mock data - replace with API calls
-  const badgesData = {
-    course_milestones: [
-      {
-        id: '1',
-        name: 'First Steps',
-        status: 'Unlocked May 12',
-        icon: '🏅',
-        backgroundColor: 'bg-pink-100',
-      },
-      {
-        id: '2',
-        name: 'Module Master',
-        status: 'Unlocked Jun 05',
-        icon: '🎖️',
-        backgroundColor: 'bg-yellow-50',
-      },
-      {
-        id: '3',
-        name: 'Course Legend',
-        status: 'Finish all courses',
-        icon: '👑',
-        backgroundColor: 'bg-orange-100',
-      },
-      {
-        id: '4',
-        name: 'Final Project(Certified Pro)',
-        status: 'Locked',
-        icon: '⭐',
-        backgroundColor: 'bg-slate-900',
-      },
-    ] as Badge[],
-    learning_streaks: [
-      {
-        id: '5',
-        name: '7 Day Fire',
-        status: 'Unlocked Jun 05',
-        icon: '🔥',
-        backgroundColor: 'bg-slate-900',
-      },
-      {
-        id: '6',
-        name: '30 Day Grind',
-        status: 'Unlocked Jun 05',
-        icon: '⭐',
-        backgroundColor: 'bg-slate-900',
-      },
-      {
-        id: '7',
-        name: 'Century Club',
-        status: '100 day streak',
-        icon: '🏆',
-        backgroundColor: 'bg-red-900',
-      },
-    ] as Badge[],
-    skill_mastery: [
-      {
-        id: '8',
-        name: 'Quiz Titan',
-        status: 'Top 5% score',
-        icon: '🏆',
-        backgroundColor: 'bg-slate-900',
-      },
-      {
-        id: '9',
-        name: 'Fast Learner',
-        status: 'Unlocked Jun 05',
-        icon: '🔥',
-        backgroundColor: 'bg-slate-900',
-      },
-      {
-        id: '10',
-        name: 'Grand Master',
-        status: 'Unlocked Jun 05',
-        icon: '🏆',
-        backgroundColor: 'bg-yellow-50',
-      },
-    ] as Badge[],
-  }
+  const badgesData = badgeSections
 
   const tabs: Tab[] = [
     { id: 'all', label: 'All Badges', count: null },
-    { id: 'course_milestones', label: 'Course Milestones', count: 4 },
-    { id: 'learning_streaks', label: 'Learning Streaks', count: 3 },
-    { id: 'skill_mastery', label: 'Skill Mastery', count: 3 },
+    { id: 'course_milestones', label: 'Course Milestones', count: badgeSections.course_milestones.length },
+    { id: 'learning_streaks', label: 'Learning Streaks', count: badgeSections.learning_streaks.length },
+    { id: 'skill_mastery', label: 'Skill Mastery', count: badgeSections.skill_mastery.length },
   ]
 
   const handleCreateBadge = async (badgeData: {
     name: string
     category: string
     criteria: string
-    image?: File
+    description: string
+    points: number
+    imageUrl?: string
   }) => {
     setIsLoading(true)
     setError(null)
     setSuccess(null)
 
+    if (!isHydrated || !session?.token) {
+      setError('Authentication required to create badges.')
+      setIsLoading(false)
+      return
+    }
+
     try {
-      const formData = new FormData()
-      formData.append('name', badgeData.name)
-      formData.append('category', badgeData.category)
-      formData.append('criteria', badgeData.criteria)
-
-      if (badgeData.image) {
-        formData.append('image', badgeData.image)
-      }
-
-      const response = await fetch('/api/achievements/create', {
+      await apiRequest<void>(endpoints.achievements.badges.create, {
         method: 'POST',
-        body: formData,
+        authToken: session.token,
+        body: badgeData,
       })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(
-          errorData.message || `Failed to create badge (${response.status})`
-        )
-      }
-
-      const createdBadge = await response.json()
-      console.log('Badge created successfully:', createdBadge)
 
       setSuccess('Badge created successfully!')
       setIsCreateModalOpen(false)
-
-      // TODO: Refresh badges list or add new badge to state
+      await fetchBadges()
       setTimeout(() => setSuccess(null), 3000)
     } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : 'Failed to create badge'
-      setError(errorMessage)
+      setError(err instanceof Error ? err.message : 'Failed to create badge')
       console.error('Error creating badge:', err)
     } finally {
       setIsLoading(false)
     }
   }
 
+  /**
+   * GET /achievements/badges/:badgeId
+   * Fetch full badge details before opening the manage/edit modal.
+   */
+  const handleSelectBadge = async (badge: Badge) => {
+    if (!isHydrated || !session?.token) {
+      setError('Authentication required.')
+      return
+    }
+
+    setError(null)
+    setIsFetchingBadge(true)
+
+    try {
+      const response = await apiRequest<unknown>(
+        endpoints.achievements.badges.byId(badge.id),
+        { method: 'GET', authToken: session.token }
+      )
+
+      const record = (response ?? {}) as Record<string, unknown>
+      const data = (record.data ?? record) as Record<string, unknown>
+
+      const imageUrl =
+        typeof data.imageUrl === 'string'
+          ? data.imageUrl
+          : typeof data.image_url === 'string'
+          ? data.image_url
+          : badge.imageUrl
+
+      setSelectedBadge({
+        id: String(data.id ?? badge.id),
+        name: String(data.name ?? badge.name),
+        status: typeof data.status === 'string' ? data.status : badge.status,
+        icon: badge.icon,
+        backgroundColor: badge.backgroundColor,
+        imageUrl,
+        description: typeof data.description === 'string' ? data.description : '',
+        points: Number(data.points ?? 0),
+        category: typeof data.category === 'string' ? data.category : '',
+        criteria: typeof data.criteria === 'string' ? data.criteria : '',
+      })
+      setIsEditModalOpen(true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load badge details')
+      console.error('Error fetching badge:', err)
+    } finally {
+      setIsFetchingBadge(false)
+    }
+  }
+
+  /**
+   * PUT /achievements/badges/:badgeId
+   */
+  const handleUpdateBadge = async (
+    badgeId: string,
+    updates: {
+      name: string
+      category: string
+      criteria: string
+      description: string
+      points: number
+      imageUrl?: string
+    }
+  ) => {
+    setIsLoading(true)
+    setError(null)
+    setSuccess(null)
+
+    if (!isHydrated || !session?.token) {
+      setError('Authentication required to update badges.')
+      setIsLoading(false)
+      return
+    }
+
+    try {
+      await apiRequest<void>(endpoints.achievements.badges.update(badgeId), {
+        method: 'PUT',
+        authToken: session.token,
+        body: updates,
+      })
+
+      setSuccess('Badge updated successfully!')
+      setIsEditModalOpen(false)
+      setSelectedBadge(null)
+      await fetchBadges()
+      setTimeout(() => setSuccess(null), 3000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update badge')
+      console.error('Error updating badge:', err)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  /**
+   * DELETE /achievements/badges/:badgeId
+   */
+  const handleDeleteBadge = async (badgeId: string) => {
+    setIsLoading(true)
+    setError(null)
+    setSuccess(null)
+
+    if (!isHydrated || !session?.token) {
+      setError('Authentication required to delete badges.')
+      setIsLoading(false)
+      return
+    }
+
+    try {
+      await apiRequest<void>(endpoints.achievements.badges.delete(badgeId), {
+        method: 'DELETE',
+        authToken: session.token,
+      })
+
+      setSuccess('Badge deleted successfully!')
+      setIsEditModalOpen(false)
+      setSelectedBadge(null)
+      await fetchBadges()
+      setTimeout(() => setSuccess(null), 3000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete badge')
+      console.error('Error deleting badge:', err)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const fetchBadges = async () => {
+    if (!isHydrated || !session?.token) {
+      return
+    }
+
+    try {
+      const response = await apiRequest<unknown>(endpoints.achievements.badges.all(), {
+        method: 'GET',
+        authToken: session.token,
+      })
+
+      const normalizedBadges = (() => {
+        if (!response) return []
+        if (Array.isArray(response)) return response
+
+        const result = response as Record<string, unknown>
+        if (Array.isArray(result.badges)) return result.badges
+        if (Array.isArray(result.items)) return result.items
+        if (Array.isArray(result.data)) return result.data
+        if (
+          result.data &&
+          typeof result.data === 'object' &&
+          Array.isArray((result.data as Record<string, unknown>).badges)
+        ) {
+          return (result.data as Record<string, unknown>).badges
+        }
+        return []
+      })() as Array<Record<string, unknown>>
+
+      const allBadges = normalizedBadges.map((badge) => {
+        const imageUrl =
+          typeof badge.imageUrl === 'string'
+            ? badge.imageUrl
+            : typeof badge.image_url === 'string'
+            ? badge.image_url
+            : undefined
+
+        return {
+          id: String(badge.id ?? ''),
+          name: String(badge.name ?? ''),
+          category: String(badge.category ?? ''),
+          criteria: String(badge.criteria ?? ''),
+          description: String(badge.description ?? ''),
+          imageUrl,
+          points: Number(badge.points ?? 0),
+          status:
+            typeof badge.status === 'string' && badge.status.trim()
+              ? badge.status
+              : 'NEW',
+        }
+      })
+
+      const groupedBadges = {
+        course_milestones: allBadges
+          .filter((badge) => badge.category === 'Course Milestone')
+          .map((badge) => ({
+            id: badge.id,
+            name: badge.name,
+            status: badge.status,
+            icon: '🏅',
+            backgroundColor: badge.imageUrl ? 'bg-slate-900' : 'bg-pink-100',
+            imageUrl: badge.imageUrl,
+            description: badge.description,
+            points: badge.points,
+            category: badge.category,
+            criteria: badge.criteria,
+          })),
+        learning_streaks: allBadges
+          .filter((badge) => badge.category === 'Learning Streaks')
+          .map((badge) => ({
+            id: badge.id,
+            name: badge.name,
+            status: badge.status,
+            icon: '🔥',
+            backgroundColor: badge.imageUrl ? 'bg-slate-900' : 'bg-orange-100',
+            imageUrl: badge.imageUrl,
+            description: badge.description,
+            points: badge.points,
+            category: badge.category,
+            criteria: badge.criteria,
+          })),
+        skill_mastery: allBadges
+          .filter((badge) => badge.category === 'Skill Mastery')
+          .map((badge) => ({
+            id: badge.id,
+            name: badge.name,
+            status: badge.status,
+            icon: '🎓',
+            backgroundColor: badge.imageUrl ? 'bg-slate-900' : 'bg-yellow-50',
+            imageUrl: badge.imageUrl,
+            description: badge.description,
+            points: badge.points,
+            category: badge.category,
+            criteria: badge.criteria,
+          })),
+      }
+
+      setBadgeSections(groupedBadges)
+    } catch (error) {
+      console.error('[achievements] failed to fetch badges', error)
+      setError('Unable to load badges. Check console for details.')
+    }
+  }
+
   const getActiveTabData = () => {
     if (activeTab === 'all') {
       return [
-        {
-          title: 'Course Milestones',
-          badges: badgesData.course_milestones,
-          icon: '✨',
-        },
-        {
-          title: 'Learning Streaks',
-          badges: badgesData.learning_streaks,
-          icon: '🔥',
-        },
+        { title: 'Course Milestones', badges: badgesData.course_milestones, icon: '✨' },
+        { title: 'Learning Streaks', badges: badgesData.learning_streaks, icon: '🔥' },
         { title: 'Skill Mastery', badges: badgesData.skill_mastery, icon: '🎓' },
       ]
     }
 
-    const sectionMap: Record<
-      string,
-      { title: string; badges: Badge[]; icon: string }
-    > = {
-      course_milestones: {
-        title: 'Course Milestones',
-        badges: badgesData.course_milestones,
-        icon: '✨',
-      },
-      learning_streaks: {
-        title: 'Learning Streaks',
-        badges: badgesData.learning_streaks,
-        icon: '🔥',
-      },
-      skill_mastery: {
-        title: 'Skill Mastery',
-        badges: badgesData.skill_mastery,
-        icon: '🎓',
-      },
+    const sectionMap: Record<string, { title: string; badges: Badge[]; icon: string }> = {
+      course_milestones: { title: 'Course Milestones', badges: badgesData.course_milestones, icon: '✨' },
+      learning_streaks: { title: 'Learning Streaks', badges: badgesData.learning_streaks, icon: '🔥' },
+      skill_mastery: { title: 'Skill Mastery', badges: badgesData.skill_mastery, icon: '🎓' },
     }
 
     return [sectionMap[activeTab]]
   }
+
+  useEffect(() => {
+    fetchBadges()
+  }, [isHydrated, session?.token])
 
   return (
     <AppShell
@@ -202,64 +339,23 @@ const AchievementsPage = () => {
       contentClassName="px-4 py-5 sm:px-6 lg:px-9 lg:py-8"
     >
       <div className="space-y-8">
-        {/* Error Alert */}
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-            <div className="text-red-600">
-              <svg
-                className="w-5 h-5"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </div>
-            <div>
-              <p className="text-red-800 font-medium">Error</p>
-              <p className="text-red-700 text-[16px]">{error}</p>
-            </div>
-            <button
-              onClick={() => setError(null)}
-              className="ml-auto text-red-400 hover:text-red-600"
-            >
-              ✕
-            </button>
+            <p className="text-red-700 text-[16px]">{error}</p>
+            <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-600">✕</button>
           </div>
         )}
 
-        {/* Success Alert */}
         {success && (
           <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
-            <div className="text-green-600">
-              <svg
-                className="w-5 h-5"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </div>
             <p className="text-green-800 font-medium">{success}</p>
           </div>
         )}
 
-        {/* Header */}
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              Achievement Gallery
-            </h1>
-            <p className="mt-1 text-[16px] text-gray-600">
-              Create and setup student badges
-            </p>
+            <h1 className="text-3xl font-bold text-gray-900">Achievement Gallery</h1>
+            <p className="mt-1 text-[16px] text-gray-600">Create and setup student badges</p>
           </div>
           <button
             onClick={() => setIsCreateModalOpen(true)}
@@ -267,18 +363,12 @@ const AchievementsPage = () => {
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium transition-colors"
           >
             <span>+</span>
-            {isLoading ? 'Creating...' : 'Create Badge'}
+            {isLoading ? 'Working...' : 'Create Badge'}
           </button>
         </div>
 
-        {/* Tabs */}
-        <AchievementTabs
-          tabs={tabs}
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-        />
+        <AchievementTabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
 
-        {/* Badge Sections */}
         <div className="space-y-12">
           {getActiveTabData().map((section) => (
             <BadgeSection
@@ -286,16 +376,28 @@ const AchievementsPage = () => {
               title={section.title}
               icon={section.icon}
               badges={section.badges}
+              onSelectBadge={handleSelectBadge}
             />
           ))}
         </div>
       </div>
 
-      {/* Create Badge Modal */}
       <CreateBadgeModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         onCreateBadge={handleCreateBadge}
+      />
+
+      <EditBadgeModal
+        isOpen={isEditModalOpen}
+        badge={selectedBadge}
+        isLoading={isLoading || isFetchingBadge}
+        onClose={() => {
+          setIsEditModalOpen(false)
+          setSelectedBadge(null)
+        }}
+        onUpdateBadge={handleUpdateBadge}
+        onDeleteBadge={handleDeleteBadge}
       />
     </AppShell>
   )
