@@ -24,8 +24,18 @@ type ApiCategory = {
   id: string;
   name: string;
   description?: string;
+  icon?: string;
+  coursesCount?: number;
+  enrolmentCount?: number;
   createdAt?: string;
   updatedAt?: string;
+};
+
+type CategoryStats = {
+  totalEnrollment: number;
+  activeCourses: number;
+  taxonomies: number;
+  distribution: Array<{ categoryName: string; percentage: number }>;
 };
 
 const iconChoices = [
@@ -58,6 +68,10 @@ function AddCategoryModal({
       toast.error("Please enter a category name.");
       return;
     }
+    if (!categoryDescription.trim()) {
+      toast.error("Please enter a category description.");
+      return;
+    }
     setIsSubmitting(true);
     try {
       await apiRequest(endpoints.courses.categories.create, {
@@ -66,6 +80,7 @@ function AddCategoryModal({
         body: {
           name: categoryName.trim(),
           description: categoryDescription.trim(),
+          icon: selectedIcon,
         },
       });
       toast.success("Category created successfully!");
@@ -169,6 +184,148 @@ function AddCategoryModal({
   );
 }
 
+function EditCategoryModal({
+  category,
+  onClose,
+  onSuccess,
+}: {
+  category: ApiCategory;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [categoryName, setCategoryName] = useState(category.name);
+  const [categoryDescription, setCategoryDescription] = useState(
+    category.description ?? ""
+  );
+  const [selectedIcon, setSelectedIcon] = useState(category.icon ?? "rocket");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { session } = useAuthSession();
+
+  async function handleUpdate() {
+    if (!categoryName.trim()) {
+      toast.error("Please enter a category name.");
+      return;
+    }
+    if (!categoryDescription.trim()) {
+      toast.error("Please enter a category description.");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      await apiRequest(endpoints.courses.categories.update(category.id), {
+        method: "PUT",
+        authToken: session?.token,
+        body: {
+          name: categoryName.trim(),
+          description: categoryDescription.trim(),
+          icon: selectedIcon,
+        },
+      });
+
+      toast.success("Category updated successfully!");
+      onSuccess();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to update category."
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <CourseModal
+      closeHref="/catalog/categories"
+      onClose={onClose}
+      maxWidthClassName="max-w-[680px]"
+    >
+      <div className="p-8 pr-14 sm:p-10 sm:pr-16">
+        <h2 className="text-[24px] font-extrabold tracking-[-0.04em] text-[#16345d]">
+          Update Category
+        </h2>
+
+        <div className="mt-8 space-y-6">
+          <label className="block">
+            <span className="mb-3 block text-[16px] font-semibold text-[#1f3556]">
+              Category Name
+            </span>
+
+            <span className="relative flex h-[58px] items-center rounded-[16px] border border-[#d7deee] bg-white px-5">
+              <input
+                value={categoryName}
+                onChange={(e) => setCategoryName(e.target.value)}
+                className="w-full bg-transparent text-[16px] text-[#264267] outline-none"
+              />
+            </span>
+          </label>
+
+          <label className="block">
+            <span className="mb-3 block text-[16px] font-semibold text-[#1f3556]">
+              Category Description
+            </span>
+
+            <textarea
+              rows={5}
+              value={categoryDescription}
+              onChange={(e) => setCategoryDescription(e.target.value)}
+              className="w-full rounded-[16px] border border-[#d7deee] bg-white px-5 py-4 text-[16px] leading-7 text-[#264267] outline-none"
+            />
+          </label>
+
+          <div>
+            <p className="text-[12px] font-extrabold uppercase tracking-[0.14em] text-[#72829a]">
+              Select Icon
+            </p>
+            <div className="mt-4 grid grid-cols-3 gap-4 sm:grid-cols-6">
+              {iconChoices.map((item) => {
+                const Icon = item.icon;
+                const selected = selectedIcon === item.key;
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => setSelectedIcon(item.key)}
+                    className={[
+                      "flex h-20 items-center justify-center rounded-[12px] border transition-colors",
+                      selected
+                        ? "border-[#4d63e1] bg-[#eef1ff] text-[#4d63e1]"
+                        : "border-[#e2e8f4] bg-white text-[#212733]",
+                    ].join(" ")}
+                  >
+                    <Icon className="h-7 w-7" strokeWidth={2} />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-8 flex flex-col gap-4 border-t border-[#e8edf7] pt-6 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="inline-flex h-12 items-center justify-center rounded-[12px] border border-[#cadfd5] bg-[#edf5f1] px-6 text-[15px] font-semibold text-[#4b8a60]"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="button"
+            onClick={handleUpdate}
+            disabled={isSubmitting}
+            className="button-primary inline-flex h-12 items-center justify-center rounded-[12px] bg-[#4b8a60] px-6 text-[15px] font-semibold text-white"
+          >
+            {isSubmitting ? "Updating..." : "Update Category"}
+          </button>
+        </div>
+      </div>
+    </CourseModal>
+  );
+}
+
 export default function CatalogCategoriesPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedIcon, setSelectedIcon] = useState("rocket");
@@ -176,9 +333,12 @@ export default function CatalogCategoriesPage() {
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [categoriesError, setCategoriesError] = useState<string | null>(null);
   const { session } = useAuthSession();
-  const [editingCategory, setEditingCategory] =
-    useState<ApiCategory | null>(null);
+  const [editingCategory, setEditingCategory] = useState<ApiCategory | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Statistics state
+  const [stats, setStats] = useState<CategoryStats | null>(null);
+  const [loadingStats, setLoadingStats] = useState(true);
 
   async function fetchCategories() {
     setLoadingCategories(true);
@@ -198,14 +358,33 @@ export default function CatalogCategoriesPage() {
     }
   }
 
+  async function fetchStats() {
+    setLoadingStats(true);
+    try {
+      const data = await apiRequest<{ message: string; data: CategoryStats }>(
+        endpoints.courses.categories.stats,
+        { authToken: session?.token }
+      );
+      setStats(data.data);
+    } catch (err) {
+      console.error("Failed to load category stats:", err);
+    } finally {
+      setLoadingStats(false);
+    }
+  }
+
   useEffect(() => {
-    fetchCategories();
+    if (session?.token) {
+      fetchCategories();
+      fetchStats();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.token]);
 
   function handleSuccess() {
     setShowAddModal(false);
     fetchCategories();
+    fetchStats();
   }
 
   async function handleDeleteCategory(id: string) {
@@ -230,6 +409,7 @@ export default function CatalogCategoriesPage() {
       }
 
       await fetchCategories();
+      await fetchStats();
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to delete category."
@@ -237,115 +417,6 @@ export default function CatalogCategoriesPage() {
     } finally {
       setDeletingId(null);
     }
-  }
-
-  function EditCategoryModal({
-    category,
-    onClose,
-    onSuccess,
-  }: {
-    category: ApiCategory;
-    onClose: () => void;
-    onSuccess: () => void;
-  }) {
-    const [categoryName, setCategoryName] = useState(category.name);
-    const [categoryDescription, setCategoryDescription] = useState(
-      category.description ?? ""
-    );
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const { session } = useAuthSession();
-
-    async function handleUpdate() {
-      if (!categoryName.trim()) {
-        toast.error("Please enter a category name.");
-        return;
-      }
-
-      setIsSubmitting(true);
-
-      try {
-        await apiRequest(endpoints.courses.categories.update(category.id), {
-          method: "PUT",
-          authToken: session?.token,
-          body: {
-            name: categoryName.trim(),
-            description: categoryDescription.trim(),
-          },
-        });
-
-        toast.success("Category updated successfully!");
-        onSuccess();
-      } catch (error) {
-        toast.error(
-          error instanceof Error ? error.message : "Failed to update category."
-        );
-      } finally {
-        setIsSubmitting(false);
-      }
-    }
-
-    return (
-      <CourseModal
-        closeHref="/catalog/categories"
-        onClose={onClose}
-        maxWidthClassName="max-w-[680px]"
-      >
-        <div className="p-8 pr-14 sm:p-10 sm:pr-16">
-          <h2 className="text-[24px] font-extrabold tracking-[-0.04em] text-[#16345d]">
-            Update Category
-          </h2>
-
-          <div className="mt-8 space-y-6">
-            <label className="block">
-              <span className="mb-3 block text-[16px] font-semibold text-[#1f3556]">
-                Category Name
-              </span>
-
-              <span className="relative flex h-[58px] items-center rounded-[16px] border border-[#d7deee] bg-white px-5">
-                <input
-                  value={categoryName}
-                  onChange={(e) => setCategoryName(e.target.value)}
-                  className="w-full bg-transparent text-[16px] text-[#264267] outline-none"
-                />
-              </span>
-            </label>
-
-            <label className="block">
-              <span className="mb-3 block text-[16px] font-semibold text-[#1f3556]">
-                Category Description
-              </span>
-
-              <textarea
-                rows={5}
-                value={categoryDescription}
-                onChange={(e) => setCategoryDescription(e.target.value)}
-                className="w-full rounded-[16px] border border-[#d7deee] bg-white px-5 py-4 text-[16px] leading-7 text-[#264267] outline-none"
-              />
-            </label>
-          </div>
-
-          <div className="mt-8 flex flex-col gap-4 border-t border-[#e8edf7] pt-6 sm:flex-row sm:justify-end">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={isSubmitting}
-              className="inline-flex h-12 items-center justify-center rounded-[12px] border border-[#cadfd5] bg-[#edf5f1] px-6 text-[15px] font-semibold text-[#4b8a60]"
-            >
-              Cancel
-            </button>
-
-            <button
-              type="button"
-              onClick={handleUpdate}
-              disabled={isSubmitting}
-              className="button-primary inline-flex h-12 items-center justify-center rounded-[12px] bg-[#4b8a60] px-6 text-[15px] font-semibold text-white"
-            >
-              {isSubmitting ? "Updating..." : "Update Category"}
-            </button>
-          </div>
-        </div>
-      </CourseModal>
-    );
   }
 
   return (
@@ -371,13 +442,6 @@ export default function CatalogCategoriesPage() {
                 <CirclePlus className="h-5 w-5" strokeWidth={2.1} />
                 Add New Category
               </button>
-              <button
-                type="button"
-                className="button-primary inline-flex h-12 items-center justify-center gap-3 rounded-[12px] bg-[#4b8a60] px-6 text-[15px] font-semibold text-white shadow-[0_20px_38px_rgba(75,138,96,0.18)]"
-              >
-                Save Changes
-                <Save className="h-5 w-5" strokeWidth={2.1} />
-              </button>
             </div>
           </div>
         </section>
@@ -394,7 +458,7 @@ export default function CatalogCategoriesPage() {
               </p>
               <div className="mt-3 flex items-end gap-3">
                 <span className="text-[60px] font-extrabold leading-none tracking-[-0.06em] text-[#16345d]">
-                  12,482
+                  {loadingStats ? "…" : stats?.totalEnrollment.toLocaleString()}
                 </span>
                 <span className="mb-2 text-[16px] font-extrabold text-[#0f8751]">+12%</span>
               </div>
@@ -406,7 +470,7 @@ export default function CatalogCategoriesPage() {
                   Active Courses
                 </p>
                 <p className="mt-5 text-[42px] font-extrabold tracking-[-0.05em] text-[#16345d]">
-                  156
+                  {loadingStats ? "…" : stats?.activeCourses}
                 </p>
               </div>
               <div className="rounded-[18px] bg-[#eef1ff] p-5">
@@ -423,20 +487,26 @@ export default function CatalogCategoriesPage() {
               <p className="text-[12px] font-extrabold uppercase tracking-[0.14em] text-[#72829a]">
                 Distribution
               </p>
-              {[
-                ["Entrepreneurship", "45%"],
-                ["Business", "45%"],
-              ].map(([label, value]) => (
-                <div key={label} className="mt-7">
-                  <div className="flex items-center justify-between gap-4 text-[15px] font-bold text-[#203553]">
-                    <span>{label}</span>
-                    <span>{value}</span>
+              {loadingStats ? (
+                <p className="mt-7 text-[15px] text-[#72829a]">Loading distribution...</p>
+              ) : stats?.distribution && stats.distribution.length > 0 ? (
+                stats.distribution.map((item) => (
+                  <div key={item.categoryName} className="mt-7">
+                    <div className="flex items-center justify-between gap-4 text-[15px] font-bold text-[#203553]">
+                      <span className="capitalize">{item.categoryName}</span>
+                      <span>{item.percentage}%</span>
+                    </div>
+                    <div className="mt-4 h-[12px] rounded-full bg-[#deece7]">
+                      <div
+                        className="h-full rounded-full bg-[#0f8751]"
+                        style={{ width: `${item.percentage}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="mt-4 h-[12px] rounded-full bg-[#deece7]">
-                    <div className="h-full w-[45%] rounded-full bg-[#0f8751]" />
-                  </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="mt-7 text-[15px] text-[#72829a]">No distribution data yet.</p>
+              )}
             </div>
           </article>
 
@@ -471,49 +541,58 @@ export default function CatalogCategoriesPage() {
                       </td>
                     </tr>
                   ) : (
-                    categories.map((cat) => (
-                      <tr key={cat.id} className="border-t border-[#eef2f8]">
-                        <td className="px-8 py-5">
-                          <div className="flex items-center gap-4">
-                            <span className="flex h-14 w-14 items-center justify-center rounded-[12px] bg-[#eef1ff] text-[#4d63e1]">
-                              <Rocket className="h-7 w-7" strokeWidth={2.1} />
-                            </span>
-                            <div>
-                              <p className="text-[16px] font-bold text-[#1f3556]">{cat.name}</p>
-                              <p className="mt-1 text-[15px] text-[#72829a]">{cat.description ?? ""}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-5">
-                          <span className="inline-flex rounded-full bg-[#deebff] px-4 py-2 text-[14px] font-bold text-[#2463e7]">
-                            —
-                          </span>
-                        </td>
-                        <td className="px-6 py-5 text-[18px] font-extrabold text-[#16345d]">
-                          —
-                        </td>
-                        <td className="px-6 py-5">
-                          <div className="flex items-center justify-end gap-3">
-                            <button
-                              type="button"
-                              onClick={() => setEditingCategory(cat)}
-                              className="inline-flex h-10 w-10 items-center justify-center rounded-[12px] border border-[#dbe3f0] text-[#4057d8]"
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </button>
+                    categories.map((cat) => {
+                      const IconComponent =
+                        iconChoices.find((ic) => ic.key === cat.icon)?.icon || Rocket;
 
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteCategory(cat.id)}
-                              disabled={deletingId === cat.id}
-                              className="inline-flex h-10 w-10 items-center justify-center rounded-[12px] border border-[#ffd9d9] text-red-500 disabled:opacity-50"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                      return (
+                        <tr key={cat.id} className="border-t border-[#eef2f8]">
+                          <td className="px-8 py-5">
+                            <div className="flex items-center gap-4">
+                              <span className="flex h-14 w-14 items-center justify-center rounded-[12px] bg-[#eef1ff] text-[#4d63e1]">
+                                <IconComponent className="h-7 w-7" strokeWidth={2.1} />
+                              </span>
+                              <div>
+                                <p className="text-[16px] font-bold text-[#1f3556] capitalize">
+                                  {cat.name}
+                                </p>
+                                <p className="mt-1 text-[15px] text-[#72829a]">
+                                  {cat.description ?? ""}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-5">
+                            <span className="inline-flex rounded-full bg-[#deebff] px-4 py-2 text-[14px] font-bold text-[#2463e7]">
+                              {cat.coursesCount ?? 0}
+                            </span>
+                          </td>
+                          <td className="px-6 py-5 text-[18px] font-extrabold text-[#16345d]">
+                            {(cat.enrolmentCount ?? 0).toLocaleString()}
+                          </td>
+                          <td className="px-6 py-5">
+                            <div className="flex items-center justify-end gap-3">
+                              <button
+                                type="button"
+                                onClick={() => setEditingCategory(cat)}
+                                className="inline-flex h-10 w-10 items-center justify-center rounded-[12px] border border-[#dbe3f0] text-[#4057d8]"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteCategory(cat.id)}
+                                disabled={deletingId === cat.id}
+                                className="inline-flex h-10 w-10 items-center justify-center rounded-[12px] border border-[#ffd9d9] text-red-500 disabled:opacity-50"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -558,6 +637,7 @@ export default function CatalogCategoriesPage() {
           onSuccess={() => {
             setEditingCategory(null);
             fetchCategories();
+            fetchStats();
           }}
         />
       ) : null}

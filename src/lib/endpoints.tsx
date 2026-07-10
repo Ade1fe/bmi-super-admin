@@ -288,6 +288,12 @@ certificates: {
     update: (courseId: string) =>
       buildEndpoint(apiBaseUrl, `/courses/${courseId}`),
 
+    // PUT  /courses/bulk-settings
+    bulkUpdateSettings: buildEndpoint(apiBaseUrl, "/courses/bulk-settings"),
+
+    // GET  /courses/settings-stats
+    settingsStats: buildEndpoint(apiBaseUrl, "/courses/settings-stats"),
+
     categories: {
       // GET  /courses/get-categories
       all: buildEndpoint(apiBaseUrl, "/courses/get-categories"),
@@ -302,6 +308,9 @@ certificates: {
       // DELETE /courses/categories/:categoryId
       delete: (categoryId: string) =>
         buildEndpoint(apiBaseUrl, `/courses/categories/${categoryId}`),
+
+      // GET  /courses/categories/stats
+      stats: buildEndpoint(apiBaseUrl, "/courses/categories/stats"),
     },
 
     modules: {
