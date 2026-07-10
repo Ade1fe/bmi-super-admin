@@ -273,6 +273,7 @@ const AchievementsPage = () => {
             category: badge.category,
             criteria: badge.criteria,
           })),
+          // -
         learning_streaks: allBadges
           .filter((badge) => badge.category === 'Learning Streaks')
           .map((badge) => ({
