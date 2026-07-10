@@ -17,6 +17,7 @@ import {
 import { AppShell } from "@/components/app-shell";
 import { useAuthSession } from "@/lib/auth-session";
 import { getCourses, type Course } from "@/lib/course-api";
+import { usePagination, PaginationFooter } from "@/components/Pagination";
 
 type CourseTab = "all" | "published" | "drafts" | "archived";
 
@@ -44,6 +45,11 @@ const tabs: { key: CourseTab; label: string }[] = [
   { key: "drafts", label: "Drafts" },
   { key: "archived", label: "Archived" },
 ];
+
+// Fetched once per tab/search; paginated client-side after that so the
+// table, mobile cards, and footer all stay in sync off one source of truth.
+const COURSES_FETCH_LIMIT = 100;
+const COURSES_PAGE_SIZE = 10;
 
 function formatStatusClass(status: string) {
   const normalized = status.toLowerCase();
@@ -73,10 +79,6 @@ function mapCourseToRow(course: Course): CourseRow {
     categoryClassName: "bg-[#deebff] text-[#2463e7]",
     lessons: `${course.totalLessons ?? 0} ${(course.totalLessons ?? 0) === 1 ? "Lesson" : "Lessons"}`,
     students: String(course.totalStudents ?? 0),
-//     lessons: course.totalLessons
-//   ? `${course.totalLessons} ${course.totalLessons === 1 ? "Lesson" : "Lessons"}`
-//   : "—",
-// students: course.totalStudents ? String(course.totalStudents) : "—",
     instructor: "Course Admin",
     instructorInitials: course.name
       .split(" ")
@@ -192,12 +194,6 @@ export default function CoursesPage() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
-
-  console.log("SESSION", session);
-console.log("USER", session?.user);
-console.log("USER ID", session?.user?.id);
-console.log("ROLE", session?.role);
-
   useEffect(() => {
     async function loadCourses() {
       if (!isHydrated) {
@@ -218,7 +214,7 @@ console.log("ROLE", session?.role);
         const response = await getCourses(
           {
             page: 1,
-            limit: 20,
+            limit: COURSES_FETCH_LIMIT,
             status: statusFilter,
             search: searchTerm || undefined,
           },
@@ -232,19 +228,27 @@ console.log("ROLE", session?.role);
         setIsLoading(false);
       }
     }
- console.log("COURSES", courses);
+
     loadCourses();
   }, [activeTab, isHydrated, searchTerm, session?.token]);
 
   const rows = courses.map(mapCourseToRow);
   const summaryCards = getSummaryCards(activeTab);
-  const resultSummary = isLoading
-    ? "Loading courses..."
-    : `Showing ${rows.length} ${rows.length === 1 ? "course" : "courses"}`;
 
-    console.log("rows", rows);
+  // ── Pagination over the currently loaded (tab + search filtered) rows ──
+  const {
+    currentPage,
+    setCurrentPage,
+    totalPages,
+    paginatedItems: paginatedRows,
+    showingLabel,
+  } = usePagination({
+    items: rows,
+    pageSize: COURSES_PAGE_SIZE,
+    resetKey: `${activeTab}:${searchTerm}`,
+  });
 
-   
+  const resultSummary = isLoading ? "Loading courses..." : showingLabel;
 
   return (
     <AppShell title="Course Management" activeSection="courses">
@@ -338,7 +342,7 @@ console.log("ROLE", session?.role);
         ) : null}
 
         <div className="space-y-4 p-4 xl:hidden">
-          {rows.map((row) => (
+          {paginatedRows.map((row) => (
             <article key={row.id} className="rounded-[12px] border border-[#edf0f7] bg-[#fbfcff] p-5">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex min-w-0 items-center gap-4">
@@ -451,7 +455,7 @@ console.log("ROLE", session?.role);
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => (
+                {paginatedRows.map((row) => (
                   <tr key={row.id} className="text-[15px] text-[#6f7d98]">
                     <td className="border-b border-[#edf0f7] px-8 py-7">
                       <div className="flex min-w-0 items-center gap-4">
@@ -514,7 +518,7 @@ console.log("ROLE", session?.role);
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => (
+                {paginatedRows.map((row) => (
                   <tr key={row.id} className="text-[15px] text-[#6f7d98]">
                     <td className="border-b border-[#edf0f7] px-8 py-7">
                       <div className="flex min-w-0 items-center gap-4">
@@ -582,7 +586,7 @@ console.log("ROLE", session?.role);
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => (
+                {paginatedRows.map((row) => (
                   <tr key={row.id} className="text-[15px] text-[#6f7d98]">
                     <td className="border-b border-[#edf0f7] px-8 py-7">
                       <div className="flex min-w-0 items-center gap-4">
@@ -645,7 +649,7 @@ console.log("ROLE", session?.role);
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => (
+                {paginatedRows.map((row) => (
                   <tr key={row.id} className="text-[15px] text-[#6f7d98]">
                     <td className="border-b border-[#edf0f7] px-8 py-7">
                       <div className="flex min-w-0 items-center gap-4">
@@ -685,24 +689,12 @@ console.log("ROLE", session?.role);
           )}
         </div>
 
-        <div className="flex flex-col gap-4 border-t border-[#edf0f7] px-6 py-5 text-[15px] font-semibold text-[#6e7c98] sm:flex-row sm:items-center sm:justify-between">
-          <p>{resultSummary}</p>
-          <div className="flex items-center gap-2">
-            <button className="flex h-10 w-10 items-center justify-center rounded-[8px] border border-[#dfe4f0] text-[#93a0b7]">
-              ‹
-            </button>
-            <button className="button-primary flex h-10 w-10 items-center justify-center rounded-[8px] bg-[#0f8751] text-[15px] font-bold text-white">
-              1
-            </button>
-            <button className="flex h-10 w-10 items-center justify-center rounded-[8px] text-[#22314c]">2</button>
-            <button className="flex h-10 w-10 items-center justify-center rounded-[8px] text-[#22314c]">3</button>
-            <button className="flex h-10 w-10 items-center justify-center rounded-[8px] text-[#93a0b7]">…</button>
-            <button className="flex h-10 w-10 items-center justify-center rounded-[8px] text-[#22314c]">256</button>
-            <button className="flex h-10 w-10 items-center justify-center rounded-[8px] border border-[#dfe4f0] text-[#93a0b7]">
-              ›
-            </button>
-          </div>
-        </div>
+        <PaginationFooter
+          label={resultSummary}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+        />
       </section>
 
       <section className="mt-8 grid gap-4 xl:grid-cols-3">
