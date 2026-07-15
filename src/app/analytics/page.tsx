@@ -28,6 +28,11 @@ type DropoffBar = {
   highlight?: boolean;
 };
 
+type CourseOption = {
+  id: string;
+  name: string;
+};
+
 const defaultMetrics: OverviewMetric[] = [
   {
     label: "Most Completed Courses",
@@ -112,6 +117,62 @@ function OverviewFilter({
   );
 }
 
+function CourseFilterDropdown({
+  courses,
+  isLoading,
+}: {
+  courses: CourseOption[];
+  isLoading: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className={[
+          "inline-flex h-11 items-center gap-3 rounded-[12px] border px-4 text-[14px] font-semibold transition-colors",
+          open
+            ? "border-[#d1e3d8] bg-[#dcefe3] text-[#2d7a53]"
+            : "border-[#dbe3f1] bg-[#f8fbff] text-[#2a4568]",
+        ].join(" ")}
+      >
+        All Courses
+        <ChevronDown className="h-4 w-4" strokeWidth={2} />
+      </button>
+
+      {open ? (
+        <>
+          {/* click-away backdrop */}
+          <div
+            className="fixed inset-0 z-10"
+            onClick={() => setOpen(false)}
+          />
+          <div className="absolute right-0 z-20 mt-2 max-h-[320px] w-[280px] overflow-y-auto rounded-[14px] border border-[#dfe6f7] bg-white p-2 shadow-[0_18px_42px_rgba(182,192,227,0.18)]">
+            {isLoading ? (
+              <p className="px-3 py-2 text-[14px] text-[#7f8ba1]">Loading courses…</p>
+            ) : courses.length === 0 ? (
+              <p className="px-3 py-2 text-[14px] text-[#7f8ba1]">No courses found</p>
+            ) : (
+              courses.map((course) => (
+                <Link
+                  key={course.id}
+                  href={`/analytics/${course.id}`}
+                  onClick={() => setOpen(false)}
+                  className="block rounded-[10px] px-3 py-2 text-[14px] font-medium text-[#243450] hover:bg-[#f1f5fb]"
+                >
+                  {course.name}
+                </Link>
+              ))
+            )}
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 export default function AnalyticsOverviewPage() {
   const { session } = useAuthSession();
   const [metrics, setMetrics] = useState<OverviewMetric[]>(defaultMetrics);
@@ -124,6 +185,9 @@ export default function AnalyticsOverviewPage() {
     dropoffPct: 40,
   });
   const [isLoading, setIsLoading] = useState(true);
+
+  const [courses, setCourses] = useState<CourseOption[]>([]);
+  const [isCoursesLoading, setIsCoursesLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
@@ -156,8 +220,56 @@ export default function AnalyticsOverviewPage() {
     };
   }, [session?.token]);
 
+  // Fetch the full course list so the "All Courses" dropdown can route to
+  // per-course analytics at /analytics/[courseId] for ANY course, not just
+  // whichever one the overview endpoint's "insight" happens to point at.
+  useEffect(() => {
+    let isMounted = true;
+    const fetchCourses = async () => {
+      if (!session?.token) {
+        setIsCoursesLoading(false);
+        return;
+      }
+      try {
+        setIsCoursesLoading(true);
+        const res = await apiRequest<any>(endpoints.courses.all, {
+          authToken: session.token,
+          cache: "no-store",
+        });
+
+        // Defensive parsing: backend may return data as an array directly,
+        // or nested under data.courses depending on endpoint version.
+        const rawList: any[] = Array.isArray(res?.data)
+          ? res.data
+          : Array.isArray(res?.data?.courses)
+            ? res.data.courses
+            : [];
+
+        if (isMounted) {
+          setCourses(
+            rawList
+              .filter((c) => c && c.id)
+              .map((c: any) => ({
+                id: c.id,
+                name: c.title ?? c.name ?? c.courseName ?? "Untitled Course",
+              }))
+          );
+        }
+      } catch (err) {
+        console.error("Failed to load course list:", err);
+      } finally {
+        if (isMounted) setIsCoursesLoading(false);
+      }
+    };
+
+    void fetchCourses();
+    return () => {
+      isMounted = false;
+    };
+  }, [session?.token]);
+
   // If a dynamic courseId is available, we redirect "View Full Course Report" there. Otherwise we fall back to "/analytics/entrepreneurship-fundamentals"
-  const detailLink = insight.courseId 
+  const detailLink = insight.courseId
     ? `/analytics/${insight.courseId}`
     : `/analytics/entrepreneurship-fundamentals`;
 
@@ -193,7 +305,7 @@ export default function AnalyticsOverviewPage() {
 
                 <div className="flex flex-wrap gap-3">
                   <OverviewFilter label="By Category" />
-                  <OverviewFilter label="All Courses" active />
+                  <CourseFilterDropdown courses={courses} isLoading={isCoursesLoading} />
                 </div>
               </div>
 
