@@ -10,16 +10,6 @@ export interface CertificateSchool {
   logoUrl: string | null;
 }
 
-// ✅ FIXED: Added "Revoked" and "Rejected" status values
-export type CertificateStatus =
-  | "Pending"
-  | "Approved"
-  | "Rejected"
-  | "Revoked"
-  | "Issued"
-  | "Active"
-  | "Verified"
-  | "Reissued";
 
 export interface Certificate {
   id: string;
@@ -32,6 +22,50 @@ export interface Certificate {
   adminNote?: string | null;
   school?: CertificateSchool;
   verificationUrl?: string;
+}
+
+
+
+export interface CertificateStudent {
+  id: string;
+  user: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+}
+
+export interface CertificateCourse {
+  id: string;
+  name: string;
+}
+
+export type CertificateStatus =
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "revoked"
+  | "issued"
+  | "active"
+  | "verified"
+  | "reissued";
+
+export interface Certificate {
+  id: string;
+  studentId: string;
+  courseId: string;
+  schoolId: string;
+  status: CertificateStatus;
+  certificateUrl: string | null;
+  adminNote?: string | null;
+  reviewedBy?: string | null;
+  reviewedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  course: CertificateCourse;
+  student: CertificateStudent;
+  school?: { name: string; logoUrl: string | null };
 }
 
 export interface CertificatesResponse {
@@ -77,6 +111,38 @@ function logError(title: string, error: unknown) {
   }
 
   console.groupEnd();
+}
+export function formatCertificateDate(value: string | null | undefined): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+  }).format(date);
+}
+
+/**
+ * Merge a partial API response (from approve/reject/revoke/reissue) into an
+ * existing table record, preserving display fields the response doesn't include.
+ */
+export function mergeCertificateUpdate(
+  existing: ReturnType<typeof formatCertificateForTable>,
+  updated: Certificate,
+  schoolNameMap?: Record<string, string>
+) {
+  const newDate = updated.reviewedAt || updated.createdAt || existing.completionDate;
+
+  return {
+    ...existing,
+    status: updated.status, // lowercase, straight from the API
+    completionDate: newDate,
+    completionDateDisplay: formatCertificateDate(newDate),
+    issueDate: newDate,
+    school: schoolNameMap?.[updated.schoolId] || existing.school,
+    __originalCert: { ...existing.__originalCert, ...updated },
+  };
 }
 
 /**
@@ -223,18 +289,17 @@ export async function revokeCertificate(
   const endpoint = endpoints.admin.certificates.revoke(certificateId);
 
   try {
-    logRequest("REVOKE CERTIFICATE", endpoint, { reason });
+    logRequest("REVOKE CERTIFICATE", endpoint, { adminNote: reason });
 
     const response = await apiRequest<CertificateActionResponse>(endpoint, {
       method: "PUT",
       authToken,
       body: {
-        reason,
+        adminNote: reason,
       },
     });
 
     logResponse("REVOKE CERTIFICATE", response);
-
     return response.data;
   } catch (error) {
     logError("REVOKE CERTIFICATE", error);
@@ -273,37 +338,42 @@ export async function reissueCertificate(
  * Format certificate for table display
  * ✅ FIXED: Now stores both formatted data and original cert for type safety
  */
-export function formatCertificateForTable(cert: Certificate) {
-  const studentName = cert.student
-    ? `${cert.student.firstName} ${cert.student.lastName}`.trim()
-    : "Unknown Student";
+export function formatCertificateForTable(
+  cert: Certificate,
+  schoolNameMap?: Record<string, string>
+) {
+  const studentName = cert.student?.user
+    ? `${cert.student.user.firstName} ${cert.student.user.lastName}`.trim()
+    : "—";
+
+  const rawDate = cert.reviewedAt || cert.createdAt || "";
 
   return {
     id: cert.id,
     student: studentName,
-    registryId: cert.certificateCode,
-    course: cert.courseName,
-    school: cert.school?.name || "—",
-    completionDate: cert.issuedDate,
-    issueDate: cert.issuedDate,
+    registryId: cert.id,
+    course: cert.course?.name || "—",
+    school: schoolNameMap?.[cert.schoolId] || cert.school?.name || "—",
+    completionDate: rawDate, // raw ISO — used for filtering
+    completionDateDisplay: formatCertificateDate(rawDate), // formatted — used for UI
+    issueDate: rawDate,
     status: cert.status,
-    studentFirstName: cert.student?.firstName || "",
-    studentLastName: cert.student?.lastName || "",
-    // ✅ NEW: Store original cert for operations requiring it
+    studentFirstName: cert.student?.user?.firstName || "",
+    studentLastName: cert.student?.user?.lastName || "",
     __originalCert: cert,
   };
 }
+
+
 
 /**
  * Get initials from certificate
  * ✅ FIXED: Accept certificate object properly typed
  */
 export function getCertificateInitials(cert: Certificate): string {
-  if (!cert.student) return "?";
-
-  const first = cert.student.firstName?.[0] || "";
-  const last = cert.student.lastName?.[0] || "";
-
+  if (!cert.student?.user) return "?";
+  const first = cert.student.user.firstName?.[0] || "";
+  const last = cert.student.user.lastName?.[0] || "";
   return (first + last).toUpperCase() || "?";
 }
 

@@ -36,7 +36,11 @@ import {
   getCertificateInitialsFromRecord,
   type Certificate,
   type CertificateStatus,
+  mergeCertificateUpdate,
 } from "@/lib/certificate";
+import { apiRequest, endpoints } from "@/lib/endpoints";
+import { parseSchoolList } from "@/lib/backend-models";
+import { PaginationFooter, usePagination } from "@/components/Pagination";
 
 type MetricCard = {
   label: string;
@@ -73,6 +77,9 @@ const metrics: MetricCard[] = [
     tone: "bg-[#fff5d7] text-[#0f8751]",
   },
 ];
+
+
+
 
 function MetricSummaryCard({ card, index }: { card: MetricCard; index: number }) {
   const Icon = card.icon;
@@ -301,9 +308,9 @@ export default function CertificateManagementPage() {
   const [activeModal, setActiveModal] = useState<CertificateModal>(null);
   const [selectedCertificate, setSelectedCertificate] = useState<CertificateRecord | null>(null);
   const [actionReason, setActionReason] = useState("");
-  
+
   const [loadingCertificateIds, setLoadingCertificateIds] = useState<Set<string>>(new Set());
-  
+
   const { session, isHydrated } = useAuthSession();
   const authToken = session?.token ?? "";
 
@@ -317,6 +324,21 @@ export default function CertificateManagementPage() {
   const [appliedDateRange, setAppliedDateRange] = useState("all");
   const [appliedSchool, setAppliedSchool] = useState("all");
 
+  const [schoolNameMap, setSchoolNameMap] = useState<Record<string, string>>({});
+
+  // ✅ Now that appliedSearchQuery/appliedDateRange/appliedSchool exist, this is safe:
+  const {
+    currentPage,
+    setCurrentPage,
+    totalPages,
+    paginatedItems: paginatedCertificates,
+    showingLabel,
+  } = usePagination({
+    items: filteredCertificates,
+    pageSize: 10,
+    resetKey: `${appliedSearchQuery}-${appliedDateRange}-${appliedSchool}`,
+  });
+
   // Fetch unique schools dynamically
   const uniqueSchools = useMemo(() => {
     return Array.from(new Set(certificates.map((c) => c.school))).filter(Boolean);
@@ -325,27 +347,35 @@ export default function CertificateManagementPage() {
   useEffect(() => {
     if (!isHydrated || !authToken) return;
 
-    const fetchCertificates = async () => {
-      setIsLoading(true);
-      setError(null);
+  const fetchCertificates = async () => {
+    setIsLoading(true);
+    setError(null);
 
-      try {
-        const data = await getAllCertificates(authToken);
-        const formatted = data.map(formatCertificateForTable);
+    try {
+      const [certData, schoolsPayload] = await Promise.all([
+        getAllCertificates(authToken),
+        apiRequest(endpoints.admin.schools, { authToken }),
+      ]);
 
-        setCertificates(formatted);
-        setFilteredCertificates(formatted);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "Failed to fetch certificates";
-        setError(message);
-        console.error("Error fetching certificates:", err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+      const schoolList = parseSchoolList(schoolsPayload);
+      const nameMap = Object.fromEntries(schoolList.map((s) => [s.id, s.name]));
+      setSchoolNameMap(nameMap);
 
-    fetchCertificates();
-  }, [isHydrated, authToken]);
+      const formatted = certData.map((cert) => formatCertificateForTable(cert, nameMap));
+
+      setCertificates(formatted);
+      setFilteredCertificates(formatted);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to fetch certificates";
+      setError(message);
+      console.error("Error fetching certificates:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  fetchCertificates();
+}, [isHydrated, authToken]);
 
   // Apply filters on button click or change
   useEffect(() => {
@@ -406,99 +436,97 @@ export default function CertificateManagementPage() {
     });
   };
 
-  const handleApproveCertificate = async (certificate: CertificateRecord) => {
-    if (!authToken) return;
+const handleApproveCertificate = async (certificate: CertificateRecord) => {
+  if (!authToken) return;
 
-    setLoadingCertificate(certificate.id, true);
-    try {
-      await approveCertificate(certificate.id, authToken);
+  setLoadingCertificate(certificate.id, true);
+  try {
+    const response = await approveCertificate(certificate.id, authToken);
 
-      setCertificates((prev) =>
-        prev.map((cert) =>
-          cert.id === certificate.id ? { ...cert, status: "Approved" as CertificateStatus } : cert
-        )
-      );
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to approve certificate";
-      setError(message);
-    } finally {
-      setLoadingCertificate(certificate.id, false);
-    }
-  };
+    setCertificates((prev) =>
+      prev.map((cert) =>
+        cert.id === certificate.id ? mergeCertificateUpdate(cert, response, schoolNameMap) : cert
+      )
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to approve certificate";
+    setError(message);
+  } finally {
+    setLoadingCertificate(certificate.id, false);
+  }
+};
 
-  const handleRejectCertificate = async () => {
-    if (!selectedCertificate || !authToken) return;
+const handleRejectCertificate = async () => {
+  if (!selectedCertificate || !authToken) return;
 
-    setLoadingCertificate(selectedCertificate.id, true);
-    try {
-      await rejectCertificate(selectedCertificate.id, actionReason, authToken);
+  setLoadingCertificate(selectedCertificate.id, true);
+  try {
+    const response = await rejectCertificate(selectedCertificate.id, actionReason, authToken);
 
-      setCertificates((prev) =>
-        prev.map((cert) =>
-          cert.id === selectedCertificate.id ? { ...cert, status: "Rejected" as CertificateStatus } : cert
-        )
-      );
+    setCertificates((prev) =>
+      prev.map((cert) =>
+        cert.id === selectedCertificate.id ? mergeCertificateUpdate(cert, response, schoolNameMap) : cert
+      )
+    );
 
-      setActiveModal(null);
-      setActionReason("");
-      setSelectedCertificate(null);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to reject certificate";
-      setError(message);
-      console.error("Error rejecting certificate:", err);
-    } finally {
-      setLoadingCertificate(selectedCertificate.id, false);
-    }
-  };
+    setActiveModal(null);
+    setActionReason("");
+    setSelectedCertificate(null);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to reject certificate";
+    setError(message);
+    console.error("Error rejecting certificate:", err);
+  } finally {
+    setLoadingCertificate(selectedCertificate.id, false);
+  }
+};
 
-  const handleRevokeCertificate = async () => {
-    if (!selectedCertificate || !authToken) return;
+const handleRevokeCertificate = async () => {
+  if (!selectedCertificate || !authToken) return;
 
-    setLoadingCertificate(selectedCertificate.id, true);
-    try {
-      await revokeCertificate(selectedCertificate.id, actionReason, authToken);
+  setLoadingCertificate(selectedCertificate.id, true);
+  try {
+    const response = await revokeCertificate(selectedCertificate.id, actionReason, authToken);
 
-      setCertificates((prev) =>
-        prev.map((cert) =>
-          cert.id === selectedCertificate.id ? { ...cert, status: "Revoked" as CertificateStatus } : cert
-        )
-      );
+    setCertificates((prev) =>
+      prev.map((cert) =>
+        cert.id === selectedCertificate.id ? mergeCertificateUpdate(cert, response, schoolNameMap) : cert
+      )
+    );
 
-      setActiveModal(null);
-      setActionReason("");
-      setSelectedCertificate(null);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to revoke certificate";
-      setError(message);
-      console.error("Error revoking certificate:", err);
-    } finally {
-      setLoadingCertificate(selectedCertificate.id, false);
-    }
-  };
+    setActiveModal(null);
+    setActionReason("");
+    setSelectedCertificate(null);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to revoke certificate";
+    setError(message);
+    console.error("Error revoking certificate:", err);
+  } finally {
+    setLoadingCertificate(selectedCertificate.id, false);
+  }
+};
 
-  const handleReissueCertificate = async (certificate: CertificateRecord) => {
-    if (!authToken) return;
+const handleReissueCertificate = async (certificate: CertificateRecord) => {
+  if (!authToken) return;
 
-    setLoadingCertificate(certificate.id, true);
-    try {
-      const response = await reissueCertificate(certificate.id, authToken);
-      const updatedCert = formatCertificateForTable(response);
+  setLoadingCertificate(certificate.id, true);
+  try {
+    const response = await reissueCertificate(certificate.id, authToken);
+    const updatedCert = mergeCertificateUpdate(certificate, response, schoolNameMap);
 
-      setCertificates((prev) =>
-        prev.map((cert) =>
-          cert.id === certificate.id ? updatedCert : cert
-        )
-      );
+    setCertificates((prev) =>
+      prev.map((cert) => (cert.id === certificate.id ? updatedCert : cert))
+    );
 
-      setSelectedCertificate(updatedCert);
-      setActiveModal("reissue");
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to reissue certificate";
-      setError(message);
-    } finally {
-      setLoadingCertificate(certificate.id, false);
-    }
-  };
+    setSelectedCertificate(updatedCert);
+    setActiveModal("reissue");
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to reissue certificate";
+    setError(message);
+  } finally {
+    setLoadingCertificate(certificate.id, false);
+  }
+};
 
   const handleVerifyCertificateClick = (record: CertificateRecord) => {
     setSelectedCertificate(record);
@@ -626,12 +654,12 @@ export default function CertificateManagementPage() {
           </div>
 
           <div>
-            {filteredCertificates.length === 0 ? (
-              <div className="px-5 py-12 text-center sm:px-7">
-                <p className="text-[#536781]">No certificates found</p>
-              </div>
-            ) : (
-              filteredCertificates.map((record) => (
+       {paginatedCertificates.length === 0 ? (
+  <div className="px-5 py-12 text-center sm:px-7">
+    <p className="text-[#536781]">No certificates found</p>
+  </div>
+) : (
+  paginatedCertificates.map((record) => (
                 <article
                   key={record.id}
                   className="grid gap-4 border-b border-[#edf1f7] px-5 py-5 sm:px-7 lg:grid-cols-[1.2fr_1.25fr_1.3fr_0.95fr_0.55fr] lg:items-center"
@@ -641,12 +669,12 @@ export default function CertificateManagementPage() {
                     <div>
                       <div className="flex items-center gap-2">
                         <p className="text-[16px] font-extrabold text-[#172f54]">{record.student}</p>
-                        {record.status === "Revoked" && (
+                        {record.status === "revoked" && (
                           <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-bold text-red-600">
                             REVOKED
                           </span>
                         )}
-                        {record.status === "Reissued" && (
+                        {record.status === "reissued" && (
                           <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-bold text-blue-600">
                             REISSUED
                           </span>
@@ -658,7 +686,7 @@ export default function CertificateManagementPage() {
 
                   <div className="text-[16px] font-bold text-[#536781]">{record.course}</div>
                   <div className="text-[16px] font-bold text-[#536781]">{record.school}</div>
-                  <div className="text-[16px] font-bold text-[#5b6d86]">{record.completionDate}</div>
+                  <div className="text-[16px] font-bold text-[#5b6d86]">{record.completionDateDisplay}</div>
 
                   <div className="relative flex justify-end">
                     <button
@@ -676,7 +704,7 @@ export default function CertificateManagementPage() {
 
                     {openActionRow === record.id ? (
                       <div className="absolute right-0 top-11 z-10 w-[228px] rounded-[16px] border border-[#e7ecf6] bg-white p-2 text-left shadow-[0_20px_44px_rgba(164,176,212,0.22)]">
-                        {record.status === "Pending" ? (
+                        {record.status === "pending" ? (
                           <>
                             <button
                               type="button"
@@ -708,7 +736,7 @@ export default function CertificateManagementPage() {
                             <button
                               type="button"
                               onClick={() => openModal("revoke", record)}
-                              disabled={loadingCertificateIds.has(record.id) || record.status === "Revoked"}
+                              disabled={loadingCertificateIds.has(record.id) || record.status === "revoked"}
                               className="flex w-full items-center rounded-[12px] px-4 py-3 text-[15px] font-medium text-[#36455f] hover:bg-[#f7f9fd] disabled:opacity-50 disabled:text-gray-400"
                             >
                               Revoke Certificate
@@ -728,41 +756,19 @@ export default function CertificateManagementPage() {
                   </div>
                 </article>
               ))
+
+              // --
             )}
           </div>
 
-          {filteredCertificates.length > 0 && (
-            <div className="flex flex-col gap-4 px-5 py-4 text-[15px] font-medium text-[#536781] sm:px-7 lg:flex-row lg:items-center lg:justify-between">
-              <p>Showing {filteredCertificates.length} of {certificates.length} certificates</p>
-
-              <div className="flex items-center gap-2 self-end lg:self-auto">
-                <button
-                  type="button"
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] border border-[#dbe3f1] text-[#98a2b6]"
-                >
-                  <ChevronLeft className="h-4 w-4" strokeWidth={2.2} />
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] bg-[#0f8751] text-[15px] font-bold text-white"
-                >
-                  1
-                </button>
-                <button type="button" className="inline-flex h-10 w-10 items-center justify-center text-[15px] font-bold text-[#203552]">
-                  2
-                </button>
-                <button type="button" className="inline-flex h-10 w-10 items-center justify-center text-[15px] font-bold text-[#203552]">
-                  3
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] border border-[#dbe3f1] text-[#98a2b6]"
-                >
-                  <ChevronRight className="h-4 w-4" strokeWidth={2.2} />
-                </button>
-              </div>
-            </div>
-          )}
+       {filteredCertificates.length > 0 && (
+  <PaginationFooter
+    label={showingLabel}
+    currentPage={currentPage}
+    totalPages={totalPages}
+    onPageChange={setCurrentPage}
+  />
+)}
         </section>
       </div>
 
@@ -819,13 +825,13 @@ export default function CertificateManagementPage() {
           <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-8">
             {/* Left: Certificate Preview */}
             <div className="flex flex-col justify-center">
-              <CertificatePreview
-                student={selectedCertificate.student}
-                course={selectedCertificate.course}
-                school={selectedCertificate.school}
-                date={selectedCertificate.completionDate}
-                registryId={selectedCertificate.registryId}
-              />
+         <CertificatePreview
+  student={selectedCertificate.student}
+  course={selectedCertificate.course}
+  school={selectedCertificate.school}
+  date={selectedCertificate.completionDateDisplay}
+  registryId={selectedCertificate.registryId}
+/>
             </div>
 
             {/* Right: Verification Details */}
@@ -834,7 +840,7 @@ export default function CertificateManagementPage() {
                 <span className="text-[12px] font-extrabold uppercase tracking-[0.08em] text-[#7e8aa0]">
                   Verification Status
                 </span>
-                {selectedCertificate.status === "Revoked" ? (
+                {selectedCertificate.status === "revoked" ? (
                   <div className="mt-3 flex items-center gap-4 rounded-[16px] border border-red-200 bg-red-50 p-5">
                     <span className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 text-red-600">
                       <AlertTriangle className="h-6 w-6" />
@@ -872,7 +878,7 @@ export default function CertificateManagementPage() {
                 </div>
                 <div>
                   <p className="text-[12px] font-bold uppercase tracking-[0.08em] text-[#7c8ba3]">Issue Date</p>
-                  <p className="mt-1 text-[16px] font-extrabold text-[#172f54]">{selectedCertificate.completionDate}</p>
+                 <p className="mt-1 text-[16px] font-extrabold text-[#172f54]">{selectedCertificate.completionDateDisplay}</p>
                 </div>
               </div>
 
@@ -933,7 +939,8 @@ export default function CertificateManagementPage() {
             <div className="mt-8">
               <h4 className="text-[22px] font-extrabold tracking-[-0.03em]">{selectedCertificate.student}</h4>
               <p className="mt-1 text-[14px] text-[#c5a880] font-medium">Graduate Professional Certification</p>
-              <p className="mt-6 text-[12px] text-white/70 font-semibold uppercase">Date Completed: {selectedCertificate.completionDate}</p>
+              {/* <p className="mt-6 text-[12px] text-white/70 font-semibold uppercase">Date Completed: {selectedCertificate.completionDate}</p> */}
+              <p className="mt-6 text-[12px] text-white/70 font-semibold uppercase">Date Completed: {selectedCertificate.completionDateDisplay}</p>
             </div>
           </div>
 
