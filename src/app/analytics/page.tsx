@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import {
   AlertTriangle,
   ArrowDownRight,
@@ -8,6 +11,8 @@ import {
   Target,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { apiRequest, endpoints } from "@/lib/endpoints";
+import { useAuthSession } from "@/lib/auth-session";
 
 type OverviewMetric = {
   label: string;
@@ -23,7 +28,7 @@ type DropoffBar = {
   highlight?: boolean;
 };
 
-const overviewMetrics: OverviewMetric[] = [
+const defaultMetrics: OverviewMetric[] = [
   {
     label: "Most Completed Courses",
     value: "1240",
@@ -47,7 +52,7 @@ const overviewMetrics: OverviewMetric[] = [
   },
 ];
 
-const dropoffBars: DropoffBar[] = [
+const defaultDropoffBars: DropoffBar[] = [
   { label: "Mon", value: 52 },
   { label: "", value: 84 },
   { label: "Tue", value: 89 },
@@ -108,6 +113,54 @@ function OverviewFilter({
 }
 
 export default function AnalyticsOverviewPage() {
+  const { session } = useAuthSession();
+  const [metrics, setMetrics] = useState<OverviewMetric[]>(defaultMetrics);
+  const [dropoffBars, setDropoffBars] = useState<DropoffBar[]>(defaultDropoffBars);
+  const [insight, setInsight] = useState({
+    courseId: "",
+    courseName: "Entrepreneurship",
+    completionRate: 72,
+    bottleneckLesson: "Lesson 5: Financial Modeling",
+    dropoffPct: 40,
+  });
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchOverview = async () => {
+      if (!session?.token) {
+        setIsLoading(false);
+        return;
+      }
+      try {
+        setIsLoading(true);
+        const res = await apiRequest<any>(endpoints.admin.analytics.overview, {
+          authToken: session.token,
+          cache: "no-store",
+        });
+        if (isMounted && res?.data) {
+          if (res.data.metrics) setMetrics(res.data.metrics);
+          if (res.data.dropoffBars) setDropoffBars(res.data.dropoffBars);
+          if (res.data.insight) setInsight(res.data.insight);
+        }
+      } catch (err) {
+        console.error("Failed to load analytics overview:", err);
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    void fetchOverview();
+    return () => {
+      isMounted = false;
+    };
+  }, [session?.token]);
+
+  // If a dynamic courseId is available, we redirect "View Full Course Report" there. Otherwise we fall back to "/analytics/entrepreneurship-fundamentals"
+  const detailLink = insight.courseId 
+    ? `/analytics/${insight.courseId}`
+    : `/analytics/entrepreneurship-fundamentals`;
+
   return (
     <AppShell
       title="Content Performance Analytics"
@@ -115,115 +168,123 @@ export default function AnalyticsOverviewPage() {
       contentClassName="px-4 py-5 sm:px-6 lg:px-9 lg:py-8"
     >
       <div className="mx-auto ">
-        <section className="grid gap-4 xl:grid-cols-3">
-          {overviewMetrics.map((metric) => (
-            <OverviewMetricCard key={metric.label} metric={metric} />
-          ))}
-        </section>
-
-        <section className="mt-8 rounded-[24px] bg-white px-6 py-6 shadow-[0_18px_42px_rgba(182,192,227,0.08)] sm:px-8 sm:py-8">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <h2 className="text-[24px] font-extrabold tracking-[-0.05em] text-[#173257]">
-                Course Drop-off Points Analysis
-              </h2>
-              <p className="mt-2 text-[15px] font-medium text-[#7b89a0]">
-                Percentage of students continuing at each lesson milestone
-              </p>
-            </div>
-
-            <div className="flex flex-wrap gap-3">
-              <OverviewFilter label="By Category" />
-              <OverviewFilter label="All Courses" active />
-            </div>
+        {isLoading ? (
+          <div className="flex h-64 items-center justify-center">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#4b8a60] border-t-transparent" />
           </div>
+        ) : (
+          <>
+            <section className="grid gap-4 xl:grid-cols-3">
+              {metrics.map((metric) => (
+                <OverviewMetricCard key={metric.label} metric={metric} />
+              ))}
+            </section>
 
-          <div className="mt-10 grid h-[330px] grid-cols-5 gap-4 sm:grid-cols-10 sm:gap-6">
-            {dropoffBars.map((bar) => (
-              <div key={`${bar.label}-${bar.value}`} className="flex h-full flex-col items-center justify-end gap-3">
-                <span
-                  className={`text-[13px] font-bold ${
-                    bar.highlight ? "text-[#f04f64]" : "text-[#7c88a0]"
-                  }`}
-                >
-                  95%
-                </span>
-                <div className="relative flex h-full w-full items-end justify-center">
-                  {bar.highlight ? (
-                    <span className="absolute left-1/2 top-5 -translate-x-1/2 rounded-full bg-[#e92e50] px-4 py-2 text-[13px] font-bold text-white shadow-[0_14px_24px_rgba(233,46,80,0.28)]">
-                      Major Bottleneck
-                    </span>
-                  ) : null}
-                  <div
-                    className={[
-                      "w-full max-w-[78px] rounded-t-[8px]",
-                      bar.highlight
-                        ? "bg-[linear-gradient(180deg,#ff4747_0%,#9a2626_100%)]"
-                        : "bg-[#cfe1da]",
-                    ].join(" ")}
-                    style={{ height: `${bar.value}%` }}
-                  />
+            <section className="mt-8 rounded-[24px] bg-white px-6 py-6 shadow-[0_18px_42px_rgba(182,192,227,0.08)] sm:px-8 sm:py-8">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <h2 className="text-[24px] font-extrabold tracking-[-0.05em] text-[#173257]">
+                    Course Drop-off Points Analysis
+                  </h2>
+                  <p className="mt-2 text-[15px] font-medium text-[#7b89a0]">
+                    Percentage of students continuing at each lesson milestone
+                  </p>
                 </div>
-                <span className="text-[14px] font-medium text-[#7a879d]">
-                  {bar.label || "\u00A0"}
-                </span>
-              </div>
-            ))}
-          </div>
-        </section>
 
-        <section className="mt-8 rounded-[24px] bg-white px-6 py-8 shadow-[0_18px_42px_rgba(182,192,227,0.08)] sm:px-8">
-          <div className="grid gap-10 xl:grid-cols-[460px_minmax(0,1fr)] xl:items-center">
-            <div className="mx-auto flex h-[320px] w-[320px] items-center justify-center rounded-full bg-[conic-gradient(#1718c9_0deg_259deg,#f5bf58_259deg_318deg,#e06443_318deg_360deg)] p-3 shadow-[inset_0_0_0_6px_rgba(255,255,255,0.82)]">
-              <div className="flex h-full w-full flex-col items-center justify-center rounded-full bg-white shadow-[0_10px_30px_rgba(195,204,229,0.22)]">
-                <span className="text-[58px] font-extrabold tracking-[-0.06em] text-[#2e3442]">
-                  72%
-                </span>
-                <span className="text-[17px] font-semibold tracking-[0.12em] text-[#78849a]">
-                  COMPLETION
-                </span>
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center gap-3">
-                <Lightbulb className="h-6 w-6 text-[#1f8d63]" strokeWidth={2.1} />
-                <h2 className="text-[24px] font-medium tracking-[-0.04em] text-[#1c2c47] sm:text-[28px]">
-                  Entrepreneurship Course Insight
-                </h2>
+                <div className="flex flex-wrap gap-3">
+                  <OverviewFilter label="By Category" />
+                  <OverviewFilter label="All Courses" active />
+                </div>
               </div>
 
-              <p className="mt-6 max-w-[720px] text-[18px] leading-9 text-[#5d708d]">
-                While completion remains healthy at{" "}
-                <span className="font-bold text-[#1d9d63]">72%</span>, analytics show a
-                significant bottleneck at{" "}
-                <span className="rounded-[10px] bg-[#e6eef8] px-3 py-1.5 font-semibold text-[#1c8c62]">
-                  Lesson 5: Financial Modeling
-                </span>
-                . Over 40% of the students who don&apos;t finish the course drop off at this
-                specific module.
-              </p>
-
-              <div className="mt-8 flex flex-wrap gap-4">
-                <span className="inline-flex items-center gap-2 rounded-[14px] border border-[#f4d8dc] bg-white px-4 py-3 text-[15px] font-semibold text-[#243450]">
-                  <AlertTriangle className="h-4 w-4 text-[#f04f64]" strokeWidth={2.2} />
-                  Bottleneck: Lesson 5
-                </span>
-                <span className="inline-flex items-center gap-2 rounded-[14px] border border-[#d8eedd] bg-white px-4 py-3 text-[15px] font-semibold text-[#243450]">
-                  <Target className="h-4 w-4 text-[#1d9d63]" strokeWidth={2.2} />
-                  72% Progress Stability
-                </span>
+              <div className="mt-10 grid h-[330px] grid-cols-5 gap-4 sm:grid-cols-10 sm:gap-6">
+                {dropoffBars.map((bar, idx) => (
+                  <div key={`${bar.label}-${idx}`} className="flex h-full flex-col items-center justify-end gap-3">
+                    <span
+                      className={`text-[13px] font-bold ${
+                        bar.highlight ? "text-[#f04f64]" : "text-[#7c88a0]"
+                      }`}
+                    >
+                      {bar.value}%
+                    </span>
+                    <div className="relative flex h-full w-full items-end justify-center">
+                      {bar.highlight ? (
+                        <span className="absolute left-1/2 top-5 -translate-x-1/2 rounded-full bg-[#e92e50] px-4 py-2 text-[13px] font-bold text-white shadow-[0_14px_24px_rgba(233,46,80,0.28)] whitespace-nowrap z-10">
+                          Major Bottleneck
+                        </span>
+                      ) : null}
+                      <div
+                        className={[
+                          "w-full max-w-[78px] rounded-t-[8px]",
+                          bar.highlight
+                            ? "bg-[linear-gradient(180deg,#ff4747_0%,#9a2626_100%)]"
+                            : "bg-[#cfe1da]",
+                        ].join(" ")}
+                        style={{ height: `${bar.value}%` }}
+                      />
+                    </div>
+                    <span className="text-[14px] font-medium text-[#7a879d]">
+                      {bar.label || "\u00A0"}
+                    </span>
+                  </div>
+                ))}
               </div>
+            </section>
 
-              <Link
-                href="/analytics/entrepreneurship-fundamentals"
-                className="button-primary mt-10 inline-flex h-14 items-center justify-center rounded-[10px] bg-[#4b8a60] px-8 text-[16px] font-semibold shadow-[0_18px_32px_rgba(75,138,96,0.20)]"
-              >
-                View Full Course Report
-              </Link>
-            </div>
-          </div>
-        </section>
+            <section className="mt-8 rounded-[24px] bg-white px-6 py-8 shadow-[0_18px_42px_rgba(182,192,227,0.08)] sm:px-8">
+              <div className="grid gap-10 xl:grid-cols-[460px_minmax(0,1fr)] xl:items-center">
+                <div className="mx-auto flex h-[320px] w-[320px] items-center justify-center rounded-full bg-[conic-gradient(#1718c9_0deg_259deg,#f5bf58_259deg_318deg,#e06443_318deg_360deg)] p-3 shadow-[inset_0_0_0_6px_rgba(255,255,255,0.82)]">
+                  <div className="flex h-full w-full flex-col items-center justify-center rounded-full bg-white shadow-[0_10px_30px_rgba(195,204,229,0.22)]">
+                    <span className="text-[58px] font-extrabold tracking-[-0.06em] text-[#2e3442]">
+                      {insight.completionRate}%
+                    </span>
+                    <span className="text-[17px] font-semibold tracking-[0.12em] text-[#78849a]">
+                      COMPLETION
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center gap-3">
+                    <Lightbulb className="h-6 w-6 text-[#1f8d63]" strokeWidth={2.1} />
+                    <h2 className="text-[24px] font-medium tracking-[-0.04em] text-[#1c2c47] sm:text-[28px]">
+                      {insight.courseName} Course Insight
+                    </h2>
+                  </div>
+
+                  <p className="mt-6 max-w-[720px] text-[18px] leading-9 text-[#5d708d]">
+                    While completion remains healthy at{" "}
+                    <span className="font-bold text-[#1d9d63]">{insight.completionRate}%</span>, analytics show a
+                    significant bottleneck at{" "}
+                    <span className="rounded-[10px] bg-[#e6eef8] px-3 py-1.5 font-semibold text-[#1c8c62]">
+                      {insight.bottleneckLesson}
+                    </span>
+                    . Over {insight.dropoffPct}% of the students who don&apos;t finish the course drop off at this
+                    specific module.
+                  </p>
+
+                  <div className="mt-8 flex flex-wrap gap-4">
+                    <span className="inline-flex items-center gap-2 rounded-[14px] border border-[#f4d8dc] bg-white px-4 py-3 text-[15px] font-semibold text-[#243450]">
+                      <AlertTriangle className="h-4 w-4 text-[#f04f64]" strokeWidth={2.2} />
+                      Bottleneck: {insight.bottleneckLesson.split(":")[0]}
+                    </span>
+                    <span className="inline-flex items-center gap-2 rounded-[14px] border border-[#d8eedd] bg-white px-4 py-3 text-[15px] font-semibold text-[#243450]">
+                      <Target className="h-4 w-4 text-[#1d9d63]" strokeWidth={2.2} />
+                      {insight.completionRate}% Progress Stability
+                    </span>
+                  </div>
+
+                  <Link
+                    href={detailLink}
+                    className="button-primary mt-10 inline-flex h-14 items-center justify-center rounded-[10px] bg-[#4b8a60] px-8 text-[16px] font-semibold shadow-[0_18px_32px_rgba(75,138,96,0.20)] text-white font-bold"
+                  >
+                    View Full Course Report
+                  </Link>
+                </div>
+              </div>
+            </section>
+          </>
+        )}
       </div>
     </AppShell>
   );
