@@ -438,7 +438,7 @@ export default function CertificateManagementPage() {
 
 const handleApproveCertificate = async (certificate: CertificateRecord) => {
   if (!authToken) return;
-
+// -
   setLoadingCertificate(certificate.id, true);
   try {
     const response = await approveCertificate(certificate.id, authToken);
