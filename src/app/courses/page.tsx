@@ -20,7 +20,7 @@ import { getCourses, type Course } from "@/lib/course-api";
 import { usePagination, PaginationFooter } from "@/components/Pagination";
 
 type CourseTab = "all" | "published" | "drafts" | "archived";
-
+// /
 type CourseRow = {
   id: string | number;
   slug: string;
