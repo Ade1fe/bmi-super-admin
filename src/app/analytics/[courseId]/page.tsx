@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import {
   CalendarDays,
   CircleAlert,
   Lightbulb,
   Save,
   Settings2,
+  ArrowLeft,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { CoursePageTitle } from "@/components/course-flow";
@@ -162,7 +164,9 @@ function QuizProgress({ critical }: { critical?: boolean }) {
   );
 }
 
-export default function EntrepreneurshipAnalyticsDetailPage() {
+export default function CourseAnalyticsDetailPage() {
+  const params = useParams();
+  const courseId = Array.isArray(params?.courseId) ? params.courseId[0] : params?.courseId;
   const { session } = useAuthSession();
 
   const [courseName, setCourseName] = useState("Entrepreneurship Fundamentals");
@@ -174,32 +178,23 @@ export default function EntrepreneurshipAnalyticsDetailPage() {
 
   useEffect(() => {
     let isMounted = true;
-    const fetchDefaultCourseDetail = async () => {
-      if (!session?.token) {
+    const fetchDetail = async () => {
+      if (!courseId || !session?.token) {
         setIsLoading(false);
         return;
       }
       try {
         setIsLoading(true);
-        // First get overview to obtain a valid courseId
-        const overviewRes = await apiRequest<any>(endpoints.admin.analytics.overview, {
+        const res = await apiRequest<any>(endpoints.admin.analytics.courseDetail(courseId), {
           authToken: session.token,
           cache: "no-store",
         });
-        const courseId = overviewRes?.data?.insight?.courseId;
-        
-        if (courseId) {
-          const res = await apiRequest<any>(endpoints.admin.analytics.courseDetail(courseId), {
-            authToken: session.token,
-            cache: "no-store",
-          });
-          if (isMounted && res?.data) {
-            if (res.data.courseName) setCourseName(res.data.courseName);
-            if (res.data.metrics) setDetailMetrics(res.data.metrics);
-            if (res.data.lessons) setLessons(res.data.lessons);
-            if (res.data.bottleneckAlerts) setBottleneckAlerts(res.data.bottleneckAlerts);
-            if (res.data.growthInsights) setGrowthInsights(res.data.growthInsights);
-          }
+        if (isMounted && res?.data) {
+          if (res.data.courseName) setCourseName(res.data.courseName);
+          if (res.data.metrics) setDetailMetrics(res.data.metrics);
+          if (res.data.lessons) setLessons(res.data.lessons);
+          if (res.data.bottleneckAlerts) setBottleneckAlerts(res.data.bottleneckAlerts);
+          if (res.data.growthInsights) setGrowthInsights(res.data.growthInsights);
         }
       } catch (err) {
         console.error("Failed to load course details:", err);
@@ -208,11 +203,11 @@ export default function EntrepreneurshipAnalyticsDetailPage() {
       }
     };
 
-    void fetchDefaultCourseDetail();
+    void fetchDetail();
     return () => {
       isMounted = false;
     };
-  }, [session?.token]);
+  }, [courseId, session?.token]);
 
   return (
     <AppShell

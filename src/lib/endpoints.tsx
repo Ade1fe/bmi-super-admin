@@ -202,6 +202,12 @@ certificates: {
     buildEndpoint(apiBaseUrl, `/admin/certificates/${certificateId}/revoke`),
   reissue: (certificateId: string) =>
     buildEndpoint(apiBaseUrl, `/admin/certificates/${certificateId}/reissue`),
+},
+
+analytics: {
+  overview: buildEndpoint(apiBaseUrl, "/admin/analytics/overview"),
+  courseDetail: (courseId: string) =>
+    buildEndpoint(apiBaseUrl, `/admin/analytics/courses/${courseId}`),
 }
 
   },
@@ -440,6 +446,12 @@ certificates: {
   resend: (broadcastId: string) =>
     buildEndpoint(apiBaseUrl, `/admin/broadcasts/${broadcastId}/resend`),
 },
+
+  settings: {
+    get: buildEndpoint(apiBaseUrl, "/admin/settings"),
+    update: buildEndpoint(apiBaseUrl, "/admin/settings"),
+    testSmtp: buildEndpoint(apiBaseUrl, "/admin/settings/test-smtp"),
+  },
 
 };
 
