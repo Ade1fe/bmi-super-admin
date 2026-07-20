@@ -208,7 +208,40 @@ analytics: {
   overview: buildEndpoint(apiBaseUrl, "/admin/analytics/overview"),
   courseDetail: (courseId: string) =>
     buildEndpoint(apiBaseUrl, `/admin/analytics/courses/${courseId}`),
-}
+},
+
+reports: {
+  competitiveInsight: (level?: string) =>
+    buildEndpoint(apiBaseUrl, `/admin/reports/competitive-insight${level ? `?level=${encodeURIComponent(level)}` : ""}`),
+  courseCompletion: (period?: string, page: number = 1, limit: number = 10, startDate?: string, endDate?: string) =>
+    buildEndpoint(
+      apiBaseUrl,
+      `/admin/reports/course-completion?period=${period || "last_30_days"}&page=${page}&limit=${limit}${startDate ? `&startDate=${encodeURIComponent(startDate)}` : ""}${endDate ? `&endDate=${encodeURIComponent(endDate)}` : ""}`
+    ),
+  learningActivity: (period?: string, page: number = 1, limit: number = 10, startDate?: string, endDate?: string) =>
+    buildEndpoint(
+      apiBaseUrl,
+      `/admin/reports/learning-activity?period=${period || "last_30_days"}&page=${page}&limit=${limit}${startDate ? `&startDate=${encodeURIComponent(startDate)}` : ""}${endDate ? `&endDate=${encodeURIComponent(endDate)}` : ""}`
+    ),
+  export: (tab: string, format: string = "csv", period?: string, startDate?: string, endDate?: string) =>
+    buildEndpoint(
+      apiBaseUrl,
+      `/admin/reports/export?tab=${tab}&format=${format}&period=${period || "last_30_days"}${startDate ? `&startDate=${encodeURIComponent(startDate)}` : ""}${endDate ? `&endDate=${encodeURIComponent(endDate)}` : ""}`
+    ),
+},
+
+payments: {
+  overview: (period?: string, startDate?: string, endDate?: string) =>
+    buildEndpoint(
+      apiBaseUrl,
+      `/admin/payments/overview?period=${period || "last_30_days"}${startDate ? `&startDate=${encodeURIComponent(startDate)}` : ""}${endDate ? `&endDate=${encodeURIComponent(endDate)}` : ""}`
+    ),
+  transactions: (page: number = 1, limit: number = 10, period?: string) =>
+    buildEndpoint(
+      apiBaseUrl,
+      `/admin/payments/transactions?page=${page}&limit=${limit}${period ? `&period=${period}` : ""}`
+    ),
+},
 
   },
 

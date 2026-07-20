@@ -1,465 +1,553 @@
 "use client";
 
-import {
-  Building2,
-  CalendarDays,
-  Landmark,
-  ShieldCheck,
-  SquareActivity,
-  Users,
-  WalletCards,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
+import {
+  BookOpen,
+  CalendarDays,
+  CheckCircle2,
+  ChevronDown,
+  FileSpreadsheet,
+  LineChart,
+  Mail,
+  MailWarning,
+  UserPlus,
+  Users,
+  Zap,
+} from "lucide-react";
 import { AppShell } from "@/components/app-shell";
-import { parseSchoolList, type SchoolSummary } from "@/lib/backend-models";
-import { formatRoleLabel, getSessionProfileName, useAuthSession } from "@/lib/auth-session";
+import { useAuthSession, getSessionProfileName } from "@/lib/auth-session";
 import { apiRequest, endpoints } from "@/lib/endpoints";
 
-type StatCard = {
-  label: string;
-  value: string;
-  helper: string;
-  icon: LucideIcon;
-  iconBox: string;
+type KPICardData = {
+  value: number | string;
+  growth: string;
 };
 
-type ActivityItem = {
+type NotificationItem = {
+  id: number;
   title: string;
-  detail: string;
   time: string;
-  icon: LucideIcon;
-  iconBox: string;
+  type: string;
 };
 
-const growthBars = [
-  { day: "Mon", value: 24 },
-  { day: "Tue", value: 68 },
-  { day: "Wed", value: 30 },
-  { day: "Thu", value: 79, highlight: true },
-  { day: "Fri", value: 68 },
-  { day: "Sat", value: 35 },
-  { day: "Sun", value: 24 },
-];
-
-const engagementTrend = [
-  38, 40, 38, 39, 39, 40, 40, 42, 40, 43, 42, 44, 43, 45, 49, 51, 51, 49, 44,
-  50, 52, 56, 57, 55, 51, 54, 52, 54, 56, 63,
-];
-
-const activities: ActivityItem[] = [
-  {
-    title: "New school joined: St. Patrick's Academy",
-    detail: "Onboarded with 450 initial students and 15 staff members.",
-    time: "10m ago",
-    icon: Building2,
-    iconBox: "bg-[#edf3ff] text-[#3567ff]",
-  },
-  {
-    title: "Certificates Issued: Batch #204",
-    detail: "25 minutes ago",
-    time: "10m ago",
-    icon: ShieldCheck,
-    iconBox: "bg-[#edf9ef] text-[#2fa360]",
-  },
-  {
-    title: "Subscription Renewed: Global Arts Institute",
-    detail: "Enterprise annual plan renewed successfully. Invoice #INV-88902.",
-    time: "10m ago",
-    icon: WalletCards,
-    iconBox: "bg-[#fff4ea] text-[#ef721e]",
-  },
-  {
-    title: "System Maintenance Completed",
-    detail: "Database optimization and security patches applied across all clusters.",
-    time: "10m ago",
-    icon: SquareActivity,
-    iconBox: "bg-[#f5efff] text-[#9a57ff]",
-  },
-];
-
-const planBreakdown = [
-  { label: "Enterprise Plan", value: "70%", color: "#f1b64d" },
-  { label: "Standard Plan", value: "25%", color: "#e05d3f" },
-  { label: "Free Tier", value: "5%", color: "#1d23c7" },
-];
-
-const chartWidth = 620;
-const chartHeight = 250;
-const minTrend = Math.min(...engagementTrend);
-const maxTrend = Math.max(...engagementTrend);
-const trendRange = maxTrend - minTrend || 1;
-
-const linePoints = engagementTrend
-  .map((value, index) => {
-    const x = 24 + (index * (chartWidth - 48)) / (engagementTrend.length - 1);
-    const y = 190 - ((value - minTrend) / trendRange) * 68;
-    return `${x},${y}`;
-  })
-  .join(" ");
-
-const areaPoints = `24,210 ${linePoints} ${chartWidth - 24},210`;
-
-function SummaryCard({ card }: { card: StatCard }) {
-  const Icon = card.icon;
-
-  return (
-    <article className="rounded-[18px] border border-[#e8eafb] bg-white px-8 py-9 shadow-[0_18px_34px_rgba(154,168,213,0.06)]">
-      <div className="flex items-start justify-between gap-5">
-        <div>
-          <p className="text-[15px] font-medium text-[#344769]">{card.label}</p>
-          <div className="mt-10 flex items-center gap-3">
-            <p className="text-[29px] font-extrabold tracking-[-0.04em] text-[#16345d]">
-              {card.value}
-            </p>
-          </div>
-          <p className="mt-3 text-[14px] font-medium text-[#7c89a2]">{card.helper}</p>
-        </div>
-
-        <div className={`rounded-xl p-3.5 ${card.iconBox}`}>
-          <Icon className="h-[22px] w-[22px]" strokeWidth={1.9} />
-        </div>
-      </div>
-    </article>
-  );
-}
-
-function formatCompactNumber(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    maximumFractionDigits: value >= 1000 ? 1 : 0,
-    notation: value >= 1000 ? "compact" : "standard",
-  }).format(value);
-}
+type StudentAtRisk = {
+  id: number;
+  name: string;
+  avatar: string;
+  course: string;
+  progress: number;
+  status: string;
+};
 
 export default function DashboardPage() {
   const { session } = useAuthSession();
-  const [schools, setSchools] = useState<SchoolSummary[]>([]);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  const token = session?.token;
+  const profileName = getSessionProfileName(session) || "Alex";
+
+  const [period, setPeriod] = useState<string>("last_7_days");
+  const [showPeriodDropdown, setShowPeriodDropdown] = useState<boolean>(false);
+
+  const [kpiCards, setKpiCards] = useState({
+    totalStudents: { value: 5660, growth: "+2.4%" },
+    activeThisWeek: { value: 874, growth: "+2.4%" },
+    availableSubjects: { value: 12, growth: "-0%" },
+    averageProgress: { value: 72, growth: "+5.4%" },
+  });
+
+  const [weeklyActivity, setWeeklyActivity] = useState([
+    { day: "Mon", value: 24, highlight: false },
+    { day: "Tue", value: 68, highlight: false },
+    { day: "Wed", value: 30, highlight: false },
+    { day: "Thur", value: 79, highlight: true },
+    { day: "Fri", value: 68, highlight: false },
+    { day: "Sat", value: 35, highlight: false },
+    { day: "Sun", value: 24, highlight: false },
+  ]);
+
+  const [completionRate, setCompletionRate] = useState({
+    totalNumber: 1124,
+    completed: 794,
+    completedPercentage: 79,
+    inProgress: 432,
+    inProgressPercentage: 45,
+  });
+
+  const [notifications, setNotifications] = useState<NotificationItem[]>([
+    {
+      id: 1,
+      title: "New student registered for SS2 Science",
+      time: "2 minutes ago",
+      type: "register",
+    },
+    {
+      id: 2,
+      title: "James Wilson completed Entrepreneurship 101",
+      time: "25 minutes ago",
+      type: "completion",
+    },
+    {
+      id: 3,
+      title: "Quiz Submission: History of Modern Arts (12 students)",
+      time: "2 hours ago",
+      type: "quiz",
+    },
+    {
+      id: 4,
+      title: "Course Update: Advanced Physics content added",
+      time: "25 minutes ago",
+      type: "update",
+    },
+  ]);
+
+  const [studentsAtRisk, setStudentsAtRisk] = useState<StudentAtRisk[]>([
+    {
+      id: 1,
+      name: "Sarah Miller",
+      avatar: "SM",
+      course: "Calculus II",
+      progress: 12,
+      status: "12% Completed",
+    },
+    {
+      id: 2,
+      name: "David Kalu",
+      avatar: "DK",
+      course: "Bio-Chemistry",
+      progress: 18,
+      status: "18% Completed",
+    },
+    {
+      id: 3,
+      name: "Sandra Duke",
+      avatar: "SD",
+      course: "Fine Arts",
+      progress: 18,
+      status: "18% Completed",
+    },
+    {
+      id: 4,
+      name: "Sandra Duke",
+      avatar: "SD",
+      course: "World Literature",
+      progress: 28,
+      status: "28% Completed",
+    },
+  ]);
+
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    let isMounted = true;
+    let isSubscribed = true;
 
-    const loadSchools = async () => {
-      if (!session?.token) {
-        if (isMounted) {
-          setSchools([]);
-          setIsLoading(false);
-        }
-        return;
-      }
-
+    const fetchAnalytics = async () => {
       try {
         setIsLoading(true);
-        setErrorMessage("");
+        const url = `${endpoints.admin.analytics.overview}?period=${period}`;
+        const res = await apiRequest<any>(url, { authToken: token });
 
-        const response = await apiRequest(endpoints.admin.schools, {
-          authToken: session.token,
-          cache: "no-store",
-        });
-
-        if (!isMounted) {
-          return;
+        if (isSubscribed && res?.data) {
+          if (res.data.kpiCards) {
+            setKpiCards(res.data.kpiCards);
+          }
+          if (Array.isArray(res.data.weeklyLearningActivity)) {
+            setWeeklyActivity(res.data.weeklyLearningActivity);
+          }
+          if (res.data.courseCompletionRate) {
+            setCompletionRate(res.data.courseCompletionRate);
+          }
+          if (Array.isArray(res.data.notifications)) {
+            setNotifications(res.data.notifications);
+          }
+          if (Array.isArray(res.data.studentsAtRisk)) {
+            setStudentsAtRisk(res.data.studentsAtRisk);
+          }
         }
-
-        setSchools(parseSchoolList(response));
-      } catch (error) {
-        if (!isMounted) {
-          return;
-        }
-
-        setErrorMessage(error instanceof Error ? error.message : "Unable to load dashboard data.");
+      } catch (err) {
+        console.error("Failed to fetch dashboard overview analytics:", err);
       } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
+        if (isSubscribed) setIsLoading(false);
       }
     };
 
-    void loadSchools();
+    fetchAnalytics();
 
     return () => {
-      isMounted = false;
+      isSubscribed = false;
     };
-  }, [session?.token]);
-
-  const activeSchoolCount = schools.filter((school) => school.isActive).length;
-  const totalStudents = schools.reduce((sum, school) => sum + school.population, 0);
-  const countriesCovered = new Set(
-    schools.map((school) => school.country).filter((country): country is string => Boolean(country)),
-  ).size;
-  const stats: StatCard[] = [
-    {
-      label: "Total Schools",
-      value: formatCompactNumber(schools.length),
-      helper: !session?.token
-        ? "Sign in to load live backend data."
-        : isLoading
-          ? "Loading live backend data..."
-          : "Connected through admin/schools",
-      icon: Landmark,
-      iconBox: "bg-[#f1ebff] text-[#7f5af0]",
-    },
-    {
-      label: "Total Students",
-      value: formatCompactNumber(totalStudents),
-      helper: errorMessage ? "Population totals unavailable right now." : "Summed from school population records",
-      icon: Users,
-      iconBox: "bg-[#e9f2ff] text-[#2d83ff]",
-    },
-    {
-      label: "Active Schools",
-      value: formatCompactNumber(activeSchoolCount),
-      helper: `${Math.max(0, schools.length - activeSchoolCount)} inactive school accounts`,
-      icon: CalendarDays,
-      iconBox: "bg-[#edf4ef] text-[#55715c]",
-    },
-    {
-      label: "Countries Covered",
-      value: formatCompactNumber(countriesCovered),
-      helper: session?.school?.name
-        ? `Current school: ${session.school.name}`
-        : session?.role
-          ? formatRoleLabel(session.role)
-          : "No active admin session",
-      icon: WalletCards,
-      iconBox: "bg-[#f4ebfb] text-[#8e63af]",
-    },
-  ];
+  }, [period, token]);
 
   return (
-    <AppShell title="Dashboard" activeSection="dashboard">
-      <section className="mb-6 rounded-[20px] border border-[#e8ecf7] bg-white px-6 py-6 shadow-[0_18px_40px_rgba(182,192,227,0.08)] sm:px-8">
-        <p className="text-[14px] font-semibold uppercase tracking-[0.14em] text-[#6f7d97]">
-          Connected Admin
-        </p>
-        <h1 className="mt-3 text-[26px] font-extrabold tracking-[-0.05em] text-[#16345d] sm:text-[30px]">
-          {getSessionProfileName(session)}
-        </h1>
-        <p className="mt-2 text-[16px] text-[#516581]">
-          {session?.user?.email || "No authenticated email found."}
-        </p>
-        <p className="mt-4 text-[15px] font-medium text-[#617693]">
-          {errorMessage
-            ? `Backend connected, but dashboard data could not be loaded: ${errorMessage}`
-            : isLoading
-              ? "Fetching live school metrics from the backend."
-              : `Live data loaded for ${schools.length} school account${schools.length === 1 ? "" : "s"}.`}
-        </p>
-      </section>
+    <AppShell
+      title="Overview"
+      activeSection="dashboard"
+      contentClassName="px-4 py-5 sm:px-6 lg:px-9 lg:py-8 bg-[#f8fafc] min-h-screen"
+    >
+      <div className="mx-auto max-w-7xl">
+        {/* Header Banner */}
+        <section className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-[26px] font-extrabold tracking-[-0.04em] text-[#16345d] sm:text-[30px]">
+              Welcome back, {profileName.split(" ")[0]}!
+            </h1>
+            <p className="mt-1 text-[15px] font-medium text-[#708099]">
+              Here is a summary of today&apos;s academic performance and school activities.
+            </p>
+          </div>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {stats.map((card) => (
-          <SummaryCard key={card.label} card={card} />
-        ))}
-      </section>
-
-      <section className="mt-6 grid gap-6 lg:mt-10 lg:gap-8 xl:grid-cols-[1.6fr_1fr]">
-        <article className="rounded-[20px] bg-white p-5 shadow-[0_20px_48px_rgba(190,198,233,0.14)] sm:p-8">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h2 className="text-[22px] font-extrabold tracking-[-0.04em] text-[#16345d]">
-                New Schools Growth
-              </h2>
-              <p className="mt-1 text-[15px] font-medium text-[#8090a8]">
-                School registration trends over last 6 months
-              </p>
-            </div>
-
+          <div className="flex items-center gap-3">
             <button
               type="button"
-              className="inline-flex h-11 items-center gap-2 rounded-[14px] border border-[#dfe4f1] px-4 text-[14px] font-semibold text-[#223c60]"
+              className="rounded-[12px] border border-[#dbe3f0] bg-white px-5 py-2.5 text-[14px] font-bold text-[#354c6c] hover:bg-slate-50 shadow-sm"
             >
-              <CalendarDays className="h-4 w-4" strokeWidth={2} />
-              Last 6 month
+              View Guide
+            </button>
+            <button
+              type="button"
+              className="rounded-[12px] bg-[#3d6e52] px-5 py-2.5 text-[14px] font-bold text-white shadow-md hover:bg-[#325a43]"
+            >
+              Support center
             </button>
           </div>
+        </section>
 
-          <div className="mt-10 grid h-[250px] grid-cols-7 items-end gap-3 sm:mt-14 sm:h-[330px] sm:gap-7">
-            {growthBars.map((bar) => (
-              <div key={bar.day} className="flex h-full flex-col items-center justify-end gap-3">
-                <div className="flex h-full w-full items-end">
-                  <div
-                    className={[
-                      "w-full rounded-t-[6px] bg-[#c9ded8]",
-                      bar.highlight
-                        ? "bg-[linear-gradient(180deg,#5ea68b_0%,#58a486_70%,#dfffee_100%)]"
-                        : "",
-                    ].join(" ")}
-                    style={{ height: `${bar.value}%` }}
-                  />
-                </div>
-                <span className="text-[14px] font-medium text-[#7f88a0]">{bar.day}</span>
+        {/* Top 4 KPI Cards */}
+        <section className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {/* Card 1: Total Students */}
+          <article className="rounded-[20px] border border-[#eef2f9] bg-white p-6 shadow-[0_14px_30px_rgba(180,190,220,0.06)]">
+            <div className="flex items-start justify-between gap-4">
+              <p className="text-[15px] font-medium text-[#495b78]">Total Students</p>
+              <div className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-[#f0eeff] text-[#855eff]">
+                <Users className="h-5 w-5" strokeWidth={2.2} />
               </div>
-            ))}
-          </div>
-        </article>
+            </div>
+            <div className="mt-4 flex items-baseline gap-3">
+              <span className="text-[36px] font-extrabold tracking-[-0.05em] text-[#173257]">
+                {kpiCards.totalStudents.value.toLocaleString()}
+              </span>
+              <span className="text-[14px] font-bold text-[#109059]">
+                ↑{kpiCards.totalStudents.growth}
+              </span>
+            </div>
+          </article>
 
-        <article className="rounded-[20px] bg-white p-5 shadow-[0_20px_48px_rgba(190,198,233,0.14)] sm:p-8">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2 className="text-[22px] font-extrabold tracking-[-0.04em] text-[#16345d]">
-                Engagement Trends
-              </h2>
-              <p className="mt-1 text-[15px] font-medium text-[#8090a8]">
-                New student sign-ups across all schools
-              </p>
+          {/* Card 2: Active This week */}
+          <article className="rounded-[20px] border border-[#eef2f9] bg-white p-6 shadow-[0_14px_30px_rgba(180,190,220,0.06)]">
+            <div className="flex items-start justify-between gap-4">
+              <p className="text-[15px] font-medium text-[#495b78]">Active This week</p>
+              <div className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-[#e5f3ff] text-[#3295ff]">
+                <Zap className="h-5 w-5" strokeWidth={2.2} />
+              </div>
+            </div>
+            <div className="mt-4 flex items-baseline gap-3">
+              <span className="text-[36px] font-extrabold tracking-[-0.05em] text-[#173257]">
+                {kpiCards.activeThisWeek.value.toLocaleString()}
+              </span>
+              <span className="text-[14px] font-bold text-[#109059]">
+                ↑{kpiCards.activeThisWeek.growth}
+              </span>
+            </div>
+          </article>
+
+          {/* Card 3: Available Subject */}
+          <article className="rounded-[20px] border border-[#eef2f9] bg-white p-6 shadow-[0_14px_30px_rgba(180,190,220,0.06)]">
+            <div className="flex items-start justify-between gap-4">
+              <p className="text-[15px] font-medium text-[#495b78]">Available Subject</p>
+              <div className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-[#edf7f1] text-[#3fb977]">
+                <BookOpen className="h-5 w-5" strokeWidth={2.2} />
+              </div>
+            </div>
+            <div className="mt-4 flex items-baseline gap-3">
+              <span className="text-[36px] font-extrabold tracking-[-0.05em] text-[#173257]">
+                {kpiCards.availableSubjects.value.toLocaleString()}
+              </span>
+              <span className="text-[14px] font-medium text-[#7c8aa0]">
+                {kpiCards.availableSubjects.growth}
+              </span>
+            </div>
+          </article>
+
+          {/* Card 4: Average Progress */}
+          <article className="rounded-[20px] border border-[#eef2f9] bg-white p-6 shadow-[0_14px_30px_rgba(180,190,220,0.06)]">
+            <div className="flex items-start justify-between gap-4">
+              <p className="text-[15px] font-medium text-[#495b78]">Average Progress</p>
+              <div className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-[#fdf0f7] text-[#eb58a7]">
+                <LineChart className="h-5 w-5" strokeWidth={2.2} />
+              </div>
+            </div>
+            <div className="mt-4 flex items-baseline gap-3">
+              <span className="text-[36px] font-extrabold tracking-[-0.05em] text-[#173257]">
+                {kpiCards.averageProgress.value}
+              </span>
+              <span className="text-[14px] font-bold text-[#109059]">
+                ↑{kpiCards.averageProgress.growth}
+              </span>
+            </div>
+          </article>
+        </section>
+
+        {/* Middle Section: Weekly Learning Activity (Left 60%) & Course Completion Rate (Right 40%) */}
+        <section className="mt-7 grid gap-7 xl:grid-cols-[1.5fr_1fr]">
+          {/* Weekly Learning Activity */}
+          <article className="rounded-[22px] border border-[#dfe6f2] bg-white p-7 shadow-[0_16px_36px_rgba(180,190,220,0.07)]">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-[19px] font-extrabold tracking-[-0.03em] text-[#16345d]">
+                  Weekly Learning Activity
+                </h2>
+                <p className="mt-1 text-[14px] text-[#7d8ca3]">
+                  Hours spent by students across all courses
+                </p>
+              </div>
+
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowPeriodDropdown(!showPeriodDropdown)}
+                  className="inline-flex h-10 items-center gap-2 rounded-[12px] border border-[#dce3f0] bg-[#f8fafc] px-3.5 text-[13px] font-semibold text-[#374c6b] hover:bg-slate-100"
+                >
+                  <CalendarDays className="h-4 w-4" strokeWidth={2} />
+                  {period === "last_7_days"
+                    ? "Last 7 days"
+                    : period === "last_30_days"
+                      ? "Last 30 days"
+                      : "Last 90 days"}
+                  <ChevronDown className="h-3.5 w-3.5" strokeWidth={2} />
+                </button>
+
+                {showPeriodDropdown && (
+                  <div className="absolute right-0 z-20 mt-2 w-44 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+                    <button
+                      type="button"
+                      onClick={() => { setPeriod("last_7_days"); setShowPeriodDropdown(false); }}
+                      className="w-full rounded-lg px-3 py-2 text-left text-[13px] font-medium text-slate-700 hover:bg-slate-100"
+                    >
+                      Last 7 days
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setPeriod("last_30_days"); setShowPeriodDropdown(false); }}
+                      className="w-full rounded-lg px-3 py-2 text-left text-[13px] font-medium text-slate-700 hover:bg-slate-100"
+                    >
+                      Last 30 days
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setPeriod("last_90_days"); setShowPeriodDropdown(false); }}
+                      className="w-full rounded-lg px-3 py-2 text-left text-[13px] font-medium text-slate-700 hover:bg-slate-100"
+                    >
+                      Last 90 days
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div className="flex items-center gap-2 text-[14px] font-bold text-[#223c60]">
-              <span className="h-3 w-3 rounded-full bg-[#16804f]" />
-              Monthly Target
-            </div>
-          </div>
-
-          <div className="mt-10">
-            <svg
-              viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-              className="h-[220px] w-full sm:h-[314px]"
-              preserveAspectRatio="none"
-              aria-label="Engagement trends"
-            >
-              <defs>
-                <linearGradient id="engagement-fill" x1="0" x2="0" y1="0" y2="1">
-                  <stop offset="0%" stopColor="#4b8b62" stopOpacity="0.12" />
-                  <stop offset="100%" stopColor="#4b8b62" stopOpacity="0.02" />
-                </linearGradient>
-              </defs>
-              <polygon points={areaPoints} fill="url(#engagement-fill)" />
-              <polyline
-                points={linePoints}
-                fill="none"
-                stroke="#4b8b62"
-                strokeWidth="3.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-
-            <div className="mt-3 grid grid-cols-7 text-center text-[12px] font-medium text-[#7f88a0] sm:text-[14px]">
-              {["Mon", "Tue", "Wed", "Thur", "Fri", "Sat", "Sun"].map((day) => (
-                <span key={day}>{day}</span>
+            {/* Bar Chart */}
+            <div className="mt-12 grid h-[240px] grid-cols-7 items-end gap-4 sm:gap-6">
+              {weeklyActivity.map((bar) => (
+                <div key={bar.day} className="flex h-full flex-col items-center justify-end gap-3">
+                  <div className="flex h-full w-full items-end justify-center">
+                    <div
+                      className={`w-full max-w-[56px] rounded-[10px] transition-all duration-300 ${
+                        bar.highlight
+                          ? "bg-[linear-gradient(180deg,#3b8260_0%,#4fa37a_60%,#c9edd8_100%)] shadow-md"
+                          : "bg-[#d3e5dc]"
+                      }`}
+                      style={{ height: `${bar.value}%` }}
+                    />
+                  </div>
+                  <span className="text-[13px] font-bold text-[#8090a7]">{bar.day}</span>
+                </div>
               ))}
             </div>
-          </div>
-        </article>
-      </section>
+          </article>
 
-      <section className="mt-6 grid gap-6 lg:mt-8 lg:gap-8 xl:grid-cols-[1.18fr_0.88fr]">
-        <article className="rounded-[20px] bg-white p-5 shadow-[0_20px_48px_rgba(190,198,233,0.14)] sm:p-8">
-          <div className="flex items-center justify-between gap-4">
-            <h2 className="text-[22px] font-extrabold tracking-[-0.04em] text-[#16345d]">
-              Weekly Learning Activity
+          {/* Course Completion Rate Donut Chart */}
+          <article className="rounded-[22px] border border-[#dfe6f2] bg-white p-7 shadow-[0_16px_36px_rgba(180,190,220,0.07)]">
+            <h2 className="text-[19px] font-extrabold tracking-[-0.03em] text-[#16345d]">
+              Course Completion Rate
             </h2>
-            <button type="button" className="text-[14px] font-bold text-[#4d63e9]">
-              View All
-            </button>
-          </div>
 
-          <div className="mt-7 space-y-6 sm:mt-9 sm:space-y-8">
-            {activities.map((item) => {
-              const Icon = item.icon;
+            <div className="mt-6 flex flex-col items-center">
+              <div className="relative flex h-[210px] w-[210px] items-center justify-center">
+                <svg viewBox="0 0 220 220" className="h-full w-full -rotate-90">
+                  {/* Background Track */}
+                  <circle
+                    cx="110"
+                    cy="110"
+                    r="76"
+                    fill="none"
+                    stroke="#00bba7"
+                    strokeWidth="32"
+                  />
+                  {/* In Progress Segment (Coral) */}
+                  <circle
+                    cx="110"
+                    cy="110"
+                    r="76"
+                    fill="none"
+                    stroke="#e86549"
+                    strokeWidth="32"
+                    strokeDasharray="210 477"
+                    strokeDashoffset="-235"
+                  />
+                </svg>
 
-              return (
-                <div key={item.title} className="flex items-start gap-3 sm:gap-4">
-                  <div className={`rounded-full p-4 ${item.iconBox}`}>
-                    <Icon className="h-5 w-5" strokeWidth={2} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[17px] font-bold leading-6 text-[#19355d]">{item.title}</p>
-                    <p className="mt-1 text-[15px] font-medium leading-6 text-[#596883]">
-                      {item.detail}
-                    </p>
-                  </div>
-                  <p className="hidden pt-2 text-[14px] font-medium text-[#a3acbe] sm:block">
-                    {item.time}
+                {/* Center Badge Labels */}
+                <div className="absolute inset-[36px] flex flex-col items-center justify-center rounded-full bg-white shadow-inner">
+                  <p className="text-[32px] font-extrabold tracking-[-0.04em] text-[#173257]">
+                    {completionRate.totalNumber}
+                  </p>
+                  <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#8696ad]">
+                    Total Number
                   </p>
                 </div>
-              );
-            })}
-          </div>
-        </article>
 
-        <article className="rounded-[20px] bg-white p-5 shadow-[0_20px_48px_rgba(190,198,233,0.14)] sm:p-8">
-          <div className="flex items-center justify-between gap-4">
-            <h2 className="text-[22px] font-extrabold tracking-[-0.04em] text-[#16345d]">
-              Student Registrations
-            </h2>
-            <button type="button" className="text-right text-[14px] font-bold text-[#4d63e9]">
-              Generate Full Report
-            </button>
-          </div>
-
-          <div className="mt-8 flex flex-col items-center gap-10">
-            <div className="relative flex h-[240px] w-[240px] items-center justify-center sm:h-[288px] sm:w-[288px]">
-              <svg viewBox="0 0 260 260" className="h-full w-full -rotate-90">
-                <circle cx="130" cy="130" r="82" fill="none" stroke="#eef1fa" strokeWidth="36" />
-                <circle
-                  cx="130"
-                  cy="130"
-                  r="82"
-                  fill="none"
-                  stroke="#1d23c7"
-                  strokeWidth="36"
-                  strokeDasharray="350 515"
-                />
-                <circle
-                  cx="130"
-                  cy="130"
-                  r="82"
-                  fill="none"
-                  stroke="#f0b750"
-                  strokeWidth="36"
-                  strokeDasharray="95 515"
-                  strokeDashoffset="-352"
-                />
-                <circle
-                  cx="130"
-                  cy="130"
-                  r="82"
-                  fill="none"
-                  stroke="#df603d"
-                  strokeWidth="36"
-                  strokeDasharray="70 515"
-                  strokeDashoffset="-447"
-                />
-              </svg>
-
-              <div className="absolute inset-[48px] rounded-full bg-white sm:inset-[57px]" />
-              <div className="absolute text-center">
-                <p className="text-[42px] font-extrabold tracking-[-0.05em] text-[#3c4048] sm:text-[54px]">
-                  6.7k
-                </p>
-                <p className="text-[14px] font-semibold uppercase tracking-[0.14em] text-[#7f879a]">
-                  Active Users
-                </p>
+                {/* Tag Badges */}
+                <span className="absolute right-3 top-7 rounded-full bg-[#1b2533] px-2.5 py-1 text-[12px] font-bold text-white shadow-md">
+                  79%
+                </span>
+                <span className="absolute bottom-10 left-3 rounded-full bg-[#1b2533] px-2.5 py-1 text-[12px] font-bold text-white shadow-md">
+                  45%
+                </span>
               </div>
 
-              <span className="absolute left-1 top-9 rounded-2xl bg-[#25272f] px-3 py-2 text-[14px] font-bold text-white sm:left-4 sm:top-12 sm:text-[15px]">
-                45%
-              </span>
-              <span className="absolute right-0 top-[92px] rounded-2xl bg-[#25272f] px-3 py-2 text-[14px] font-bold text-white sm:right-[8px] sm:top-[116px] sm:text-[15px]">
-                79%
-              </span>
-              <span className="absolute bottom-5 left-0 rounded-2xl bg-[#25272f] px-3 py-2 text-[14px] font-bold text-white sm:bottom-8 sm:left-2 sm:text-[15px]">
-                45%
+              {/* Legend List */}
+              <div className="mt-8 w-full space-y-4 border-t border-[#f0f4f9] pt-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="h-4 w-4 rounded-[5px] bg-[#00bba7]" />
+                    <span className="text-[15px] font-bold text-[#354a6b]">Completed</span>
+                  </div>
+                  <span className="text-[17px] font-extrabold text-[#173257]">
+                    {completionRate.completed}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="h-4 w-4 rounded-[5px] bg-[#e86549]" />
+                    <span className="text-[15px] font-bold text-[#354a6b]">In Progress</span>
+                  </div>
+                  <span className="text-[17px] font-extrabold text-[#173257]">
+                    {completionRate.inProgress}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </article>
+        </section>
+
+        {/* Bottom Section: Notification (Left 45%) & Students At Risk (Right 55%) */}
+        <section className="mt-7 grid gap-7 xl:grid-cols-[1fr_1.25fr]">
+          {/* Notifications */}
+          <article className="rounded-[22px] border border-[#dfe6f2] bg-white p-7 shadow-[0_16px_36px_rgba(180,190,220,0.07)]">
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="text-[19px] font-extrabold tracking-[-0.03em] text-[#16345d]">
+                Notification
+              </h2>
+              <button type="button" className="text-[14px] font-bold text-[#0f8751] hover:underline">
+                View All
+              </button>
+            </div>
+
+            <div className="mt-7 space-y-6">
+              {notifications.map((item) => {
+                let iconEl = <UserPlus className="h-5 w-5 text-[#2ca266]" strokeWidth={2} />;
+                let iconBoxBg = "bg-[#eef8f2]";
+
+                if (item.type === "completion") {
+                  iconEl = <CheckCircle2 className="h-5 w-5 text-[#3295ff]" strokeWidth={2} />;
+                  iconBoxBg = "bg-[#eaf4ff]";
+                } else if (item.type === "quiz") {
+                  iconEl = <FileSpreadsheet className="h-5 w-5 text-[#8855ff]" strokeWidth={2} />;
+                  iconBoxBg = "bg-[#f2ecff]";
+                } else if (item.type === "update") {
+                  iconEl = <MailWarning className="h-5 w-5 text-[#d98218]" strokeWidth={2} />;
+                  iconBoxBg = "bg-[#fff5e8]";
+                }
+
+                return (
+                  <div key={item.id} className="flex items-start gap-4">
+                    <div
+                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${iconBoxBg}`}
+                    >
+                      {iconEl}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[15px] font-bold leading-5 text-[#1b3457]">
+                        {item.title}
+                      </p>
+                      <p className="mt-1 text-[13px] font-medium text-[#7f8da4]">{item.time}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </article>
+
+          {/* Students At Risk */}
+          <article className="overflow-hidden rounded-[22px] border border-[#dfe6f2] bg-white p-7 shadow-[0_16px_36px_rgba(180,190,220,0.07)]">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="text-[19px] font-extrabold tracking-[-0.03em] text-[#16345d]">
+                Students At Risk
+              </h2>
+              <span className="inline-flex items-center rounded-full bg-[#fde8e8] px-3.5 py-1.5 text-[12px] font-extrabold uppercase tracking-[0.06em] text-[#e04545]">
+                Immediate Action Required
               </span>
             </div>
 
-            <div className="w-full space-y-5">
-              {planBreakdown.map((item) => (
-                <div key={item.label} className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <span className="h-7 w-7 rounded-md" style={{ backgroundColor: item.color }} />
-                    <span className="text-[15px] font-bold text-[#19355d]">{item.label}</span>
-                  </div>
-                  <span className="text-[18px] font-extrabold text-[#16345d]">{item.value}</span>
-                </div>
-              ))}
+            <div className="mt-6 overflow-x-auto">
+              <table className="min-w-full text-left">
+                <thead>
+                  <tr className="border-b border-[#edf2fa] text-[12px] font-extrabold uppercase tracking-[0.14em] text-[#7a8aa3]">
+                    <th className="py-4 font-extrabold">Student</th>
+                    <th className="px-4 py-4 font-extrabold">Course</th>
+                    <th className="px-4 py-4 font-extrabold">Progress</th>
+                    <th className="py-4 text-right font-extrabold">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {studentsAtRisk.map((student) => (
+                    <tr key={student.id} className="border-b border-[#f3f6fc] text-[14px]">
+                      <td className="py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#e8eef8] text-[13px] font-bold text-[#2d4366]">
+                            {student.avatar}
+                          </div>
+                          <span className="font-bold text-[#1b3457]">{student.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 font-medium text-[#465978]">{student.course}</td>
+                      <td className="px-4 py-4">
+                        <div className="w-36">
+                          <div className="h-2 w-full rounded-full bg-[#f0f4fa]">
+                            <div
+                              className="h-2 rounded-full bg-[#e54545]"
+                              style={{ width: `${student.progress}%` }}
+                            />
+                          </div>
+                          <span className="mt-1 block text-[12px] font-bold text-[#e54545]">
+                            {student.status}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-4 text-right">
+                        <button
+                          type="button"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                        >
+                          <Mail className="h-4 w-4" strokeWidth={1.8} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </div>
-        </article>
-      </section>
+          </article>
+        </section>
+      </div>
     </AppShell>
   );
 }

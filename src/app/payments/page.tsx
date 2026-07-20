@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import {
   Building2,
   CalendarDays,
@@ -8,8 +11,14 @@ import {
   ReceiptText,
   UserRound,
   WalletCards,
+  RefreshCw,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { endpoints, apiRequest } from "@/lib/endpoints";
+import { useAuthSession } from "@/lib/auth-session";
+
+type TransactionStatus = "PAID" | "PENDING" | "FAILED";
+type PaymentMethod = "Visa" | "PayPal" | "Bank Transfer" | "Mastercard" | "Wire" | string;
 
 type RevenueMetric = {
   label: string;
@@ -20,12 +29,8 @@ type RevenueMetric = {
   iconBoxClassName: string;
 };
 
-type TransactionStatus = "PAID" | "PENDING" | "FAILED";
-
-type PaymentMethod = "Visa" | "PayPal" | "Bank Transfer" | "Mastercard" | "Wire";
-
 type TransactionRow = {
-  id: number;
+  id: string | number;
   date: string;
   payer: string;
   payerDetail: string;
@@ -37,18 +42,18 @@ type TransactionRow = {
   status: TransactionStatus;
 };
 
-const metrics: RevenueMetric[] = [
+const defaultMetrics: RevenueMetric[] = [
   {
     label: "Total Revenue",
-    value: "$428,500.00",
-    note: "$428,500.00",
+    value: "₦428,500.00",
+    note: "₦428,500.00",
     tone: "positive",
     icon: WalletCards,
     iconBoxClassName: "bg-[#edf7f1] text-[#0f8751]",
   },
   {
     label: "Revenue from Schools",
-    value: "$310,200.00",
+    value: "₦310,200.00",
     note: "+8.2% from last month",
     tone: "positive",
     icon: Building2,
@@ -56,7 +61,7 @@ const metrics: RevenueMetric[] = [
   },
   {
     label: "Revenue from Individuals",
-    value: "$118,300.00",
+    value: "₦118,300.00",
     note: "+15.3% from last month",
     tone: "positive",
     icon: UserRound,
@@ -64,7 +69,7 @@ const metrics: RevenueMetric[] = [
   },
   {
     label: "Refunds",
-    value: "$2,450.00",
+    value: "₦2,450.00",
     note: "-2.1% from last month",
     tone: "negative",
     icon: ReceiptText,
@@ -72,13 +77,13 @@ const metrics: RevenueMetric[] = [
   },
 ];
 
-const trendValues = [
+const defaultTrendValues = [
   77, 78, 77, 77.5, 77.5, 78, 78, 79, 78.5, 80, 79, 80, 80.5, 80, 81.5, 83,
   84, 84, 84.5, 84, 83, 81, 80.5, 84, 85, 85.5, 87.5, 88, 88.5, 87.5, 85.5,
   85.5, 87.2, 86, 85.5, 86.5, 87, 89, 91,
 ];
 
-const transactions: TransactionRow[] = [
+const defaultTransactions: TransactionRow[] = [
   {
     id: 1,
     date: "Oct 24, 2023",
@@ -86,7 +91,7 @@ const transactions: TransactionRow[] = [
     payerDetail: "School Account",
     avatar: "initials",
     avatarText: "SH",
-    amount: "$12,500.00",
+    amount: "₦12,500.00",
     plan: "Enterprise",
     method: "Visa",
     status: "PAID",
@@ -97,7 +102,7 @@ const transactions: TransactionRow[] = [
     payer: "Alex Johnson",
     payerDetail: "Individual",
     avatar: "photo",
-    amount: "$299.00",
+    amount: "₦299.00",
     plan: "Premium",
     method: "PayPal",
     status: "PAID",
@@ -109,7 +114,7 @@ const transactions: TransactionRow[] = [
     payerDetail: "Institution",
     avatar: "initials",
     avatarText: "TC",
-    amount: "$4,800.00",
+    amount: "₦4,800.00",
     plan: "Institute",
     method: "Bank Transfer",
     status: "PENDING",
@@ -120,7 +125,7 @@ const transactions: TransactionRow[] = [
     payer: "Sara Williams",
     payerDetail: "Individual",
     avatar: "photo",
-    amount: "$99.00",
+    amount: "₦99.00",
     plan: "Basic",
     method: "Mastercard",
     status: "FAILED",
@@ -132,36 +137,20 @@ const transactions: TransactionRow[] = [
     payerDetail: "Corporate",
     avatar: "initials",
     avatarText: "GL",
-    amount: "$25,000.00",
+    amount: "₦25,000.00",
     plan: "Partner",
     method: "Wire",
     status: "PAID",
   },
 ];
 
-const chartWidth = 1180;
-const chartHeight = 340;
-const minTrend = Math.min(...trendValues);
-const maxTrend = Math.max(...trendValues);
-const trendRange = maxTrend - minTrend || 1;
-const linePoints = trendValues
-  .map((value, index) => {
-    const x = 34 + (index * (chartWidth - 68)) / (trendValues.length - 1);
-    const y = 174 - ((value - minTrend) / trendRange) * 68;
-    return `${x},${y}`;
-  })
-  .join(" ");
-const areaPoints = `34,238 ${linePoints} ${chartWidth - 34},238`;
-
 function statusClassName(status: TransactionStatus) {
   if (status === "PAID") {
     return "bg-[#dff5e7] text-[#16a165]";
   }
-
   if (status === "PENDING") {
     return "bg-[#fff1d7] text-[#e19218]";
   }
-
   return "bg-[#ffe1e1] text-[#df4c4c]";
 }
 
@@ -169,37 +158,10 @@ function methodIcon(method: PaymentMethod) {
   if (method === "Bank Transfer" || method === "Wire") {
     return <Building2 className="h-5 w-5 text-[#7184a3]" strokeWidth={2} />;
   }
-
   if (method === "PayPal") {
     return <WalletCards className="h-5 w-5 text-[#7184a3]" strokeWidth={2} />;
   }
-
   return <CreditCard className="h-5 w-5 text-[#7184a3]" strokeWidth={2} />;
-}
-
-function RevenueCard({ metric }: { metric: RevenueMetric }) {
-  const Icon = metric.icon;
-
-  return (
-    <article className="rounded-[18px] border border-[#dfe6f7] bg-white px-6 py-7 shadow-[0_16px_34px_rgba(171,185,223,0.05)]">
-      <div className="flex items-start justify-between gap-4">
-        <p className="text-[16px] font-medium text-[#223f64]">{metric.label}</p>
-        <span className={`inline-flex h-10 w-10 items-center justify-center rounded-[12px] ${metric.iconBoxClassName}`}>
-          <Icon className="h-5 w-5" strokeWidth={2.1} />
-        </span>
-      </div>
-      <p className="mt-6 text-[34px] font-extrabold tracking-[-0.05em] text-[#173257]">
-        {metric.value}
-      </p>
-      <p
-        className={`mt-4 text-[14px] font-semibold ${
-          metric.tone === "negative" ? "text-[#ff4f68]" : "text-[#0f8751]"
-        }`}
-      >
-        {metric.note}
-      </p>
-    </article>
-  );
 }
 
 function TransactionAvatar({ row }: { row: TransactionRow }) {
@@ -211,26 +173,140 @@ function TransactionAvatar({ row }: { row: TransactionRow }) {
 
   return (
     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#e8f4ef] text-[15px] font-bold text-[#117b54]">
-      {row.avatarText}
+      {row.avatarText || "SH"}
     </div>
   );
 }
 
 export default function PaymentsPage() {
+  const { session } = useAuthSession();
+  const token = session?.token;
+
+  const [period, setPeriod] = useState<string>("last_30_days");
+  const [showDatePicker, setShowDatePicker] = useState<boolean>(false);
+
+  const [metrics, setMetrics] = useState<RevenueMetric[]>(defaultMetrics);
+  const [trendValues, setTrendValues] = useState<number[]>(defaultTrendValues);
+  const [transactions, setTransactions] = useState<TransactionRow[]>(defaultTransactions);
+  const [pagination, setPagination] = useState({ total: 12840, page: 1, limit: 5, totalPages: 2568 });
+
+  const [loading, setLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    let isSubscribed = true;
+    setLoading(true);
+
+    const fetchPaymentOverview = async () => {
+      try {
+        const url = endpoints.admin.payments.overview(period);
+        const res = await apiRequest<any>(url, { authToken: token });
+
+        if (isSubscribed && res?.data) {
+          const apiMetrics = res.data.metrics;
+          if (Array.isArray(apiMetrics) && apiMetrics.length >= 4) {
+            setMetrics([
+              { ...apiMetrics[0], icon: WalletCards },
+              { ...apiMetrics[1], icon: Building2 },
+              { ...apiMetrics[2], icon: UserRound },
+              { ...apiMetrics[3], icon: ReceiptText },
+            ]);
+          }
+
+          if (Array.isArray(res.data.trendValues)) {
+            setTrendValues(res.data.trendValues);
+          }
+
+          if (Array.isArray(res.data.transactions)) {
+            setTransactions(res.data.transactions);
+          }
+
+          if (res.data.pagination) {
+            setPagination(res.data.pagination);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch payment overview:", err);
+      } finally {
+        if (isSubscribed) setLoading(false);
+      }
+    };
+
+    fetchPaymentOverview();
+    return () => {
+      isSubscribed = false;
+    };
+  }, [period, token]);
+
+  const handlePageChange = async (newPage: number) => {
+    if (newPage < 1 || newPage > pagination.totalPages) return;
+    try {
+      const url = endpoints.admin.payments.transactions(newPage, pagination.limit, period);
+      const res = await apiRequest<any>(url, { authToken: token });
+      if (res?.data?.transactions) {
+        setTransactions(res.data.transactions);
+        setPagination((prev) => ({ ...prev, page: newPage }));
+      }
+    } catch (err) {
+      console.error("Failed to change transaction page:", err);
+    }
+  };
+
+  // SVG Chart calculations
+  const chartWidth = 1180;
+  const chartHeight = 340;
+  const minTrend = Math.min(...trendValues);
+  const maxTrend = Math.max(...trendValues);
+  const trendRange = maxTrend - minTrend || 1;
+  const linePoints = trendValues
+    .map((value, index) => {
+      const x = 34 + (index * (chartWidth - 68)) / (trendValues.length - 1);
+      const y = 174 - ((value - minTrend) / trendRange) * 68;
+      return `${x},${y}`;
+    })
+    .join(" ");
+  const areaPoints = `34,238 ${linePoints} ${chartWidth - 34},238`;
+
   return (
     <AppShell
       title="Payments & Revenue"
       activeSection="payments"
-      contentClassName="px-4 py-5 sm:px-6 lg:px-9 lg:py-8"
+      contentClassName="px-4 py-5 sm:px-6 lg:px-9 lg:py-8 bg-[#f8fafc] min-h-screen"
     >
-      <div className="mx-auto">
+      <div className="mx-auto max-w-7xl">
+        {/* Top 4 KPI Cards */}
         <section className="grid gap-4 xl:grid-cols-4">
-          {metrics.map((metric) => (
-            <RevenueCard key={metric.label} metric={metric} />
-          ))}
+          {metrics.map((metric) => {
+            const Icon = metric.icon;
+            return (
+              <article
+                key={metric.label}
+                className="rounded-[18px] border border-[#dfe6f7] bg-white px-6 py-7 shadow-[0_16px_34px_rgba(171,185,223,0.05)] transition-all hover:shadow-md"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <p className="text-[16px] font-medium text-[#223f64]">{metric.label}</p>
+                  <span
+                    className={`inline-flex h-10 w-10 items-center justify-center rounded-[12px] ${metric.iconBoxClassName}`}
+                  >
+                    <Icon className="h-5 w-5" strokeWidth={2.1} />
+                  </span>
+                </div>
+                <p className="mt-6 text-[34px] font-extrabold tracking-[-0.05em] text-[#173257]">
+                  {metric.value}
+                </p>
+                <p
+                  className={`mt-4 text-[14px] font-semibold ${
+                    metric.tone === "negative" ? "text-[#ff4f68]" : "text-[#0f8751]"
+                  }`}
+                >
+                  {metric.note}
+                </p>
+              </article>
+            );
+          })}
         </section>
 
-        <section className="mt-8 rounded-[22px] bg-white p-7 shadow-[0_18px_38px_rgba(180,193,229,0.07)]">
+        {/* Middle Section: Revenue Trends Area Chart */}
+        <section className="mt-8 rounded-[22px] bg-white p-7 shadow-[0_18px_38px_rgba(180,193,229,0.07)] border border-slate-200/80">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h2 className="text-[18px] font-extrabold tracking-[-0.03em] text-[#16345d]">
@@ -241,14 +317,57 @@ export default function PaymentsPage() {
               </p>
             </div>
 
-            <button
-              type="button"
-              className="inline-flex h-11 items-center gap-2 rounded-[12px] border border-[#dbe3f1] bg-[#f8fbff] px-4 text-[14px] font-semibold text-[#314868]"
-            >
-              <CalendarDays className="h-4 w-4" strokeWidth={2} />
-              Last 30 days
-              <ChevronDown className="h-4 w-4" strokeWidth={2} />
-            </button>
+            {/* Date Filter Selector */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowDatePicker(!showDatePicker)}
+                className="inline-flex h-11 items-center gap-2 rounded-[12px] border border-[#dbe3f1] bg-[#f8fbff] px-4 text-[14px] font-semibold text-[#314868] hover:bg-slate-100"
+              >
+                <CalendarDays className="h-4 w-4" strokeWidth={2} />
+                {period === "last_7_days"
+                  ? "Last 7 days"
+                  : period === "last_90_days"
+                    ? "Last 90 days"
+                    : period === "last_year"
+                      ? "Last 1 year"
+                      : "Last 30 days"}
+                <ChevronDown className="h-4 w-4" strokeWidth={2} />
+              </button>
+
+              {showDatePicker && (
+                <div className="absolute right-0 z-30 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
+                  <button
+                    type="button"
+                    onClick={() => { setPeriod("last_7_days"); setShowDatePicker(false); }}
+                    className="w-full rounded-lg px-3 py-2 text-left text-[13px] font-semibold text-slate-700 hover:bg-slate-100"
+                  >
+                    Last 7 days
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setPeriod("last_30_days"); setShowDatePicker(false); }}
+                    className="w-full rounded-lg px-3 py-2 text-left text-[13px] font-semibold text-slate-700 hover:bg-slate-100"
+                  >
+                    Last 30 days
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setPeriod("last_90_days"); setShowDatePicker(false); }}
+                    className="w-full rounded-lg px-3 py-2 text-left text-[13px] font-semibold text-slate-700 hover:bg-slate-100"
+                  >
+                    Last 90 days
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setPeriod("last_year"); setShowDatePicker(false); }}
+                    className="w-full rounded-lg px-3 py-2 text-left text-[13px] font-semibold text-slate-700 hover:bg-slate-100"
+                  >
+                    Last 1 year
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="mt-8 rounded-[18px] border border-[#eef2f7] p-4">
@@ -309,6 +428,7 @@ export default function PaymentsPage() {
           </div>
         </section>
 
+        {/* Bottom Section: Recent Transactions Table */}
         <section className="mt-8 overflow-hidden rounded-[22px] border border-[#dfe6f2] bg-white shadow-[0_18px_38px_rgba(180,193,229,0.07)]">
           <div className="flex flex-col gap-4 border-b border-[#e8edf7] px-6 py-7 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-[18px] font-extrabold tracking-[-0.03em] text-[#16345d]">
@@ -316,7 +436,8 @@ export default function PaymentsPage() {
             </h2>
             <button
               type="button"
-              className="text-[16px] font-bold text-[#0f8751]"
+              onClick={() => handlePageChange(1)}
+              className="text-[16px] font-bold text-[#0f8751] hover:underline"
             >
               View All
             </button>
@@ -338,7 +459,7 @@ export default function PaymentsPage() {
                 {transactions.map((transaction) => (
                   <tr
                     key={transaction.id}
-                    className="border-t border-[#edf1f7] text-[15px] text-[#4f5f7c]"
+                    className="border-t border-[#edf1f7] text-[15px] text-[#4f5f7c] hover:bg-slate-50/70"
                   >
                     <td className="px-6 py-5 font-medium">{transaction.date}</td>
                     <td className="px-4 py-5">
@@ -365,7 +486,11 @@ export default function PaymentsPage() {
                       </div>
                     </td>
                     <td className="px-4 py-5">
-                      <span className={`rounded-full px-3 py-1.5 text-[14px] font-bold ${statusClassName(transaction.status)}`}>
+                      <span
+                        className={`rounded-full px-3 py-1.5 text-[14px] font-bold ${statusClassName(
+                          transaction.status
+                        )}`}
+                      >
                         {transaction.status}
                       </span>
                     </td>
@@ -375,34 +500,55 @@ export default function PaymentsPage() {
             </table>
           </div>
 
+          {/* Table Pagination */}
           <div className="flex flex-col gap-4 border-t border-[#edf1f7] px-6 py-5 text-[15px] text-[#667892] sm:flex-row sm:items-center sm:justify-between">
-            <p className="font-medium">Showing 1 to 5 of 12,840 certificates</p>
+            <p className="font-medium">
+              Showing 1 to {transactions.length} of {pagination.total.toLocaleString()} records
+            </p>
             <div className="flex items-center gap-2 text-[#33496b]">
               <button
                 type="button"
-                className="inline-flex h-9 w-9 items-center justify-center rounded-[8px] border border-[#dbe3f1] bg-white"
+                disabled={pagination.page === 1}
+                onClick={() => handlePageChange(pagination.page - 1)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-[8px] border border-[#dbe3f1] bg-white disabled:opacity-40"
               >
                 <ChevronLeft className="h-4 w-4" strokeWidth={2.2} />
               </button>
+
               <button
                 type="button"
-                className="inline-flex h-9 w-9 items-center justify-center rounded-[8px] bg-[#0f8751] text-white"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-[8px] bg-[#0f8751] text-white font-bold"
               >
-                1
+                {pagination.page}
               </button>
-              <button type="button" className="inline-flex h-9 w-9 items-center justify-center rounded-[8px]">
-                2
-              </button>
-              <button type="button" className="inline-flex h-9 w-9 items-center justify-center rounded-[8px]">
-                3
-              </button>
-              <span className="px-1">...</span>
-              <button type="button" className="inline-flex h-9 w-9 items-center justify-center rounded-[8px]">
-                256
-              </button>
+
+              {pagination.page < pagination.totalPages && (
+                <button
+                  type="button"
+                  onClick={() => handlePageChange(pagination.page + 1)}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-[8px] hover:bg-slate-100"
+                >
+                  {pagination.page + 1}
+                </button>
+              )}
+
+              {pagination.page + 1 < pagination.totalPages && <span className="px-1">...</span>}
+
+              {pagination.totalPages > 1 && pagination.page !== pagination.totalPages && (
+                <button
+                  type="button"
+                  onClick={() => handlePageChange(pagination.totalPages)}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-[8px] hover:bg-slate-100"
+                >
+                  {pagination.totalPages}
+                </button>
+              )}
+
               <button
                 type="button"
-                className="inline-flex h-9 w-9 items-center justify-center rounded-[8px] border border-[#dbe3f1] bg-white"
+                disabled={pagination.page === pagination.totalPages}
+                onClick={() => handlePageChange(pagination.page + 1)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-[8px] border border-[#dbe3f1] bg-white disabled:opacity-40"
               >
                 <ChevronRight className="h-4 w-4" strokeWidth={2.2} />
               </button>
