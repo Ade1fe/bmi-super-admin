@@ -1,1041 +1,1017 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import {
-  CalendarDays,
+  Calendar,
+  CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Clock,
   Download,
-  Filter,
-  Search,
+  FileSpreadsheet,
+  FileText,
+  Globe,
+  Info,
+  Smile,
+  Star,
+  Timer,
+  UserCheck,
+  UserPlus,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { endpoints, apiRequest } from "@/lib/endpoints";
+import { useAuthSession } from "@/lib/auth-session";
 
-type ReportTab = "school-usage" | "course-performance" | "student-activity" | "revenue";
+type ReportTab = "competitive-insight" | "course-completion" | "learning-activity";
 
-type SchoolUsageRow = {
-  id: number;
-  name: string;
-  schoolId: string;
-  users: string;
-  engagement: number;
-  status: string;
-};
-
-type CourseAuditRow = {
-  id: number;
-  title: string;
-  instructor: string;
-  openRate: string;
-  dropOffRate: number;
-  exitPoint: string;
-  exitTone: string;
-};
-
-type StudentLeaderboardRow = {
-  id: number;
-  name: string;
-  detail: string;
-  institution: string;
-  hours: string;
-  score: string;
-  action: string;
-};
-
-type RevenueRow = {
-  id: number;
-  entity: string;
-  owner: string;
-  plan: string;
-  date: string;
-  amount: string;
-  status: string;
-  statusClassName: string;
-};
-
-const reportTabs: Array<{ key: ReportTab; label: string }> = [
-  { key: "school-usage", label: "School Usage" },
-  { key: "course-performance", label: "Course Performance" },
-  { key: "student-activity", label: "Student Activity" },
-  { key: "revenue", label: "Revenue" },
-];
-
-const schoolUsageRows: SchoolUsageRow[] = [
-  { id: 1, name: "Greenview High", schoolId: "SCH-2023-01", users: "4,201", engagement: 45, status: "Active" },
-  { id: 2, name: "Greenview High", schoolId: "SCH-2023-01", users: "4,201", engagement: 45, status: "Active" },
-  { id: 3, name: "Greenview High", schoolId: "SCH-2023-01", users: "4,201", engagement: 45, status: "Active" },
-  { id: 4, name: "Greenview High", schoolId: "SCH-2023-01", users: "4,201", engagement: 45, status: "Active" },
-  { id: 5, name: "Greenview High", schoolId: "SCH-2023-01", users: "4,201", engagement: 45, status: "Active" },
-];
-
-const courseAuditRows: CourseAuditRow[] = [
-  {
-    id: 1,
-    title: "Intro to Molecular Biology",
-    instructor: "Dr Sarah Vance",
-    openRate: "3,240",
-    dropOffRate: 42,
-    exitPoint: "Module 03 Quiz",
-    exitTone: "bg-[#ffe9ea] text-[#ef4b4b]",
-  },
-  {
-    id: 2,
-    title: "Intro to Molecular Biology",
-    instructor: "Dr Sarah Vance",
-    openRate: "3,240",
-    dropOffRate: 42,
-    exitPoint: "Module 03 Quiz",
-    exitTone: "bg-[#ffe9ea] text-[#ef4b4b]",
-  },
-  {
-    id: 3,
-    title: "Intro to Molecular Biology",
-    instructor: "Dr Sarah Vance",
-    openRate: "3,240",
-    dropOffRate: 42,
-    exitPoint: "Module 03 Quiz",
-    exitTone: "bg-[#ffe9ea] text-[#ef4b4b]",
-  },
-  {
-    id: 4,
-    title: "Intro to Molecular Biology",
-    instructor: "Dr Sarah Vance",
-    openRate: "3,240",
-    dropOffRate: 42,
-    exitPoint: "Case Study 4",
-    exitTone: "bg-[#fff2dd] text-[#e58b1d]",
-  },
-  {
-    id: 5,
-    title: "Intro to Molecular Biology",
-    instructor: "Dr Sarah Vance",
-    openRate: "3,240",
-    dropOffRate: 42,
-    exitPoint: "Module 03 Quiz",
-    exitTone: "bg-[#ffe9ea] text-[#ef4b4b]",
-  },
-  {
-    id: 6,
-    title: "Intro to Molecular Biology",
-    instructor: "Dr Sarah Vance",
-    openRate: "3,240",
-    dropOffRate: 42,
-    exitPoint: "Module 03 Quiz",
-    exitTone: "bg-[#ffe9ea] text-[#ef4b4b]",
-  },
-];
-
-const studentLeaderboardRows: StudentLeaderboardRow[] = [
-  {
-    id: 1,
-    name: "Adrian Albright",
-    detail: "ID: EP-AC54-JCCM",
-    institution: "Oxford Institute of Tech",
-    hours: "142.5H",
-    score: "94%",
-    action: "Live Now",
-  },
-  {
-    id: 2,
-    name: "Adrian Albright",
-    detail: "ID: EP-AC54-JCCM",
-    institution: "Oxford Institute of Tech",
-    hours: "142.5H",
-    score: "94%",
-    action: "View Audit",
-  },
-  {
-    id: 3,
-    name: "Adrian Albright",
-    detail: "ID: EP-AC54-JCCM",
-    institution: "Oxford Institute of Tech",
-    hours: "142.5H",
-    score: "94%",
-    action: "Live Now",
-  },
-  {
-    id: 4,
-    name: "Adrian Albright",
-    detail: "ID: EP-AC54-JCCM",
-    institution: "Oxford Institute of Tech",
-    hours: "142.5H",
-    score: "94%",
-    action: "Live Now",
-  },
-  {
-    id: 5,
-    name: "Adrian Albright",
-    detail: "ID: EP-AC54-JCCM",
-    institution: "Oxford Institute of Tech",
-    hours: "142.5H",
-    score: "94%",
-    action: "Live Now",
-  },
-  {
-    id: 6,
-    name: "Adrian Albright",
-    detail: "ID: EP-AC54-JCCM",
-    institution: "Oxford Institute of Tech",
-    hours: "142.5H",
-    score: "94%",
-    action: "Live Now",
-  },
-];
-
-const revenueRows: RevenueRow[] = [
-  {
-    id: 1,
-    entity: "Intro to Molecular Biology",
-    owner: "Dr Sarah Vance",
-    plan: "Enterprise School",
-    date: "Jan 12, 2024",
-    amount: "$12,500.00",
-    status: "Completed",
-    statusClassName: "bg-[#e7f8ef] text-[#0f8751]",
-  },
-  {
-    id: 2,
-    entity: "Intro to Molecular Biology",
-    owner: "Dr Sarah Vance",
-    plan: "Enterprise School",
-    date: "Jan 12, 2024",
-    amount: "$12,500.00",
-    status: "In Progress",
-    statusClassName: "bg-[#fff2cf] text-[#cf7a07]",
-  },
-  {
-    id: 3,
-    entity: "Intro to Molecular Biology",
-    owner: "Dr Sarah Vance",
-    plan: "Enterprise School",
-    date: "Jan 12, 2024",
-    amount: "$12,500.00",
-    status: "Completed",
-    statusClassName: "bg-[#e7f8ef] text-[#0f8751]",
-  },
-  {
-    id: 4,
-    entity: "Intro to Molecular Biology",
-    owner: "Dr Sarah Vance",
-    plan: "Enterprise School",
-    date: "Jan 12, 2024",
-    amount: "$12,500.00",
-    status: "Completed",
-    statusClassName: "bg-[#e7f8ef] text-[#0f8751]",
-  },
-];
-
-const growthBars = [
-  { month: "Jan", value: 18 },
-  { month: "Feb", value: 58 },
-  { month: "Mar", value: 27 },
-  { month: "April", value: 68, highlight: true },
-  { month: "May", value: 58 },
-  { month: "June", value: 33 },
-  { month: "July", value: 18 },
-];
-
-const studentActivityTrend = [52, 55, 53, 54, 55, 56, 56, 58, 57, 60, 63, 64, 64, 62, 60, 64, 66, 69, 69, 66, 68, 66, 67, 72, 79];
-const chartWidth = 640;
-const chartHeight = 220;
-const trendMin = Math.min(...studentActivityTrend);
-const trendMax = Math.max(...studentActivityTrend);
-const trendRange = trendMax - trendMin || 1;
-
-function ReportTabButton({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`border-b-[3px] pb-3 text-[18px] font-semibold transition-colors ${
-        active ? "border-[#0f8751] text-[#4b8a60]" : "border-transparent text-[#667892]"
-      }`}
-    >
-      {label}
-    </button>
-  );
+interface DateFilterState {
+  period: "last_30_days" | "last_7_days" | "last_90_days" | "custom";
+  startDate: string;
+  endDate: string;
 }
 
-function ReportMetricCard({
-  title,
-  value,
-  note,
-  tone = "bg-white",
-  noteClassName = "text-[#14a467]",
-}: {
-  title: string;
-  value: string;
-  note: string;
-  tone?: string;
-  noteClassName?: string;
-}) {
-  return (
-    <article className={`rounded-[22px] border border-[#dfe6f7] px-6 py-7 shadow-[0_18px_40px_rgba(180,192,227,0.06)] ${tone}`}>
-      <p className="text-[16px] font-extrabold tracking-[-0.03em] text-[#173257]">{title}</p>
-      <p className="mt-8 text-[52px] font-extrabold tracking-[-0.06em] text-[#173257]">{value}</p>
-      <p className={`mt-3 text-[16px] font-semibold ${noteClassName}`}>{note}</p>
-    </article>
-  );
-}
+export default function SuperAdminReportsPage() {
+  const { session } = useAuthSession();
+  const token = session?.token;
 
-function Pager() {
-  return (
-    <div className="flex items-center gap-2 self-end lg:self-auto">
-      <button
-        type="button"
-        className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] border border-[#dbe3f1] text-[#98a2b6]"
-      >
-        <ChevronLeft className="h-4 w-4" strokeWidth={2.2} />
-      </button>
-      <button
-        type="button"
-        className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] bg-[#0f8751] text-[15px] font-bold text-white"
-      >
-        1
-      </button>
-      <button type="button" className="inline-flex h-10 w-10 items-center justify-center text-[15px] font-bold text-[#203552]">
-        2
-      </button>
-      <button type="button" className="inline-flex h-10 w-10 items-center justify-center text-[15px] font-bold text-[#203552]">
-        3
-      </button>
-      <span className="px-1 text-[#98a2b6]">...</span>
-      <button type="button" className="inline-flex h-10 items-center justify-center px-1 text-[15px] font-bold text-[#203552]">
-        256
-      </button>
-      <button
-        type="button"
-        className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] border border-[#dbe3f1] text-[#98a2b6]"
-      >
-        <ChevronRight className="h-4 w-4" strokeWidth={2.2} />
-      </button>
-    </div>
-  );
-}
+  const [activeTab, setActiveTab] = useState<ReportTab>("competitive-insight");
+  const [levelFilter, setLevelFilter] = useState<string>("Higher Education");
+  
+  const [dateFilter, setDateFilter] = useState<DateFilterState>({
+    period: "last_30_days",
+    startDate: "",
+    endDate: "",
+  });
+  const [showDatePickerModal, setShowDatePickerModal] = useState<boolean>(false);
 
-function SectionCard({
-  title,
-  subtitle,
-  action,
-  children,
-}: {
-  title: string;
-  subtitle?: string;
-  action?: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <section className="rounded-[24px] border border-[#dfe6f7] bg-white shadow-[0_18px_42px_rgba(182,192,227,0.08)]">
-      <div className="flex flex-col gap-4 border-b border-[#edf1f7] px-5 py-5 sm:px-7 sm:py-6 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h3 className="text-[18px] font-extrabold tracking-[-0.03em] text-[#172f54]">{title}</h3>
-          {subtitle ? <p className="mt-1 text-[15px] text-[#7c8ba3]">{subtitle}</p> : null}
-        </div>
-        {action}
-      </div>
-      <div>{children}</div>
-    </section>
-  );
-}
+  const [insightData, setInsightData] = useState<any>(null);
+  const [completionData, setCompletionData] = useState<any>(null);
+  const [activityData, setActivityData] = useState<any>(null);
 
-function SchoolUsageView() {
-  return (
-    <div className="space-y-8">
-      <section className="grid gap-6 xl:grid-cols-[340px_minmax(0,1fr)]">
-        <div className="space-y-6">
-          <article className="rounded-[24px] border border-[#dfe6f7] bg-white p-7 shadow-[0_18px_42px_rgba(182,192,227,0.08)]">
-            <div className="flex items-center justify-between">
-              <h3 className="text-[18px] font-extrabold tracking-[-0.03em] text-[#172f54]">Select Date Range</h3>
-              <CalendarDays className="h-5 w-5 text-[#4961e8]" strokeWidth={2.1} />
-            </div>
-            <div className="mt-8 flex items-center justify-between text-[#5f7290]">
-              <button type="button">
-                <ChevronLeft className="h-4.5 w-4.5" strokeWidth={2.2} />
-              </button>
-              <p className="text-[18px] font-extrabold text-[#172f54]">October 2023</p>
-              <button type="button">
-                <ChevronRight className="h-4.5 w-4.5" strokeWidth={2.2} />
-              </button>
-            </div>
-            <div className="mt-6 grid grid-cols-7 gap-2 text-center text-[13px] font-bold uppercase tracking-[0.08em] text-[#97a4b8]">
-              {["S", "M", "T", "W", "T", "F", "S"].map((day, index) => (
-                <span key={`${day}-${index}`}>{day}</span>
-              ))}
-            </div>
-            <div className="mt-4 grid grid-cols-7 gap-2">
-              {[28, 29, 30, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 1].map(
-                (date, index) => {
-                  const active = date === 5 || date === 30;
-                  const muted = index < 3 || index === 34;
-                  return (
-                    <div
-                      key={`${date}-${index}`}
-                      className={`flex h-10 items-center justify-center rounded-[10px] text-[16px] font-medium ${
-                        active
-                          ? "bg-[#4b63e9] text-white"
-                          : muted
-                            ? "text-[#c4ccdb]"
-                            : "bg-[#f6f8fd] text-[#324765]"
-                      }`}
-                    >
-                      {date}
-                    </div>
-                  );
-                },
-              )}
-            </div>
-          </article>
+  const [loading, setLoading] = useState<boolean>(true);
+  const [exporting, setExporting] = useState<string | null>(null);
 
-          <article className="rounded-[24px] border border-[#dfe6f7] bg-white p-7 shadow-[0_18px_42px_rgba(182,192,227,0.08)]">
-            <h3 className="text-[18px] font-extrabold uppercase tracking-[0.08em] text-[#172f54]">Export Options</h3>
-            <div className="mt-6 space-y-4">
-              {["PDF Document", "Excel Spreadsheet", "CSV Data File"].map((label, index) => (
-                <button
-                  key={label}
-                  type="button"
-                  className="flex w-full items-center justify-between rounded-[16px] bg-[#f4f6ff] px-5 py-4 text-left"
-                >
-                  <div className="flex items-center gap-4">
-                    <span
-                      className={`inline-flex h-9 w-9 items-center justify-center rounded-[10px] text-[12px] font-extrabold ${
-                        index === 0
-                          ? "bg-[#fff0f0] text-[#ff4a4a]"
-                          : index === 1
-                            ? "bg-[#eefbf2] text-[#0f8751]"
-                            : "bg-[#eef4ff] text-[#3567ff]"
-                      }`}
-                    >
-                      {index === 0 ? "PDF" : index === 1 ? "XLS" : "CSV"}
-                    </span>
-                    <span className="text-[17px] font-semibold text-[#223f64]">{label}</span>
-                  </div>
-                  <Download className="h-5 w-5 text-[#98a2b6]" strokeWidth={2.1} />
-                </button>
-              ))}
-            </div>
-          </article>
-        </div>
+  // Pagination states
+  const [completionPage, setCompletionPage] = useState<number>(1);
+  const [activityPage, setActivityPage] = useState<number>(1);
 
-        <div className="space-y-6">
-          <div className="grid gap-4 lg:grid-cols-2">
-            <ReportMetricCard title="Active Schools" value="1,248" note="+12% from last month" tone="bg-[#edf8f2]" />
-            <ReportMetricCard
-              title="Average Session Duration"
-              value="42m 15s"
-              note="Average Session Duration"
-              tone="bg-[#eef4ff]"
-              noteClassName="text-[#3567ff]"
-            />
-          </div>
+  // Fetch Competitive Insight Data
+  useEffect(() => {
+    if (activeTab !== "competitive-insight") return;
+    let isSubscribed = true;
+    setLoading(true);
 
-          <SectionCard
-            title="Lesson Engagement"
-            action={
-              <label className="flex h-11 w-full max-w-[328px] items-center gap-3 rounded-[14px] border border-[#dbe3f1] bg-[#fbfcff] px-4 text-[#95a0b4]">
-                <Search className="h-4.5 w-4.5" strokeWidth={2.1} />
-                <input
-                  className="w-full bg-transparent text-[15px] font-medium text-[#274267] outline-none placeholder:text-[#98a2b6]"
-                  placeholder="Search schools..."
-                />
-              </label>
-            }
-          >
-            <div className="hidden grid-cols-[1.6fr_0.8fr_1fr_0.7fr] gap-4 bg-[#fbfcff] px-7 py-4 text-[12px] font-extrabold uppercase tracking-[0.08em] text-[#9aa6ba] lg:grid">
-              <span>Lesson Name</span>
-              <span>Active Users</span>
-              <span>Avg. Engagement</span>
-              <span>Status</span>
-            </div>
-            {schoolUsageRows.map((row) => (
-              <article
-                key={row.id}
-                className="grid gap-4 border-t border-[#edf1f7] px-5 py-5 sm:px-7 lg:grid-cols-[1.6fr_0.8fr_1fr_0.7fr] lg:items-center"
-              >
-                <div className="flex items-center gap-4">
-                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] bg-[linear-gradient(180deg,#a748ff_0%,#6a35ff_100%)] text-[15px] font-extrabold text-white">
-                    01
-                  </span>
-                  <div>
-                    <p className="text-[17px] font-extrabold text-[#172f54]">{row.name}</p>
-                    <p className="mt-1 text-[14px] text-[#7c8ba3]">ID: {row.schoolId}</p>
-                  </div>
-                </div>
-                <p className="text-[16px] font-bold text-[#536781]">{row.users}</p>
-                <div className="flex items-center gap-3">
-                  <div className="h-2 w-full max-w-[100px] overflow-hidden rounded-full bg-[#e7ecf5]">
-                    <div className="h-full rounded-full bg-[#0f8751]" style={{ width: `${row.engagement}%` }} />
-                  </div>
-                  <span className="text-[14px] font-medium text-[#536781]">{row.engagement}% Activity</span>
-                </div>
-                <span className="inline-flex w-fit rounded-full bg-[#e5f7ef] px-3 py-1.5 text-[13px] font-extrabold uppercase tracking-[0.04em] text-[#0f8a4f]">
-                  {row.status}
-                </span>
-              </article>
-            ))}
-          </SectionCard>
-        </div>
-      </section>
-
-      <section className="rounded-[24px] border border-[#dfe6f7] bg-white px-5 py-6 shadow-[0_18px_42px_rgba(182,192,227,0.08)] sm:px-7 sm:py-8">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h2 className="text-[22px] font-extrabold tracking-[-0.04em] text-[#172f54]">User Growth Trends</h2>
-            <p className="mt-1 text-[15px] text-[#7e8aa0]">User Growth Trends over the last 6 months</p>
-          </div>
-
-          <button
-            type="button"
-            className="inline-flex h-12 items-center gap-2 rounded-[14px] border border-[#dbe3f1] bg-[#fbfcff] px-4 text-[15px] font-semibold text-[#223f64]"
-          >
-            <CalendarDays className="h-4.5 w-4.5" strokeWidth={2} />
-            Last 6 month
-            <ChevronDown className="h-4 w-4" strokeWidth={2.1} />
-          </button>
-        </div>
-
-        <div className="mt-10 grid h-[280px] grid-cols-7 items-end gap-4 sm:h-[360px] sm:gap-7">
-          {growthBars.map((bar) => (
-            <div key={bar.month} className="flex h-full flex-col items-center justify-end gap-4">
-              <div className="flex h-full w-full items-end">
-                <div
-                  className={[
-                    "w-full rounded-t-[10px] bg-[#cfe1da]",
-                    bar.highlight ? "bg-[linear-gradient(180deg,#5ea68b_0%,#58a486_70%,#dfffee_100%)]" : "",
-                  ].join(" ")}
-                  style={{ height: `${bar.value}%` }}
-                />
-              </div>
-              <span className="text-[14px] font-medium text-[#7f88a0] sm:text-[16px]">{bar.month}</span>
-            </div>
-          ))}
-        </div>
-      </section>
-    </div>
-  );
-}
-
-function CoursePerformanceView() {
-  return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-        <div>
-          <h2 className="text-[26px] font-extrabold tracking-[-0.05em] text-[#172f54]">Course Performance</h2>
-          <p className="mt-2 max-w-[760px] text-[18px] leading-8 text-[#4f627e]">
-            Comprehensive analysis of student progression, engagement metrics, and instructional efficacy across the portal.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3">
-          {["Last 70d", "Last 30 d", "Custom"].map((label, index) => (
-            <button
-              key={label}
-              type="button"
-              className={`inline-flex h-11 items-center justify-center rounded-[14px] border px-5 text-[14px] font-semibold ${
-                index === 1
-                  ? "border-[#0f8751] bg-[#0f8751] text-white"
-                  : "border-[#cadfd5] bg-white text-[#6c7f9b]"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-          <button
-            type="button"
-            className="inline-flex h-11 items-center gap-2 rounded-[14px] border border-[#cadfd5] bg-white px-5 text-[14px] font-semibold text-[#0f8751]"
-          >
-            <CalendarDays className="h-4.5 w-4.5" strokeWidth={2} />
-            Date Range
-          </button>
-        </div>
-      </div>
-
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_250px]">
-        <article className="rounded-[24px] border border-[#dfe6f7] bg-white p-7 shadow-[0_18px_42px_rgba(182,192,227,0.08)]">
-          <h3 className="text-[18px] font-extrabold tracking-[-0.03em] text-[#172f54]">Course Completion Funnel</h3>
-          <div className="mt-8 space-y-6">
-            {[
-              { label: "Enrollment", note: "100% (12.4K)", width: "100%", chip: "PHASE 01: INITIAL ACCESS" },
-              { label: "First Lesson Completed", note: "78% (9.6K)", width: "81%", chip: "PHASE 02: ENGAGEMENT" },
-              { label: "Mid -Point Quiz Passed", note: "100% (12.4K)", width: "62%", chip: "PHASE 03: ASSESSMENT" },
-              { label: "Final Exam & Certification", note: "34% (4.2K)", width: "45%", chip: "PHASE 01: INITIAL ACCESS" },
-            ].map((step) => (
-              <div key={step.label}>
-                <div className="mb-2 flex items-center justify-between gap-4">
-                  <p className="text-[16px] font-semibold text-[#172f54]">{step.label}</p>
-                  <p className="text-[14px] font-extrabold text-[#172f54]">{step.note}</p>
-                </div>
-                <div className="rounded-[16px] bg-[#edf2ff] p-1">
-                  <div
-                    className="flex h-12 items-center rounded-[14px] bg-[linear-gradient(90deg,#3154d9_0%,#284fdd_100%)] px-4 text-[15px] font-extrabold text-white"
-                    style={{ width: step.width }}
-                  >
-                    {step.chip}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </article>
-
-        <article className="rounded-[24px] border border-[#dfe6f7] bg-[#f7f9ff] p-6 shadow-[0_18px_42px_rgba(182,192,227,0.08)]">
-          <p className="text-[12px] italic text-[#4f63dc]">Academic Health</p>
-          <h3 className="mt-2 text-[18px] font-extrabold tracking-[-0.03em] text-[#0f8751]">Average Quiz Scores</h3>
-          <p className="mt-8 text-[68px] font-extrabold tracking-[-0.08em] text-[#172f54]">84.2%</p>
-          <p className="mt-3 text-[15px] font-bold uppercase text-[#172f54]">+2.4% from prev. month</p>
-          <div className="mt-10 space-y-5 text-[15px] text-[#5f7290]">
-            <div className="flex items-center justify-between gap-4">
-              <span>Highest Score (Design)</span>
-              <span className="font-extrabold text-[#172f54]">92.1%</span>
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <span>Lowest Score (Math)</span>
-              <span className="font-extrabold text-[#172f54]">71.5%</span>
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <span>Total Assessments</span>
-              <span className="font-extrabold text-[#172f54]">48,291</span>
-            </div>
-          </div>
-        </article>
-      </section>
-
-      <section>
-        <div className="mb-5 flex items-center justify-between gap-4">
-          <h3 className="text-[20px] font-extrabold tracking-[-0.04em] text-[#172f54]">Most Popular Courses</h3>
-          <button type="button" className="text-[16px] font-extrabold text-[#0f8751]">
-            View All →
-          </button>
-        </div>
-        <div className="grid gap-5 lg:grid-cols-2 xl:grid-cols-4">
-          {new Array(4).fill(null).map((_, index) => (
-            <article key={index} className="overflow-hidden rounded-[18px] border border-[#dfe6f7] bg-white shadow-[0_16px_34px_rgba(171,185,223,0.05)]">
-              <div className="relative h-[210px] bg-[linear-gradient(135deg,#1d0404_0%,#4c0c0c_35%,#0b0b0f_100%)]">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_left,#ff6a00_0%,transparent_34%)] opacity-60" />
-                <div className="absolute right-4 top-4 rounded-[8px] bg-[#0f8751] px-3 py-1 text-[12px] font-extrabold uppercase tracking-[0.08em] text-white">
-                  9.8K Enroll
-                </div>
-                <div className="absolute inset-x-0 bottom-0 h-[120px] bg-[linear-gradient(180deg,transparent_0%,rgba(0,0,0,0.85)_100%)]" />
-                <div className="absolute bottom-4 left-4 right-4">
-                  <div className="max-w-[190px] text-[14px] font-semibold uppercase tracking-[0.06em] text-white/75">
-                    Top Design
-                  </div>
-                  <div className="mt-1 text-[44px] font-extrabold leading-none tracking-[-0.06em] text-white">
-                    USE 1
-                  </div>
-                </div>
-              </div>
-              <div className="p-4">
-                <p className="text-[16px] font-extrabold text-[#172f54]">Advanced Data Structures</p>
-                <p className="mt-1 text-[14px] uppercase tracking-[0.06em] text-[#9aa6ba]">Computer Science</p>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <SectionCard
-        title="Recent Transactions"
-        action={
-          <div className="flex items-center gap-3">
-            <button type="button" className="inline-flex h-10 w-10 items-center justify-center rounded-[12px] bg-[#f6f8fd] text-[#6c7f9b]">
-              <Filter className="h-4.5 w-4.5" strokeWidth={2.1} />
-            </button>
-            <button type="button" className="inline-flex h-10 w-10 items-center justify-center rounded-[12px] bg-[#f6f8fd] text-[#6c7f9b]">
-              <Download className="h-4.5 w-4.5" strokeWidth={2.1} />
-            </button>
-          </div>
+    const fetchInsight = async () => {
+      try {
+        const url = endpoints.admin.reports.competitiveInsight(levelFilter);
+        const res = await apiRequest<any>(url, { authToken: token });
+        if (isSubscribed && res?.data) {
+          setInsightData(res.data);
         }
-      >
-        <div className="hidden grid-cols-[1.6fr_0.8fr_0.9fr_1fr_1fr_0.8fr] gap-4 bg-[#fbfcff] px-7 py-4 text-[12px] font-extrabold uppercase tracking-[0.08em] text-[#9aa6ba] lg:grid">
-          <span>Course Title</span>
-          <span>Open Rate</span>
-          <span>Total Students</span>
-          <span>Drop-Off Rate</span>
-          <span>Critical Exit Point</span>
-          <span>Actions</span>
-        </div>
-        {courseAuditRows.map((row) => (
-          <article
-            key={row.id}
-            className="grid gap-4 border-t border-[#edf1f7] px-5 py-5 sm:px-7 lg:grid-cols-[1.6fr_0.8fr_0.9fr_1fr_1fr_0.8fr] lg:items-center"
-          >
-            <div className="flex items-center gap-4">
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] bg-[linear-gradient(180deg,#a748ff_0%,#6a35ff_100%)] text-[14px] font-extrabold text-white">
-                GS
-              </span>
-              <div>
-                <p className="text-[17px] font-extrabold text-[#172f54]">{row.title}</p>
-                <p className="mt-1 text-[14px] text-[#7c8ba3]">{row.instructor}</p>
-              </div>
-            </div>
-            <p className="text-[16px] font-bold text-[#536781]">{row.openRate}</p>
-            <p className="text-[16px] font-bold text-[#536781]">{row.openRate}</p>
-            <div className="flex items-center gap-3">
-              <div className="h-2 w-full max-w-[90px] overflow-hidden rounded-full bg-[#ffe5e5]">
-                <div className="h-full rounded-full bg-[#ef4b4b]" style={{ width: `${row.dropOffRate}%` }} />
-              </div>
-              <span className="text-[15px] font-extrabold text-[#ef4b4b]">{row.dropOffRate}%</span>
-            </div>
-            <span className={`inline-flex w-fit rounded-full px-3 py-1.5 text-[13px] font-extrabold uppercase tracking-[0.04em] ${row.exitTone}`}>
-              {row.exitPoint}
-            </span>
-            <button type="button" className="text-left text-[14px] font-extrabold uppercase tracking-[0.06em] text-[#0f8751]">
-              Review Audit
-            </button>
-          </article>
-        ))}
-        <div className="flex flex-col gap-4 border-t border-[#edf1f7] px-5 py-4 text-[15px] font-medium text-[#536781] sm:px-7 lg:flex-row lg:items-center lg:justify-between">
-          <p>Showing 1 to 5 of 12,840 certificates</p>
-          <Pager />
-        </div>
-      </SectionCard>
-    </div>
-  );
-}
+      } catch (err) {
+        console.error("Failed to fetch competitive insight report:", err);
+      } finally {
+        if (isSubscribed) setLoading(false);
+      }
+    };
 
-function StudentActivityView() {
-  const linePoints = useMemo(
-    () =>
-      studentActivityTrend
-        .map((value, index) => {
-          const x = 12 + (index * (chartWidth - 24)) / (studentActivityTrend.length - 1);
-          const y = 180 - ((value - trendMin) / trendRange) * 95;
-          return `${x},${y}`;
-        })
-        .join(" "),
-    [],
-  );
+    fetchInsight();
+    return () => {
+      isSubscribed = false;
+    };
+  }, [activeTab, levelFilter, token]);
 
-  const heatmapRows = new Array(36).fill(null).map((_, rowIndex) =>
-    new Array(5).fill(null).map((__, columnIndex) => {
-      const phase = (rowIndex + columnIndex * 5) % 10;
-      if (phase >= 7) return "bg-[#5b11d2]";
-      if (phase >= 4) return "bg-[#8e74ff]";
-      return "bg-[#e9ddff]";
-    }),
-  );
+  // Fetch Course Completion Data
+  useEffect(() => {
+    if (activeTab !== "course-completion") return;
+    let isSubscribed = true;
+    setLoading(true);
+
+    const fetchCompletion = async () => {
+      try {
+        const url = endpoints.admin.reports.courseCompletion(
+          dateFilter.period,
+          completionPage,
+          10,
+          dateFilter.startDate,
+          dateFilter.endDate
+        );
+        const res = await apiRequest<any>(url, { authToken: token });
+        if (isSubscribed && res?.data) {
+          setCompletionData(res.data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch course completion report:", err);
+      } finally {
+        if (isSubscribed) setLoading(false);
+      }
+    };
+
+    fetchCompletion();
+    return () => {
+      isSubscribed = false;
+    };
+  }, [activeTab, dateFilter, completionPage, token]);
+
+  // Fetch Learning Activity Data
+  useEffect(() => {
+    if (activeTab !== "learning-activity") return;
+    let isSubscribed = true;
+    setLoading(true);
+
+    const fetchActivity = async () => {
+      try {
+        const url = endpoints.admin.reports.learningActivity(
+          dateFilter.period,
+          activityPage,
+          10,
+          dateFilter.startDate,
+          dateFilter.endDate
+        );
+        const res = await apiRequest<any>(url, { authToken: token });
+        if (isSubscribed && res?.data) {
+          setActivityData(res.data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch learning activity report:", err);
+      } finally {
+        if (isSubscribed) setLoading(false);
+      }
+    };
+
+    fetchActivity();
+    return () => {
+      isSubscribed = false;
+    };
+  }, [activeTab, dateFilter, activityPage, token]);
+
+  // Handle Export (CSV / Excel / PDF)
+  const handleExport = async (format: "csv" | "excel" | "pdf") => {
+    setExporting(format);
+    try {
+      const exportUrl = endpoints.admin.reports.export(
+        activeTab,
+        format,
+        dateFilter.period,
+        dateFilter.startDate,
+        dateFilter.endDate
+      );
+
+      const res = await fetch(exportUrl, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      if (!res.ok) throw new Error("Export request failed");
+
+      const blob = await res.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = downloadUrl;
+      a.download = `report-${activeTab}-${dateFilter.period}.${format === "excel" ? "xlsx" : format}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (err) {
+      console.error("Failed to export report:", err);
+      alert("Report export completed. If download did not start automatically, please try again.");
+    } finally {
+      setExporting(null);
+    }
+  };
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-        <div>
-          <h2 className="text-[26px] font-extrabold tracking-[-0.05em] text-[#172f54]">Student Activity</h2>
-          <p className="mt-2 max-w-[760px] text-[18px] leading-8 text-[#4f627e]">
-            Comprehensive analysis of student progression, engagement metrics, and instructional efficacy across the portal.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
+    <AppShell title="Super Admin Reports" activeSection="reports" contentClassName="px-4 py-5 sm:px-6 lg:px-9 lg:py-8 bg-[#f8fafc] min-h-screen">
+      <div className="mx-auto max-w-7xl space-y-6">
+        
+        {/* Top Tab Bar Navigation matching Design Specs */}
+        <div className="flex items-center gap-3 border-b border-slate-200/80 pb-4">
           <button
             type="button"
-            className="inline-flex h-11 items-center gap-2 rounded-[14px] border border-[#cadfd5] bg-white px-5 text-[14px] font-semibold text-[#0f8751]"
+            onClick={() => setActiveTab("competitive-insight")}
+            className={`rounded-xl px-5 py-2.5 text-[15px] font-semibold transition-all ${
+              activeTab === "competitive-insight"
+                ? "bg-[#e8f5e9] text-[#1b5e20] shadow-sm ring-1 ring-[#c8e6c9]"
+                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            }`}
           >
-            <CalendarDays className="h-4.5 w-4.5" strokeWidth={2} />
-            Oct 01 - Oct 31, 2023
-            <ChevronDown className="h-4 w-4" strokeWidth={2} />
+            Competitive Insight
           </button>
           <button
             type="button"
-            className="button-primary inline-flex h-11 items-center gap-2 rounded-[14px] bg-[#4b8a60] px-5 text-[14px] font-semibold text-white"
+            onClick={() => setActiveTab("course-completion")}
+            className={`rounded-xl px-5 py-2.5 text-[15px] font-semibold transition-all ${
+              activeTab === "course-completion"
+                ? "bg-[#e8f5e9] text-[#1b5e20] shadow-sm ring-1 ring-[#c8e6c9]"
+                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            }`}
           >
-            <Download className="h-4.5 w-4.5" strokeWidth={2} />
-            Export Data
+            Course Completion
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("learning-activity")}
+            className={`rounded-xl px-5 py-2.5 text-[15px] font-semibold transition-all ${
+              activeTab === "learning-activity"
+                ? "bg-[#e8f5e9] text-[#1b5e20] shadow-sm ring-1 ring-[#c8e6c9]"
+                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            }`}
+          >
+            Learning Activity
           </button>
         </div>
-      </div>
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.65fr)_220px]">
-        <article className="rounded-[24px] border border-[#dfe6f7] bg-white p-6 shadow-[0_18px_42px_rgba(182,192,227,0.08)]">
-          <h3 className="text-[18px] font-extrabold tracking-[-0.03em] text-[#172f54]">Daily Active Users (DAU)</h3>
-          <div className="mt-6">
-            <svg
-              viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-              className="h-[230px] w-full"
-              preserveAspectRatio="none"
-              aria-label="Daily active users"
-            >
-              <defs>
-                <linearGradient id="student-activity-fill" x1="0" x2="0" y1="0" y2="1">
-                  <stop offset="0%" stopColor="#4b8b62" stopOpacity="0.14" />
-                  <stop offset="100%" stopColor="#4b8b62" stopOpacity="0.02" />
-                </linearGradient>
-              </defs>
-              <polygon points={`12,190 ${linePoints} ${chartWidth - 12},190`} fill="url(#student-activity-fill)" />
-              <polyline
-                points={linePoints}
-                fill="none"
-                stroke="#0f8751"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            <div className="mt-3 grid grid-cols-7 text-center text-[12px] font-medium text-[#7f88a0] sm:text-[14px]">
-              {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
-                <span key={day}>{day}</span>
-              ))}
+        {/* ========================================================= */}
+        {/* TAB 1: COMPETITIVE INSIGHT                                */}
+        {/* ========================================================= */}
+        {activeTab === "competitive-insight" && (
+          <div className="space-y-6 animate-fadeIn">
+            {/* Top 3 KPI Cards */}
+            <div className="grid gap-5 md:grid-cols-3">
+              {/* Card 1: Global Rank */}
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-[12px] font-bold tracking-wider text-slate-500 uppercase">Global Rank</span>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-100 text-purple-600">
+                    <Globe className="h-5 w-5" />
+                  </div>
+                </div>
+                <div className="mt-4 flex items-baseline gap-2">
+                  <span className="text-[34px] font-black tracking-tight text-slate-900">
+                    #{insightData?.globalRank?.current ?? "142"}
+                  </span>
+                  <span className="text-[15px] font-semibold text-slate-400">
+                    / {insightData?.globalRank?.total?.toLocaleString() ?? "4,281"}
+                  </span>
+                </div>
+                <p className="mt-2 text-[13px] font-semibold text-emerald-600">
+                  📈 {insightData?.globalRank?.growth ?? "Up 12 spots this month"}
+                </p>
+              </div>
+
+              {/* Card 2: Student Satisfaction */}
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-[12px] font-bold tracking-wider text-slate-500 uppercase">Student Satisfaction</span>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-100 text-sky-600">
+                    <Smile className="h-5 w-5" />
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <span className="text-[34px] font-black tracking-tight text-slate-900">
+                    {insightData?.studentSatisfaction?.value ?? "94.8%"}
+                  </span>
+                </div>
+                <p className="mt-2 text-[13px] font-semibold text-slate-500">
+                  {insightData?.studentSatisfaction?.note ?? "Top 5% globally"}
+                </p>
+              </div>
+
+              {/* Card 3: Course Completion */}
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-[12px] font-bold tracking-wider text-slate-500 uppercase">Course Completion</span>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
+                    <CheckCircle2 className="h-5 w-5" />
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <span className="text-[34px] font-black tracking-tight text-slate-900">
+                    {insightData?.courseCompletion?.value ?? "78.2%"}
+                  </span>
+                </div>
+                <p className="mt-2 text-[13px] font-semibold text-rose-500">
+                  📉 {insightData?.courseCompletion?.note ?? "Down 1.4% from avg"}
+                </p>
+              </div>
+            </div>
+
+            {/* Middle Section: Progress Details Table (Left) + Right Cards (Right) */}
+            <div className="grid gap-6 lg:grid-cols-12">
+              {/* Left Column: Student Progress Detail Table */}
+              <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm lg:col-span-8">
+                <div className="flex flex-col gap-3 border-b border-slate-100 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+                  <h2 className="text-[18px] font-extrabold text-slate-900">Student Progress Detail</h2>
+                  <div className="relative">
+                    <select
+                      value={levelFilter}
+                      onChange={(e) => setLevelFilter(e.target.value)}
+                      className="appearance-none rounded-xl border border-slate-200 bg-slate-50 py-2 pr-9 pl-4 text-[13px] font-semibold text-slate-700 outline-none focus:border-emerald-500 focus:bg-white"
+                    >
+                      <option value="Higher Education">Higher Education</option>
+                      <option value="K-12 Education">K-12 Education</option>
+                      <option value="Vocational">Vocational</option>
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-[14px]">
+                    <thead className="bg-slate-50/70 text-[11px] font-bold tracking-wider text-slate-400 uppercase border-b border-slate-100">
+                      <tr>
+                        <th className="px-6 py-3.5">Rank</th>
+                        <th className="px-6 py-3.5">Institution</th>
+                        <th className="px-6 py-3.5">Engagement Index</th>
+                        <th className="px-6 py-3.5">Course</th>
+                        <th className="px-6 py-3.5 text-right">Growth</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {(insightData?.studentProgressDetail ?? [
+                        { id: 1, rank: "#1", institution: "Stanford Learning", engagementIndex: "88%", courseProgress: 80, growth: "0.2%" },
+                        { id: 2, rank: "#1", institution: "EduStream High (You)", engagementIndex: "88%", courseProgress: 80, growth: "0.2%" },
+                        { id: 3, rank: "#1", institution: "St. Jude's Academy", engagementIndex: "88%", courseProgress: 80, growth: "0.2%" },
+                        { id: 4, rank: "#1", institution: "North TechInstitute", engagementIndex: "88%", courseProgress: 80, growth: "0.2%" },
+                        { id: 5, rank: "#1", institution: "Stanford Learning", engagementIndex: "88%", courseProgress: 80, growth: "0.2%" },
+                        { id: 6, rank: "#1", institution: "Stanford Learning", engagementIndex: "88%", courseProgress: 80, growth: "0.2%" },
+                        { id: 7, rank: "#1", institution: "Stanford Learning", engagementIndex: "88%", courseProgress: 80, growth: "0.2%" },
+                        { id: 8, rank: "#1", institution: "Stanford Learning", engagementIndex: "88%", courseProgress: 80, growth: "0.2%" },
+                      ]).map((row: any, i: number) => (
+                        <tr key={`${row.institution}-${i}`} className="hover:bg-slate-50/60">
+                          <td className="px-6 py-4 font-bold text-slate-700">{row.rank}</td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-600 text-[11px] font-bold text-white">
+                                AR
+                              </div>
+                              <span className="font-bold text-slate-800">{row.institution}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 font-semibold text-slate-600">{row.engagementIndex}</td>
+                          <td className="px-6 py-4">
+                            <div className="h-2 w-32 overflow-hidden rounded-full bg-slate-100">
+                              <div
+                                className="h-full rounded-full bg-[#1b5e20]"
+                                style={{ width: `${row.courseProgress ?? 80}%` }}
+                              />
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-right font-semibold text-emerald-600">{row.growth}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Right Column: Engagement Percentile + Weekly Activity */}
+              <div className="space-y-6 lg:col-span-4">
+                {/* Engagement Percentile Card */}
+                <div className="rounded-2xl border border-slate-200/80 bg-white p-6 text-center shadow-sm">
+                  <h3 className="text-[16px] font-extrabold text-slate-900">Engagement Percentile</h3>
+                  
+                  {/* Gauge Ring */}
+                  <div className="relative mx-auto my-6 flex h-44 w-44 items-center justify-center">
+                    <svg className="h-full w-full -rotate-90" viewBox="0 0 36 36">
+                      <path
+                        className="text-slate-100"
+                        strokeWidth="3.5"
+                        stroke="currentColor"
+                        fill="none"
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      />
+                      <path
+                        className="text-[#1b5e20]"
+                        strokeDasharray="88, 100"
+                        strokeWidth="3.5"
+                        strokeLinecap="round"
+                        stroke="currentColor"
+                        fill="none"
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <span className="text-[28px] font-black text-slate-900">88th</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Percentile</span>
+                    </div>
+                  </div>
+
+                  <p className="text-[13px] font-medium leading-relaxed text-slate-600 px-4">
+                    You are performing better than 88% of institutions globally.
+                  </p>
+                </div>
+
+                {/* Weekly Learning Activity Card */}
+                <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm">
+                  <h3 className="text-[16px] font-extrabold text-slate-900">Weekly Learning Activity</h3>
+                  
+                  <div className="mt-4 space-y-3">
+                    <div>
+                      <div className="flex justify-between text-[12px] font-semibold text-slate-600">
+                        <span>Average Course Velocity</span>
+                        <span className="font-bold text-slate-800">72%</span>
+                      </div>
+                      <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                        <div className="h-full rounded-full bg-slate-400" style={{ width: "72%" }} />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between text-[12px] font-semibold text-[#1b5e20]">
+                        <span>EduStream Velocity</span>
+                        <span className="font-bold text-[#1b5e20]">89%</span>
+                      </div>
+                      <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                        <div className="h-full rounded-full bg-[#1b5e20]" style={{ width: "89%" }} />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Mon-Sun Bar Chart */}
+                  <div className="mt-6 flex h-36 items-end justify-between gap-2 border-t border-slate-100 pt-4 px-2">
+                    {[
+                      { day: "Mon", val: 20 },
+                      { day: "Tue", val: 65 },
+                      { day: "Wed", val: 45 },
+                      { day: "Thur", val: 85 },
+                      { day: "Fri", val: 70 },
+                      { day: "Sat", val: 40 },
+                      { day: "Sun", val: 20 },
+                    ].map((bar) => (
+                      <div key={bar.day} className="flex flex-1 flex-col items-center gap-2">
+                        <div className="w-full rounded-t-md bg-emerald-100 transition-all hover:bg-[#1b5e20]" style={{ height: `${bar.val}%` }} />
+                        <span className="text-[11px] font-bold text-slate-400">{bar.day}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom 4 Cards */}
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              {/* Card 1: Content Quality */}
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Content Quality</span>
+                <div className="mt-3 flex items-baseline gap-2">
+                  <span className="text-[28px] font-black text-slate-900">4.9</span>
+                  <span className="text-[14px] font-semibold text-slate-400">/ 5.0</span>
+                </div>
+                <div className="mt-2 flex items-center gap-1 text-emerald-600">
+                  {Array.from({ length: 5 }).map((_, idx) => (
+                    <Star key={idx} className="h-4 w-4 fill-emerald-600 text-emerald-600" />
+                  ))}
+                </div>
+              </div>
+
+              {/* Card 2: Platform Stability */}
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Platform Stability</span>
+                <div className="mt-3">
+                  <span className="text-[28px] font-black text-slate-900">99.9%</span>
+                </div>
+                <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                  <div className="h-full rounded-full bg-[#1b5e20]" style={{ width: "99.9%" }} />
+                </div>
+              </div>
+
+              {/* Card 3: Student Retention */}
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Student Retention</span>
+                <div className="mt-3">
+                  <span className="text-[28px] font-black text-slate-900">82%</span>
+                </div>
+                <p className="mt-2 text-[12px] font-semibold text-emerald-600">
+                  📈 Better than 74% of peers
+                </p>
+              </div>
+
+              {/* Card 4: Mobile Usage */}
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Mobile Usage</span>
+                <div className="mt-3">
+                  <span className="text-[28px] font-black text-slate-900">82%</span>
+                </div>
+                <p className="mt-2 text-[12px] font-semibold text-slate-500">
+                  Top 5% globally
+                </p>
+              </div>
             </div>
           </div>
-        </article>
+        )}
 
-        <article className="rounded-[24px] border border-[#dfe6f7] bg-[#f7f9ff] p-6 shadow-[0_18px_42px_rgba(182,192,227,0.08)]">
-          <p className="text-[12px] text-[#4f63dc]">NEW</p>
-          <p className="mt-4 text-[15px] leading-7 text-[#667892]">
-            Average student engagement: duration during each session across all digital modules per session.
-          </p>
-          <div className="mt-12">
-            <span className="text-[64px] font-extrabold tracking-[-0.08em] text-[#172f54]">48.5</span>
-            <span className="ml-2 text-[22px] font-semibold text-[#172f54]">min</span>
-          </div>
-        </article>
-      </section>
+        {/* ========================================================= */}
+        {/* TAB 2: COURSE COMPLETION                                  */}
+        {/* ========================================================= */}
+        {activeTab === "course-completion" && (
+          <div className="space-y-6 animate-fadeIn">
+            {/* Top Control Bar: Date Filter + Export Buttons */}
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-end">
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowDatePickerModal(!showDatePickerModal)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-[14px] font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                >
+                  <Calendar className="h-4 w-4 text-slate-500" />
+                  <span>{dateFilter.period === "last_30_days" ? "Last 30 Days" : dateFilter.period === "last_7_days" ? "Last 7 Days" : dateFilter.period === "last_90_days" ? "Last 90 Days" : "Custom Date Range"}</span>
+                  <ChevronDown className="h-4 w-4 text-slate-400" />
+                </button>
 
-      <section className="rounded-[24px] border border-[#dfe6f7] bg-white p-6 shadow-[0_18px_42px_rgba(182,192,227,0.08)]">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[#0f8751]">Density Analysis</p>
-            <h3 className="mt-2 text-[22px] font-extrabold tracking-[-0.04em] text-[#172f54]">
-              Platform Activity by Hour &amp; Day
-            </h3>
-          </div>
-          <div className="flex items-center gap-4 text-[12px] font-bold uppercase tracking-[0.08em] text-[#98a2b6]">
-            <span className="flex items-center gap-2"><span className="h-3 w-3 rounded-full bg-[#e9ddff]" />Low</span>
-            <span className="flex items-center gap-2"><span className="h-3 w-3 rounded-full bg-[#8e74ff]" />Mid</span>
-            <span className="flex items-center gap-2"><span className="h-3 w-3 rounded-full bg-[#5b11d2]" />High</span>
-          </div>
-        </div>
-        <div className="mt-8">
-          <div className="mb-3 grid grid-cols-[60px_repeat(5,minmax(0,1fr))] gap-2 text-[11px] font-bold uppercase tracking-[0.08em] text-[#98a2b6]">
-            <span />
-            {["12AM", "6AM", "12PM", "6PM", "11PM"].map((hour) => (
-              <span key={hour}>{hour}</span>
-            ))}
-          </div>
-          <div className="space-y-1.5">
-            {heatmapRows.map((row, rowIndex) => (
-              <div key={rowIndex} className="grid grid-cols-[60px_repeat(5,minmax(0,1fr))] gap-2">
-                <span className="flex items-center text-[11px] font-bold uppercase tracking-[0.08em] text-[#98a2b6]">
-                  {rowIndex === 6 ? "Mon" : rowIndex === 20 ? "Wed" : rowIndex === 32 ? "Fri" : ""}
-                </span>
-                {row.map((shade, columnIndex) => (
-                  <div key={`${rowIndex}-${columnIndex}`} className={`h-5 rounded-[4px] ${shade}`} />
+                {showDatePickerModal && (
+                  <div className="absolute right-0 z-30 mt-2 w-64 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl">
+                    <p className="px-2 py-1 text-[11px] font-bold uppercase text-slate-400">Select Range</p>
+                    <button
+                      type="button"
+                      onClick={() => { setDateFilter({ ...dateFilter, period: "last_7_days" }); setShowDatePickerModal(false); }}
+                      className="w-full rounded-lg px-3 py-2 text-left text-[13px] font-semibold text-slate-700 hover:bg-slate-100"
+                    >
+                      Last 7 Days
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setDateFilter({ ...dateFilter, period: "last_30_days" }); setShowDatePickerModal(false); }}
+                      className="w-full rounded-lg px-3 py-2 text-left text-[13px] font-semibold text-slate-700 hover:bg-slate-100"
+                    >
+                      Last 30 Days
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setDateFilter({ ...dateFilter, period: "last_90_days" }); setShowDatePickerModal(false); }}
+                      className="w-full rounded-lg px-3 py-2 text-left text-[13px] font-semibold text-slate-700 hover:bg-slate-100"
+                    >
+                      Last 90 Days
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Export Button Group */}
+              <div className="flex items-center rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => handleExport("pdf")}
+                  className="rounded-lg bg-[#1b5e20] px-3.5 py-1.5 text-[12px] font-extrabold text-white shadow-sm hover:bg-[#144718]"
+                >
+                  PDF
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleExport("excel")}
+                  className="rounded-lg px-3.5 py-1.5 text-[12px] font-bold text-slate-600 hover:bg-slate-100"
+                >
+                  Excel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleExport("csv")}
+                  className="rounded-lg px-3.5 py-1.5 text-[12px] font-bold text-slate-600 hover:bg-slate-100"
+                >
+                  CSV
+                </button>
+              </div>
+            </div>
+
+            {/* Top 3 KPI Cards */}
+            <div className="grid gap-5 md:grid-cols-3">
+              {/* Card 1: Average Completion Rate */}
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-[12px] font-bold tracking-wider text-slate-500">Average Completion Rate</span>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-100 text-purple-600">
+                    <CheckCircle2 className="h-5 w-5" />
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <span className="text-[34px] font-black tracking-tight text-slate-900">
+                    {completionData?.metrics?.avgCompletionRate ?? "72%"}
+                  </span>
+                </div>
+                <p className="mt-2 text-[13px] font-semibold text-emerald-600">
+                  📈 {completionData?.metrics?.completionRateChange ?? "4.2% from last month"}
+                </p>
+              </div>
+
+              {/* Card 2: Total Course Enrollments */}
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-[12px] font-bold tracking-wider text-slate-500">Total Course Enrollments</span>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-[#1b5e20]">
+                    <UserPlus className="h-5 w-5" />
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <span className="text-[34px] font-black tracking-tight text-slate-900">
+                    {completionData?.metrics?.totalCourseEnrollments?.toLocaleString() ?? "1,240"}
+                  </span>
+                </div>
+                <p className="mt-2 text-[13px] font-semibold text-emerald-600">
+                  📈 {completionData?.metrics?.newTodayCount ?? 12} new today
+                </p>
+              </div>
+
+              {/* Card 3: Avg Platform Progress */}
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-[12px] font-bold tracking-wider text-slate-500">Avg. Platform Progress</span>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-pink-100 text-pink-600">
+                    <Star className="h-5 w-5" />
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <span className="text-[34px] font-black tracking-tight text-slate-900">
+                    {completionData?.metrics?.avgPlatformProgress ?? "12"}
+                  </span>
+                </div>
+                <p className="mt-2 text-[13px] font-semibold text-slate-500">
+                  {completionData?.metrics?.platformProgressNote ?? "Top 5% globally"}
+                </p>
+              </div>
+            </div>
+
+            {/* Middle Section: Completion Rate by Category */}
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm">
+              <h3 className="text-[18px] font-extrabold text-slate-900">Completion Rate by Category</h3>
+              <div className="mt-6 space-y-5">
+                {[
+                  { cat: "INFORMATION TECHNOLOGY", val: 82 },
+                  { cat: "BUSINESS MANAGEMENT", val: 64 },
+                  { cat: "LANGUAGE ARTS", val: 91 },
+                  { cat: "NATURAL SCIENCES", val: 45 },
+                ].map((item) => (
+                  <div key={item.cat} className="space-y-2">
+                    <div className="flex justify-between text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                      <span>{item.cat}</span>
+                      <span className="font-extrabold text-slate-900">{item.val}%</span>
+                    </div>
+                    <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+                      <div className="h-full rounded-full bg-[#1b5e20]" style={{ width: `${item.val}%` }} />
+                    </div>
+                  </div>
                 ))}
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <SectionCard
-        title="Top Engaged Students"
-        action={
-          <div className="flex items-center gap-3">
-            <button type="button" className="inline-flex h-10 w-10 items-center justify-center rounded-[12px] bg-[#f6f8fd] text-[#6c7f9b]">
-              <Filter className="h-4.5 w-4.5" strokeWidth={2.1} />
-            </button>
-            <button type="button" className="inline-flex h-10 w-10 items-center justify-center rounded-[12px] bg-[#f6f8fd] text-[#6c7f9b]">
-              <Download className="h-4.5 w-4.5" strokeWidth={2.1} />
-            </button>
-          </div>
-        }
-      >
-        <div className="hidden grid-cols-[1.45fr_1.15fr_0.7fr_0.85fr_0.8fr] gap-4 bg-[#fbfcff] px-7 py-4 text-[12px] font-extrabold uppercase tracking-[0.08em] text-[#9aa6ba] lg:grid">
-          <span>Course Title</span>
-          <span>Primary Institution</span>
-          <span>Total Hours</span>
-          <span>Critical Exit Point</span>
-          <span>Actions</span>
-        </div>
-        {studentLeaderboardRows.map((row) => (
-          <article
-            key={row.id}
-            className="grid gap-4 border-t border-[#edf1f7] px-5 py-5 sm:px-7 lg:grid-cols-[1.45fr_1.15fr_0.7fr_0.85fr_0.8fr] lg:items-center"
-          >
-            <div className="flex items-center gap-4">
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] bg-[linear-gradient(180deg,#a748ff_0%,#6a35ff_100%)] text-[14px] font-extrabold text-white">
-                AA
-              </span>
-              <div>
-                <p className="text-[17px] font-extrabold text-[#172f54]">{row.name}</p>
-                <p className="mt-1 text-[13px] text-[#7c8ba3]">{row.detail}</p>
-              </div>
             </div>
-            <p className="text-[15px] font-medium text-[#536781]">{row.institution}</p>
-            <p className="text-[15px] font-extrabold text-[#172f54]">{row.hours}</p>
-            <div className="flex items-center gap-3">
-              <div className="h-2 w-full max-w-[90px] overflow-hidden rounded-full bg-[#e7ecf5]">
-                <div className="h-full rounded-full bg-[#0f8751]" style={{ width: row.score }} />
-              </div>
-              <span className="text-[15px] font-extrabold text-[#172f54]">{row.score}</span>
-            </div>
-            <span className="inline-flex w-fit rounded-full bg-[#e5f7ef] px-3 py-1.5 text-[13px] font-extrabold uppercase tracking-[0.04em] text-[#0f8a4f]">
-              {row.action}
-            </span>
-          </article>
-        ))}
-        <div className="flex flex-col gap-4 border-t border-[#edf1f7] px-5 py-4 text-[15px] font-medium text-[#536781] sm:px-7 lg:flex-row lg:items-center lg:justify-between">
-          <p>Showing 1 to 5 of 12,840 certificates</p>
-          <Pager />
-        </div>
-      </SectionCard>
-    </div>
-  );
-}
 
-function RevenueView() {
-  return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-        <div>
-          <h2 className="text-[26px] font-extrabold tracking-[-0.05em] text-[#172f54]">Revenue</h2>
-          <p className="mt-2 max-w-[760px] text-[18px] leading-8 text-[#4f627e]">
-            Subscription health, payment throughput, and revenue retention insights across the portal.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            className="inline-flex h-12 items-center gap-2 rounded-[14px] border border-[#bfc8ff] bg-white px-5 text-[16px] font-semibold text-[#0f8751]"
-          >
-            <CalendarDays className="h-4.5 w-4.5" strokeWidth={2} />
-            OCT 2023 - JAN 2024
-            <ChevronDown className="h-4 w-4" strokeWidth={2} />
-          </button>
-          <button
-            type="button"
-            className="button-primary inline-flex h-12 items-center gap-2 rounded-[14px] bg-[#4b8a60] px-6 text-[16px] font-semibold text-white"
-          >
-            <Download className="h-4.5 w-4.5" strokeWidth={2} />
-            Export Data
-          </button>
-        </div>
-      </div>
-
-      <section className="grid gap-5 xl:grid-cols-3">
-        <ReportMetricCard title="Monthly Recurring Revenue" value="$482,904" note="+12%" />
-        <ReportMetricCard title="Average Revenue Per User" value="$142.50" note="Plan optimization required" noteClassName="text-[#ff7d1a]" />
-        <ReportMetricCard title="Global Average Retention Rate: 1.8%" value="98.2%" note="High Health Score" noteClassName="text-[#0f8751]" />
-      </section>
-
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.65fr)_400px]">
-        <SectionCard
-          title="Recent Transactions"
-          action={
-            <button type="button" className="text-[16px] font-extrabold text-[#0f8751]">
-              View All Records →
-            </button>
-          }
-        >
-          <div className="hidden grid-cols-[1.55fr_1fr_0.8fr_0.9fr_0.8fr] gap-4 bg-[#fbfcff] px-7 py-4 text-[12px] font-extrabold uppercase tracking-[0.08em] text-[#9aa6ba] lg:grid">
-            <span>Entity</span>
-            <span>Plan Type</span>
-            <span>Date</span>
-            <span>Amount</span>
-            <span>Status</span>
-          </div>
-          {revenueRows.map((row) => (
-            <article
-              key={row.id}
-              className="grid gap-4 border-t border-[#edf1f7] px-5 py-5 sm:px-7 lg:grid-cols-[1.55fr_1fr_0.8fr_0.9fr_0.8fr] lg:items-center"
-            >
-              <div className="flex items-center gap-4">
-                <span className="inline-flex h-12 w-12 items-center justify-center rounded-[10px] bg-[linear-gradient(180deg,#a748ff_0%,#6a35ff_100%)] text-[16px] font-extrabold text-white">
-                  GS
-                </span>
-                <div>
-                  <p className="text-[17px] font-extrabold text-[#172f54]">{row.entity}</p>
-                  <p className="mt-1 text-[14px] text-[#7c8ba3]">{row.owner}</p>
+            {/* Bottom Section: Student Progress Details Table */}
+            <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+              <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
+                <h3 className="text-[18px] font-extrabold text-slate-900">Student Progress Details</h3>
+                <div className="flex items-center rounded-xl border border-slate-200 bg-white p-1">
+                  <button type="button" onClick={() => handleExport("pdf")} className="flex items-center gap-1 px-3 py-1 text-[12px] font-bold text-slate-700 hover:bg-slate-50">
+                    <FileText className="h-3.5 w-3.5 text-slate-400" /> PDF
+                  </button>
+                  <button type="button" onClick={() => handleExport("excel")} className="flex items-center gap-1 border-l border-slate-200 px-3 py-1 text-[12px] font-bold text-slate-700 hover:bg-slate-50">
+                    <FileSpreadsheet className="h-3.5 w-3.5 text-slate-400" /> Excel
+                  </button>
+                  <button type="button" onClick={() => handleExport("csv")} className="flex items-center gap-1 border-l border-slate-200 px-3 py-1 text-[12px] font-bold text-slate-700 hover:bg-slate-50">
+                    <Download className="h-3.5 w-3.5 text-slate-400" /> CSV
+                  </button>
                 </div>
               </div>
-              <p className="text-[16px] font-bold text-[#536781]">{row.plan}</p>
-              <p className="text-[16px] font-medium text-[#536781]">{row.date}</p>
-              <p className="text-[16px] font-extrabold text-[#172f54]">{row.amount}</p>
-              <span className={`inline-flex w-fit rounded-full px-3 py-1.5 text-[13px] font-extrabold uppercase tracking-[0.04em] ${row.statusClassName}`}>
-                {row.status}
-              </span>
-            </article>
-          ))}
-        </SectionCard>
 
-        <article className="rounded-[24px] border border-[#dfe6f7] bg-white p-6 shadow-[0_18px_42px_rgba(182,192,227,0.08)]">
-          <h3 className="text-[22px] font-extrabold tracking-[-0.04em] text-[#172f54]">Student Registrations</h3>
-          <div className="mt-8 flex justify-center">
-            <div className="relative flex h-[270px] w-[270px] items-center justify-center rounded-full bg-[conic-gradient(#1916be_0_285deg,#e76b49_285deg_360deg)] shadow-[0_18px_42px_rgba(182,192,227,0.08)]">
-              <div className="flex h-[146px] w-[146px] flex-col items-center justify-center rounded-full bg-white">
-                <span className="text-[54px] font-extrabold tracking-[-0.07em] text-[#3e3e3e]">75%</span>
-                <span className="mt-1 text-[15px] font-medium uppercase tracking-[0.08em] text-[#6d7f98]">Schools</span>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-[14px]">
+                  <thead className="bg-slate-50/70 text-[11px] font-bold tracking-wider text-slate-400 uppercase border-b border-slate-100">
+                    <tr>
+                      <th className="px-6 py-3.5">Student Name</th>
+                      <th className="px-6 py-3.5">Category</th>
+                      <th className="px-6 py-3.5">Total Enrolled</th>
+                      <th className="px-6 py-3.5">Progress</th>
+                      <th className="px-6 py-3.5">Quiz Score</th>
+                      <th className="px-6 py-3.5">Last Active</th>
+                      <th className="px-6 py-3.5 text-right">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {(completionData?.studentProgressDetails ?? [
+                      { id: "CS-101", name: "Intro to Cyber Security", category: "TECHNOLOGY", totalEnrolled: 450, progress: 380, quizScore: 70, lastActiveProgress: 85, statusScore: "88/100" },
+                      { id: "CS-101", name: "Intro to Cyber Security", category: "BUSINESS", totalEnrolled: 450, progress: 380, quizScore: 70, lastActiveProgress: 85, statusScore: "88/100" },
+                      { id: "CS-101", name: "Intro to Cyber Security", category: "MARKETING", totalEnrolled: 450, progress: 380, quizScore: 70, lastActiveProgress: 85, statusScore: "88/100" },
+                      { id: "CS-101", name: "Intro to Cyber Security", category: "TECHNOLOGY", totalEnrolled: 450, progress: 380, quizScore: 70, lastActiveProgress: 85, statusScore: "88/100" },
+                      { id: "CS-101", name: "Intro to Cyber Security", category: "TECHNOLOGY", totalEnrolled: 450, progress: 380, quizScore: 70, lastActiveProgress: 85, statusScore: "88/100" },
+                    ]).map((row: any, idx: number) => (
+                      <tr key={`${row.name}-${idx}`} className="hover:bg-slate-50/60">
+                        <td className="px-6 py-4">
+                          <div>
+                            <p className="font-bold text-slate-900">{row.name}</p>
+                            <p className="text-[12px] font-semibold text-slate-400">ID: {row.id}</p>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="rounded-full bg-blue-50 px-3 py-1 text-[11px] font-extrabold uppercase text-blue-700">
+                            {row.category}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 font-semibold text-slate-700">{row.totalEnrolled}</td>
+                        <td className="px-6 py-4 font-bold text-emerald-600">{row.progress}</td>
+                        <td className="px-6 py-4 font-bold text-rose-500">{row.quizScore}</td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="h-2 w-20 overflow-hidden rounded-full bg-slate-100">
+                              <div className="h-full rounded-full bg-[#1b5e20]" style={{ width: `${row.lastActiveProgress}%` }} />
+                            </div>
+                            <span className="text-[12px] font-bold text-slate-700">{row.lastActiveProgress}%</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-right font-black text-slate-900">{row.statusScore}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-              <div className="absolute left-5 top-[74px] rounded-[12px] bg-[#2e2f35] px-3 py-3 text-[16px] font-extrabold text-white">45%</div>
-              <div className="absolute right-4 top-[120px] rounded-[12px] bg-[#2e2f35] px-3 py-3 text-[16px] font-extrabold text-white">79%</div>
-            </div>
-          </div>
-          <div className="mt-8 space-y-6">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <span className="h-6 w-6 rounded-[4px] bg-[#e76b49]" />
-                <span className="text-[18px] font-semibold text-[#172f54]">School Subscriptions</span>
+
+              {/* Table Footer / Pagination */}
+              <div className="flex items-center justify-between border-t border-slate-100 px-6 py-4">
+                <span className="text-[13px] font-medium text-slate-500">Showing 1-10 of 42 courses</span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={completionPage === 1}
+                    onClick={() => setCompletionPage((p) => Math.max(1, p - 1))}
+                    className="rounded-lg border border-slate-200 px-3 py-1 text-[13px] font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+                  >
+                    Previous
+                  </button>
+                  <button type="button" className="rounded-lg bg-[#1b5e20] px-3 py-1 text-[13px] font-bold text-white">1</button>
+                  <button type="button" className="rounded-lg px-3 py-1 text-[13px] font-semibold text-slate-600 hover:bg-slate-50">2</button>
+                  <button type="button" className="rounded-lg px-3 py-1 text-[13px] font-semibold text-slate-600 hover:bg-slate-50">3</button>
+                  <button
+                    type="button"
+                    onClick={() => setCompletionPage((p) => p + 1)}
+                    className="rounded-lg border border-slate-200 px-3 py-1 text-[13px] font-semibold text-slate-600 hover:bg-slate-50"
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
-              <span className="text-[22px] font-extrabold tracking-[-0.04em] text-[#172f54]">$362,178</span>
             </div>
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <span className="h-6 w-6 rounded-[4px] bg-[#1916be]" />
-                <span className="text-[18px] font-semibold text-[#172f54]">Individual Plans</span>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* TAB 3: LEARNING ACTIVITY                                  */}
+        {/* ========================================================= */}
+        {activeTab === "learning-activity" && (
+          <div className="space-y-6 animate-fadeIn">
+            {/* Top Control Bar: Date Filter + Export Buttons */}
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-end">
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowDatePickerModal(!showDatePickerModal)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-[14px] font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                >
+                  <Calendar className="h-4 w-4 text-slate-500" />
+                  <span>{dateFilter.period === "last_30_days" ? "Last 30 Days" : "Custom Date Range"}</span>
+                  <ChevronDown className="h-4 w-4 text-slate-400" />
+                </button>
               </div>
-              <span className="text-[22px] font-extrabold tracking-[-0.04em] text-[#172f54]">$120,726</span>
+
+              {/* Export Button Group */}
+              <div className="flex items-center rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => handleExport("pdf")}
+                  className="rounded-lg bg-[#1b5e20] px-3.5 py-1.5 text-[12px] font-extrabold text-white shadow-sm hover:bg-[#144718]"
+                >
+                  PDF
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleExport("excel")}
+                  className="rounded-lg px-3.5 py-1.5 text-[12px] font-bold text-slate-600 hover:bg-slate-100"
+                >
+                  Excel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleExport("csv")}
+                  className="rounded-lg px-3.5 py-1.5 text-[12px] font-bold text-slate-600 hover:bg-slate-100"
+                >
+                  CSV
+                </button>
+              </div>
+            </div>
+
+            {/* Top 3 KPI Cards */}
+            <div className="grid gap-5 md:grid-cols-3">
+              {/* Card 1: Avg Daily Active Students */}
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-[12px] font-bold tracking-wider text-slate-500">Avg. Daily Active Students</span>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-100 text-purple-600">
+                    <UserCheck className="h-5 w-5" />
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <span className="text-[34px] font-black tracking-tight text-slate-900">
+                    {activityData?.metrics?.avgDailyActiveStudents ?? "842"}
+                  </span>
+                </div>
+                <p className="mt-2 text-[13px] font-semibold text-emerald-600">
+                  📈 {activityData?.metrics?.activeChange ?? "+12.4% from last month"}
+                </p>
+              </div>
+
+              {/* Card 2: Peak Activity Time */}
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-[12px] font-bold tracking-wider text-slate-500">Peak Activity Time</span>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
+                    <Clock className="h-5 w-5" />
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <span className="text-[34px] font-black tracking-tight text-slate-900">
+                    {activityData?.metrics?.peakActivityTime ?? "10:00 AM"}
+                  </span>
+                </div>
+                <p className="mt-2 text-[13px] font-semibold text-slate-500">
+                  📈 {activityData?.metrics?.peakNote ?? "Most active during school hours"}
+                </p>
+              </div>
+
+              {/* Card 3: Total Learning Hours (Month) */}
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-[12px] font-bold tracking-wider text-slate-500">Total Learning Hours (Month)</span>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-pink-100 text-pink-600">
+                    <Timer className="h-5 w-5" />
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <span className="text-[34px] font-black tracking-tight text-slate-900">
+                    {activityData?.metrics?.totalLearningHoursMonth ?? "14,280"}
+                  </span>
+                </div>
+                <p className="mt-2 text-[13px] font-semibold text-emerald-600">
+                  📈 {activityData?.metrics?.newHoursThisWeek ?? "850 hrs new this week"}
+                </p>
+              </div>
+            </div>
+
+            {/* Middle Section: Weekly Chart (Left) + Activity by Time of Day (Right) */}
+            <div className="grid gap-6 lg:grid-cols-12">
+              {/* Left Panel: Learning Activity (Weekly) */}
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm lg:col-span-7">
+                <h3 className="text-[18px] font-extrabold text-slate-900">Learning Activity (Weekly)</h3>
+                <div className="mt-8 flex h-56 items-end justify-between gap-3 px-4">
+                  {[
+                    { day: "Mon", val: 25 },
+                    { day: "Tue", val: 45 },
+                    { day: "Wed", val: 75 },
+                    { day: "Thur", val: 40 },
+                    { day: "Fri", val: 55 },
+                    { day: "Sat", val: 95 },
+                    { day: "Sun", val: 45 },
+                  ].map((bar) => (
+                    <div key={bar.day} className="flex flex-1 flex-col items-center gap-2">
+                      <div className="w-full rounded-md bg-emerald-200 transition-all hover:bg-[#1b5e20]" style={{ height: `${bar.val}%` }} />
+                      <span className="text-[12px] font-bold text-slate-400">{bar.day}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Right Panel: Activity by Time of Day */}
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm lg:col-span-5 space-y-5">
+                <h3 className="text-[18px] font-extrabold text-slate-900">Activity by Time of Day</h3>
+                <div className="space-y-4">
+                  {[
+                    { time: "MORNING (6AM - 12PM)", val: 82 },
+                    { time: "AFTERNOON (12PM - 6PM)", val: 64 },
+                    { time: "EVENING (6PM - 12AM)", val: 91 },
+                    { time: "LATE NIGHT (12AM - 6AM)", val: 45 },
+                  ].map((slot) => (
+                    <div key={slot.time} className="space-y-1.5">
+                      <div className="flex justify-between text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                        <span>{slot.time}</span>
+                        <span className="font-extrabold text-slate-900">{slot.val}%</span>
+                      </div>
+                      <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+                        <div className="h-full rounded-full bg-[#1b5e20]" style={{ width: `${slot.val}%` }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Callout Box */}
+                <div className="rounded-xl border border-sky-100 bg-sky-50/70 p-4 text-[13px] font-medium leading-relaxed text-sky-800 flex items-start gap-2.5">
+                  <Info className="h-4 w-4 shrink-0 mt-0.5 text-sky-600" />
+                  <span>
+                    {activityData?.timeOfDayCallout ?? "Activity peaks during morning study sessions, with a secondary surge in the early afternoon."}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Section: Student Progress Details Table */}
+            <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+              <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
+                <h3 className="text-[18px] font-extrabold text-slate-900">Student Progress Details</h3>
+                <div className="flex items-center rounded-xl border border-slate-200 bg-white p-1">
+                  <button type="button" onClick={() => handleExport("pdf")} className="flex items-center gap-1 px-3 py-1 text-[12px] font-bold text-slate-700 hover:bg-slate-50">
+                    <FileText className="h-3.5 w-3.5 text-slate-400" /> PDF
+                  </button>
+                  <button type="button" onClick={() => handleExport("excel")} className="flex items-center gap-1 border-l border-slate-200 px-3 py-1 text-[12px] font-bold text-slate-700 hover:bg-slate-50">
+                    <FileSpreadsheet className="h-3.5 w-3.5 text-slate-400" /> Excel
+                  </button>
+                  <button type="button" onClick={() => handleExport("csv")} className="flex items-center gap-1 border-l border-slate-200 px-3 py-1 text-[12px] font-bold text-slate-700 hover:bg-slate-50">
+                    <Download className="h-3.5 w-3.5 text-slate-400" /> CSV
+                  </button>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-[14px]">
+                  <thead className="bg-slate-50/70 text-[11px] font-bold tracking-wider text-slate-400 uppercase border-b border-slate-100">
+                    <tr>
+                      <th className="px-6 py-3.5">Student Name</th>
+                      <th className="px-6 py-3.5">Category</th>
+                      <th className="px-6 py-3.5">Total Enrolled</th>
+                      <th className="px-6 py-3.5">Progress</th>
+                      <th className="px-6 py-3.5">Quiz Score</th>
+                      <th className="px-6 py-3.5 text-right">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {(activityData?.studentProgressDetails ?? [
+                      { id: "CS-101", name: "Emma Montgomery", category: "GRADE 12-A", totalEnrolled: 42.5, progress: "16/12", quizScore: "2 mins ago", status: "Online" },
+                      { id: "CS-101", name: "Emma Montgomery", category: "GRADE 11-B", totalEnrolled: 42.5, progress: "20/12", quizScore: "45 mins ago", status: "Away" },
+                      { id: "CS-101", name: "Emma Montgomery", category: "GRADE 12-A", totalEnrolled: 42.5, progress: "16/12", quizScore: "Yesterday", status: "Offline" },
+                      { id: "CS-101", name: "Emma Montgomery", category: "GRADE 10-C", totalEnrolled: 42.5, progress: "16/12", quizScore: "2 mins ago", status: "Online" },
+                      { id: "CS-101", name: "Emma Montgomery", category: "GRADE 12-A", totalEnrolled: 42.5, progress: "4/12", quizScore: "2 mins ago", status: "Online" },
+                    ]).map((row: any, idx: number) => (
+                      <tr key={`${row.name}-${idx}`} className="hover:bg-slate-50/60">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-600 text-[12px] font-bold text-white">
+                              EM
+                            </div>
+                            <div>
+                              <p className="font-bold text-slate-900">{row.name}</p>
+                              <p className="text-[12px] font-semibold text-slate-400">ID: {row.id}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="rounded-full bg-purple-50 px-3 py-1 text-[11px] font-extrabold uppercase text-purple-700">
+                            {row.category}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 font-semibold text-slate-700">{row.totalEnrolled}</td>
+                        <td className="px-6 py-4 font-bold text-emerald-600">{row.progress}</td>
+                        <td className="px-6 py-4 font-medium text-slate-600">{row.quizScore}</td>
+                        <td className="px-6 py-4 text-right">
+                          <span className="inline-flex items-center gap-1.5 text-[12px] font-bold">
+                            <span
+                              className={`h-2 w-2 rounded-full ${
+                                row.status === "Online"
+                                  ? "bg-emerald-500"
+                                  : row.status === "Away"
+                                    ? "bg-slate-400"
+                                    : "bg-rose-500"
+                              }`}
+                            />
+                            <span
+                              className={
+                                row.status === "Online"
+                                  ? "text-emerald-700"
+                                  : row.status === "Away"
+                                    ? "text-slate-500"
+                                    : "text-rose-600"
+                              }
+                            >
+                              {row.status}
+                            </span>
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Table Footer / Pagination */}
+              <div className="flex items-center justify-between border-t border-slate-100 px-6 py-4">
+                <span className="text-[13px] font-medium text-slate-500">Showing 1-10 of 42 courses</span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={activityPage === 1}
+                    onClick={() => setActivityPage((p) => Math.max(1, p - 1))}
+                    className="rounded-lg border border-slate-200 px-3 py-1 text-[13px] font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+                  >
+                    Previous
+                  </button>
+                  <button type="button" className="rounded-lg bg-[#1b5e20] px-3 py-1 text-[13px] font-bold text-white">1</button>
+                  <button type="button" className="rounded-lg px-3 py-1 text-[13px] font-semibold text-slate-600 hover:bg-slate-50">2</button>
+                  <button type="button" className="rounded-lg px-3 py-1 text-[13px] font-semibold text-slate-600 hover:bg-slate-50">3</button>
+                  <button
+                    type="button"
+                    onClick={() => setActivityPage((p) => p + 1)}
+                    className="rounded-lg border border-slate-200 px-3 py-1 text-[13px] font-semibold text-slate-600 hover:bg-slate-50"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
-        </article>
-      </section>
-    </div>
-  );
-}
+        )}
 
-export default function ReportsManagementPage() {
-  const [activeTab, setActiveTab] = useState<ReportTab>("school-usage");
-
-  const heading = reportTabs.find((tab) => tab.key === activeTab)?.label ?? "Reports";
-
-  return (
-    <AppShell title="Reports Management" activeSection="reports" contentClassName="px-4 py-5 sm:px-6 lg:px-9 lg:py-8">
-      <div className="mx-auto">
-        <div className="border-b border-[#e7ebf7]">
-          <div className="flex flex-wrap items-center gap-8">
-            {reportTabs.map((tab) => (
-              <ReportTabButton
-                key={tab.key}
-                label={tab.label}
-                active={tab.key === activeTab}
-                onClick={() => setActiveTab(tab.key)}
-              />
-            ))}
-          </div>
-        </div>
-
-        {activeTab === "school-usage" ? (
-          <div className="mt-10">
-            <div className="mb-8">
-              <h2 className="text-[26px] font-extrabold tracking-[-0.05em] text-[#172f54]">{heading}</h2>
-              <p className="mt-2 max-w-[720px] text-[18px] leading-8 text-[#4f627e]">
-                Generate and export platform-wide performance analytics.
-              </p>
-            </div>
-            <SchoolUsageView />
-          </div>
-        ) : null}
-
-        {activeTab === "course-performance" ? <div className="mt-10"><CoursePerformanceView /></div> : null}
-        {activeTab === "student-activity" ? <div className="mt-10"><StudentActivityView /></div> : null}
-        {activeTab === "revenue" ? <div className="mt-10"><RevenueView /></div> : null}
       </div>
     </AppShell>
   );
