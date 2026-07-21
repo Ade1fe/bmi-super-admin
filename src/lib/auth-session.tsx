@@ -228,7 +228,7 @@ export function getSessionProfileName(session: AuthSession | null) {
     return session.school.name;
   }
 
-  return "Naomi Tan";
+  return "Admin User";
 }
 
 export function getSessionProfileRole(session: AuthSession | null) {
