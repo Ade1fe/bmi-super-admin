@@ -33,7 +33,7 @@ interface DateFilterState {
 }
 
 export default function SuperAdminReportsPage() {
-  const { session } = useAuthSession();
+  const { session, isHydrated } = useAuthSession();
   const token = session?.token;
 
   const [activeTab, setActiveTab] = useState<ReportTab>("competitive-insight");
@@ -60,6 +60,12 @@ export default function SuperAdminReportsPage() {
   // Fetch Competitive Insight Data
   useEffect(() => {
     if (activeTab !== "competitive-insight") return;
+    if (!isHydrated) return;
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+
     let isSubscribed = true;
     setLoading(true);
 
@@ -81,11 +87,17 @@ export default function SuperAdminReportsPage() {
     return () => {
       isSubscribed = false;
     };
-  }, [activeTab, levelFilter, token]);
+  }, [activeTab, levelFilter, token, isHydrated]);
 
   // Fetch Course Completion Data
   useEffect(() => {
     if (activeTab !== "course-completion") return;
+    if (!isHydrated) return;
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+
     let isSubscribed = true;
     setLoading(true);
 
@@ -113,11 +125,17 @@ export default function SuperAdminReportsPage() {
     return () => {
       isSubscribed = false;
     };
-  }, [activeTab, dateFilter, completionPage, token]);
+  }, [activeTab, dateFilter, completionPage, token, isHydrated]);
 
   // Fetch Learning Activity Data
   useEffect(() => {
     if (activeTab !== "learning-activity") return;
+    if (!isHydrated) return;
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+
     let isSubscribed = true;
     setLoading(true);
 
@@ -145,7 +163,7 @@ export default function SuperAdminReportsPage() {
     return () => {
       isSubscribed = false;
     };
-  }, [activeTab, dateFilter, activityPage, token]);
+  }, [activeTab, dateFilter, activityPage, token, isHydrated]);
 
   // Handle Export (CSV / Excel / PDF)
   const handleExport = async (format: "csv" | "excel" | "pdf") => {
@@ -182,8 +200,8 @@ export default function SuperAdminReportsPage() {
   };
 
   return (
-    <AppShell title="Super Admin Reports" activeSection="reports" contentClassName="px-4 py-5 sm:px-6 lg:px-9 lg:py-8 bg-[#f8fafc] min-h-screen">
-      <div className="mx-auto max-w-7xl space-y-6">
+    <AppShell title="Super Admin Reports" activeSection="reports" contentClassName="px-4 py-5 sm:px-6 lg:px-9 lg:py-8 lg:pb-20 bg-[#f8fafc] min-h-screen">
+      <div className="mx-auto max-w-7xl space-y-6 pb-16 sm:pb-24">
         
         {/* Top Tab Bar Navigation matching Design Specs */}
         <div className="flex items-center gap-3 border-b border-slate-200/80 pb-4">
@@ -226,7 +244,7 @@ export default function SuperAdminReportsPage() {
         {/* TAB 1: COMPETITIVE INSIGHT                                */}
         {/* ========================================================= */}
         {activeTab === "competitive-insight" && (
-          <div className="space-y-6 animate-fadeIn">
+          <div className="space-y-6 animate-fadeIn pb-12 sm:pb-16">
             {/* Top 3 KPI Cards */}
             <div className="grid gap-5 md:grid-cols-3">
               {/* Card 1: Global Rank */}
@@ -496,7 +514,7 @@ export default function SuperAdminReportsPage() {
         {/* TAB 2: COURSE COMPLETION                                  */}
         {/* ========================================================= */}
         {activeTab === "course-completion" && (
-          <div className="space-y-6 animate-fadeIn">
+          <div className="space-y-6 animate-fadeIn pb-12 sm:pb-16">
             {/* Top Control Bar: Date Filter + Export Buttons */}
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-end">
               <div className="relative">
@@ -744,7 +762,7 @@ export default function SuperAdminReportsPage() {
         {/* TAB 3: LEARNING ACTIVITY                                  */}
         {/* ========================================================= */}
         {activeTab === "learning-activity" && (
-          <div className="space-y-6 animate-fadeIn">
+          <div className="space-y-6 animate-fadeIn pb-12 sm:pb-16">
             {/* Top Control Bar: Date Filter + Export Buttons */}
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-end">
               <div className="relative">
