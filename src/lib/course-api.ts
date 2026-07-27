@@ -1021,3 +1021,122 @@ export async function removeLessonPrerequisite(
 ): Promise<void> {
   console.warn("removeLessonPrerequisite: Backend endpoint not yet implemented");
 }
+
+/**
+ * POST /file-upload/image
+ * Uploads an image file (e.g. course thumbnail) to the backend storage.
+ */
+export async function uploadImageFile(
+  file: File,
+  authToken?: string
+): Promise<string> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const url = endpoints.fileUpload.image;
+  if (!url) {
+    throw new Error("API URL is not configured.");
+  }
+
+  const headers: HeadersInit = {};
+  if (authToken) {
+    headers["Authorization"] = `Bearer ${authToken}`;
+  }
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers,
+    body: formData,
+  });
+
+  if (!response.ok) {
+    let message = `Upload failed with status ${response.status}`;
+    try {
+      const payload = await response.json();
+      message = payload.message || payload.error || message;
+    } catch {
+      // Ignore JSON parse error
+    }
+    throw new Error(message);
+  }
+
+  const payload = await response.json();
+  const fileObj = payload?.file || payload?.data?.file || payload;
+  const location =
+    fileObj?.uploadedFileLocation ||
+    fileObj?.secureUrl ||
+    fileObj?.url ||
+    payload?.url;
+
+  if (typeof location === "string" && location.trim()) {
+    return location.trim();
+  }
+
+  throw new Error("Unable to read uploaded file location from server response.");
+}
+
+/**
+ * POST /file-upload/file or /file-upload/image
+ * Uploads any document/media file (e.g. PDF, DOCX, MP4) to backend storage.
+ */
+export async function uploadGenericFile(
+  file: File,
+  authToken?: string
+): Promise<string> {
+  const isImage = file.type.startsWith("image/");
+  const endpointUrl = isImage
+    ? endpoints.fileUpload.image
+    : endpoints.fileUpload.file;
+
+  if (!endpointUrl) {
+    throw new Error("File upload endpoint URL is not configured.");
+  }
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const headers: HeadersInit = {};
+  if (authToken) {
+    headers["Authorization"] = `Bearer ${authToken}`;
+  }
+
+  let response = await fetch(endpointUrl, {
+    method: "POST",
+    headers,
+    body: formData,
+  });
+
+  // If /file-upload/file fails or isn't accepting file type, try /file-upload/image as fallback
+  if (!response.ok && !isImage && endpoints.fileUpload.image) {
+    response = await fetch(endpoints.fileUpload.image, {
+      method: "POST",
+      headers,
+      body: formData,
+    });
+  }
+
+  if (!response.ok) {
+    let message = `Upload failed with status ${response.status}`;
+    try {
+      const payload = await response.json();
+      message = payload.message || payload.error || message;
+    } catch {
+      // Ignore JSON parse error
+    }
+    throw new Error(message);
+  }
+
+  const payload = await response.json();
+  const fileObj = payload?.file || payload?.data?.file || payload;
+  const location =
+    fileObj?.uploadedFileLocation ||
+    fileObj?.secureUrl ||
+    fileObj?.url ||
+    payload?.url;
+
+  if (typeof location === "string" && location.trim()) {
+    return location.trim();
+  }
+
+  throw new Error("Unable to read uploaded file location from server response.");
+}

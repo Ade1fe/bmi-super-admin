@@ -486,6 +486,10 @@ payments: {
     testSmtp: buildEndpoint(apiBaseUrl, "/admin/settings/test-smtp"),
   },
 
+  fileUpload: {
+    image: buildEndpoint(apiBaseUrl, "/file-upload/image"),
+    file: buildEndpoint(apiBaseUrl, "/file-upload/file"),
+  },
 };
 
 export async function apiRequest<TResponse>(

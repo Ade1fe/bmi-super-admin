@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { use, useEffect, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useRef, useState } from "react";
 import {
   BookOpen,
   ChevronDown,
@@ -15,6 +15,7 @@ import {
   AlertCircle,
   CheckCircle,
   RefreshCw,
+  Upload,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { CourseActionLink, CoursePageTitle } from "@/components/course-flow";
@@ -23,6 +24,7 @@ import {
   deleteModule,
   fetchModules,
   getCourseBySlug,
+  uploadImageFile,
   type Course,
   type CourseModule,
   createObjective,
@@ -47,6 +49,7 @@ export default function EditCoursePage({
   params: Promise<{ slug: string }>;
 }) {
   const { session, isHydrated } = useAuthSession();
+  const editFileInputRef = useRef<HTMLInputElement>(null);
   const { slug } = use(params);
   const [course, setCourse] = useState<Course | null>(null);
   const [modules, setModules] = useState<CourseModule[]>([]);
@@ -61,6 +64,8 @@ export default function EditCoursePage({
   const [courseName, setCourseName] = useState("");
   const [courseDescription, setCourseDescription] = useState("");
   const [courseStatus, setCourseStatus] = useState("");
+  const [courseThumbnailUrl, setCourseThumbnailUrl] = useState("");
+  const [isUploadingThumbnail, setIsUploadingThumbnail] = useState(false);
 
   // ═══════════════════════════════════════════════════════════════════════
   // OBJECTIVES STATE
@@ -116,6 +121,7 @@ export default function EditCoursePage({
         setCourseName(fetchedCourse.name ?? "");
         setCourseDescription(fetchedCourse.description ?? "");
         setCourseStatus(fetchedCourse.status ?? "");
+        setCourseThumbnailUrl(fetchedCourse.thumbnailUrl ?? "");
         setModules(fetchedModules);
       } catch (err) {
         if (!active) {
@@ -283,6 +289,7 @@ export default function EditCoursePage({
             name: courseName,
             description: courseDescription,
             status: courseStatus,
+            thumbnailUrl: courseThumbnailUrl,
           },
         }
       );
@@ -653,6 +660,60 @@ export default function EditCoursePage({
                   <option value="published">Published</option>
                   <option value="archived">Archived</option>
                 </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold">
+                  Course Thumbnail
+                </label>
+
+                <input
+                  ref={editFileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/jpg,image/webp"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setIsUploadingThumbnail(true);
+                    try {
+                      const local = URL.createObjectURL(file);
+                      setCourseThumbnailUrl(local);
+                      const url = await uploadImageFile(file, session?.token);
+                      setCourseThumbnailUrl(url);
+                    } catch (err) {
+                      console.error("Thumbnail upload failed:", err);
+                    } finally {
+                      setIsUploadingThumbnail(false);
+                    }
+                  }}
+                />
+
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                  {courseThumbnailUrl ? (
+                    <img
+                      src={courseThumbnailUrl}
+                      alt="Thumbnail Preview"
+                      className="h-16 w-24 rounded-lg border object-cover shrink-0"
+                    />
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => editFileInputRef.current?.click()}
+                    disabled={isUploadingThumbnail}
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-gray-300 px-4 text-sm font-semibold text-[#16345d] hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    <Upload className="h-4 w-4" />
+                    {isUploadingThumbnail ? "Uploading..." : "Upload Image"}
+                  </button>
+                  <input
+                    type="text"
+                    placeholder="Or paste image URL"
+                    value={courseThumbnailUrl}
+                    onChange={(e) => setCourseThumbnailUrl(e.target.value)}
+                    className="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#16345d]"
+                  />
+                </div>
               </div>
 
               <div className="flex justify-end gap-3 pt-4">

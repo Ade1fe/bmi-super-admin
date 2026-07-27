@@ -1,7 +1,7 @@
 "use client";
 
-import { Upload } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Upload, Loader2, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import {
@@ -16,6 +16,7 @@ import { useAuthSession } from "@/lib/auth-session";
 import {
   createCourse,
   getCategories,
+  uploadImageFile,
   type ApiCourseCategory,
   type CourseDifficultyLevel,
 } from "@/lib/course-api";
@@ -41,11 +42,15 @@ function extractCreatedCourseId(response: unknown) {
 export default function CreateCoursePage() {
   const router = useRouter();
   const { session, isHydrated } = useAuthSession();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [difficultyLevel, setDifficultyLevel] = useState<CourseDifficultyLevel>("beginner");
   const [description, setDescription] = useState("");
   const [thumbnailUrl, setThumbnailUrl] = useState("");
+  const [isUploadingThumbnail, setIsUploadingThumbnail] = useState(false);
+  const [thumbnailUploadError, setThumbnailUploadError] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const [categories, setCategories] = useState<ApiCourseCategory[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -74,6 +79,41 @@ export default function CreateCoursePage() {
     fetchCourseCategories();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isHydrated, session?.token]);
+
+  async function handleFileSelected(file: File) {
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setThumbnailUploadError("Please select a valid image file (JPG, PNG, WebP).");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setThumbnailUploadError("Image size exceeds the 5MB limit.");
+      return;
+    }
+
+    setThumbnailUploadError(null);
+
+    // Instant local preview
+    const localPreview = URL.createObjectURL(file);
+    setThumbnailUrl(localPreview);
+    setIsUploadingThumbnail(true);
+
+    try {
+      const uploadedUrl = await uploadImageFile(file, session?.token);
+      setThumbnailUrl(uploadedUrl);
+    } catch (err) {
+      console.error("Thumbnail upload failed:", err);
+      setThumbnailUploadError(
+        err instanceof Error
+          ? err.message
+          : "Failed to upload thumbnail to server. Using local preview."
+      );
+    } finally {
+      setIsUploadingThumbnail(false);
+    }
+  }
 
   async function handleSaveCourse(continueToContent = false) {
     if (!name.trim()) {
@@ -223,13 +263,83 @@ export default function CreateCoursePage() {
                 Course Thumbnail
               </h2>
 
-              <label className="mt-8 flex min-h-[220px] cursor-pointer flex-col items-center justify-center rounded-[24px] border-2 border-dashed border-[#bfe6d2] bg-[#f1fdf6] px-6 text-center">
-                <Upload className="h-12 w-12 text-[#0f8751]" strokeWidth={2.2} />
-                <span className="mt-5 text-[18px] font-semibold text-[#41597c]">
-                  Click to upload or drag and drop
-                </span>
-                <span className="mt-2 text-[16px] text-[#72829a]">JPG, PNG (Max 5MB)</span>
-              </label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/jpg,image/webp"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleFileSelected(file);
+                }}
+              />
+
+              {isUploadingThumbnail ? (
+                <div className="mt-8 flex min-h-[220px] flex-col items-center justify-center rounded-[24px] border-2 border-dashed border-[#bfe6d2] bg-[#f1fdf6] px-6 text-center">
+                  <Loader2 className="h-10 w-10 animate-spin text-[#0f8751]" />
+                  <span className="mt-4 text-[16px] font-semibold text-[#41597c]">
+                    Uploading image...
+                  </span>
+                </div>
+              ) : thumbnailUrl ? (
+                <div className="group relative mt-8 min-h-[220px] overflow-hidden rounded-[24px] border-2 border-solid border-[#bfe6d2] bg-[#f1fdf6]">
+                  <img
+                    src={thumbnailUrl}
+                    alt="Course Thumbnail Preview"
+                    className="h-[220px] w-full object-cover"
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center gap-3 bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="rounded-[10px] bg-white px-4 py-2 text-[14px] font-semibold text-[#182f53] shadow hover:bg-gray-100"
+                    >
+                      Change Image
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setThumbnailUrl("");
+                        if (fileInputRef.current) fileInputRef.current.value = "";
+                      }}
+                      className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-red-600 text-white shadow hover:bg-red-700"
+                      title="Remove image"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDragging(true);
+                  }}
+                  onDragLeave={() => setIsDragging(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDragging(false);
+                    const file = e.dataTransfer.files?.[0];
+                    if (file) handleFileSelected(file);
+                  }}
+                  className={`mt-8 flex min-h-[220px] cursor-pointer flex-col items-center justify-center rounded-[24px] border-2 border-dashed px-6 text-center transition-colors ${
+                    isDragging
+                      ? "border-[#0f8751] bg-[#e1f9eb]"
+                      : "border-[#bfe6d2] bg-[#f1fdf6] hover:bg-[#eaf8f0]"
+                  }`}
+                >
+                  <Upload className="h-12 w-12 text-[#0f8751]" strokeWidth={2.2} />
+                  <span className="mt-5 text-[18px] font-semibold text-[#41597c]">
+                    Click to upload or drag and drop
+                  </span>
+                  <span className="mt-2 text-[16px] text-[#72829a]">JPG, PNG (Max 5MB)</span>
+                </div>
+              )}
+
+              {thumbnailUploadError ? (
+                <p className="mt-2 text-[14px] text-[#a42f2f]">{thumbnailUploadError}</p>
+              ) : null}
 
               <div className="mt-6">
                 <CourseTextField
@@ -263,3 +373,4 @@ export default function CreateCoursePage() {
     </AppShell>
   );
 }
+

@@ -3,7 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import type { ComponentType, ChangeEvent } from "react";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthSession } from "@/lib/auth-session";
@@ -20,6 +20,7 @@ import {
   updateLesson,
   updateModule,
   updateQuiz,
+  uploadGenericFile,
   type AddQuestionPayload,
   type CourseLesson,
   type CourseModule,
@@ -959,6 +960,7 @@ function ContentLessonEditorModal({
   }) => Promise<void>;
   isSaving?: boolean;
 }) {
+  const { session } = useAuthSession();
   const [lessonType, setLessonType] = useState("Reading Material");
   const [lessonTitle, setLessonTitle] = useState("");
   const [content, setContent] = useState("");
@@ -966,6 +968,13 @@ function ContentLessonEditorModal({
   const [accessLevel, setAccessLevel] = useState("Enrolled Students");
   const [estimatedReadingTime, setEstimatedReadingTime] = useState("10 mins");
   const [lessonOrder, setLessonOrder] = useState("1");
+  const [attachmentLabel, setAttachmentLabel] = useState("");
+  const [uploadedFileName, setUploadedFileName] = useState("");
+  const [uploadedFileUrl, setUploadedFileUrl] = useState("");
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   const [moduleId, setModuleId] = useState(selectedModuleId || modules[0]?.id || "");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -975,6 +984,33 @@ function ContentLessonEditorModal({
       setModuleId(selectedModuleId || modules[0]?.id || "");
     }
   }, [moduleId, modules, selectedModuleId]);
+
+  async function handleAttachmentFile(file: File) {
+    if (file.size > 50 * 1024 * 1024) {
+      setError("File size exceeds maximum limit of 50MB.");
+      return;
+    }
+
+    setIsUploadingAttachment(true);
+    setError(null);
+    setUploadedFileName(file.name);
+
+    try {
+      const url = await uploadGenericFile(file, session?.token);
+      setUploadedFileUrl(url);
+
+      if (file.type.startsWith("video/") || lessonType === "Video Lesson") {
+        setVideoUrl(url);
+      }
+    } catch (err) {
+      console.error("Attachment upload failed:", err);
+      setError(err instanceof Error ? err.message : "Failed to upload file.");
+      setUploadedFileName("");
+      setUploadedFileUrl("");
+    } finally {
+      setIsUploadingAttachment(false);
+    }
+  }
 
   async function handleSave() {
     if (!onSaveLesson) return;
@@ -989,10 +1025,11 @@ function ContentLessonEditorModal({
     setError(null);
     setIsSubmitting(true);
     try {
+      const finalVideoUrl = videoUrl.trim() || uploadedFileUrl || undefined;
       await onSaveLesson({
         title: lessonTitle.trim(),
         content: content.trim(),
-        videoUrl: videoUrl.trim() || undefined,
+        videoUrl: finalVideoUrl,
         type:
           lessonType === "Video Lesson"
             ? "video"
@@ -1032,7 +1069,7 @@ function ContentLessonEditorModal({
           <button
             type="button"
             onClick={handleSave}
-            disabled={isSubmitting || isSaving}
+            disabled={isSubmitting || isSaving || isUploadingAttachment}
             className="inline-flex min-w-[176px] items-center justify-between rounded-[12px] bg-[#4b8a60] px-6 text-[15px] font-semibold text-white shadow-[0_20px_38px_rgba(75,138,96,0.18)] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
           >
             <span>{isSubmitting ? "Saving…" : "Save Changes"}</span>
@@ -1123,22 +1160,88 @@ function ContentLessonEditorModal({
                 onChange={(e) => setEstimatedReadingTime(e.target.value)}
                 options={["10 mins", "20 mins", "30 mins"]}
               />
-              <ModalInput label="Attachment Label" placeholder="e.g. Reading Material PDF" />
+              <ModalInput
+                label="Attachment Label"
+                placeholder="e.g. Reading Material PDF"
+                value={attachmentLabel}
+                onChange={(e) => setAttachmentLabel(e.target.value)}
+              />
             </div>
 
             <div>
               <span className="mb-3 block text-[14px] font-semibold text-[#51627f]">
                 Upload File
               </span>
-              <label className="flex min-h-[126px] cursor-pointer flex-col items-center justify-center rounded-[18px] border-2 border-dashed border-[#bfe6d2] bg-[#f1fdf6] px-6 text-center">
-                <Upload className="h-10 w-10 text-[#0f8751]" strokeWidth={2.1} />
-                <span className="mt-4 text-[15px] font-semibold text-[#47617f]">
-                  Click to upload or drag and drop
-                </span>
-                <span className="mt-1 text-[15px] text-[#72829a]">
-                  PDF, DOCX or MP4 (Max 50MB)
-                </span>
-              </label>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.docx,.doc,.mp4,.mov,.zip,image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleAttachmentFile(file);
+                }}
+              />
+
+              {uploadedFileUrl ? (
+                <div className="flex items-center justify-between rounded-[18px] border border-[#bfe6d2] bg-[#f1fdf6] p-4">
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    <FileText className="h-8 w-8 text-[#0f8751] shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[14px] font-bold text-[#16345d] truncate">
+                        {uploadedFileName || "Uploaded File"}
+                      </p>
+                      <p className="text-[12px] text-[#72829a] truncate">{uploadedFileUrl}</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUploadedFileName("");
+                      setUploadedFileUrl("");
+                      if (fileInputRef.current) fileInputRef.current.value = "";
+                    }}
+                    className="ml-3 text-red-500 hover:text-red-700 text-sm font-semibold shrink-0"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDragOver(true);
+                  }}
+                  onDragLeave={(e) => {
+                    e.preventDefault();
+                    setIsDragOver(false);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDragOver(false);
+                    const file = e.dataTransfer.files?.[0];
+                    if (file) handleAttachmentFile(file);
+                  }}
+                  className={[
+                    "flex min-h-[126px] cursor-pointer flex-col items-center justify-center rounded-[18px] border-2 border-dashed px-6 text-center transition-colors",
+                    isDragOver
+                      ? "border-[#0f8751] bg-[#e6f7ee]"
+                      : "border-[#bfe6d2] bg-[#f1fdf6] hover:bg-[#eefbf3]",
+                  ].join(" ")}
+                >
+                  <Upload className="h-10 w-10 text-[#0f8751]" strokeWidth={2.1} />
+                  <span className="mt-4 text-[15px] font-semibold text-[#47617f]">
+                    {isUploadingAttachment
+                      ? "Uploading file..."
+                      : "Click to upload or drag and drop"}
+                  </span>
+                  <span className="mt-1 text-[15px] text-[#72829a]">
+                    PDF, DOCX or MP4 (Max 50MB)
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>
