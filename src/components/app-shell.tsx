@@ -1,8 +1,9 @@
 "use client";
 
-import { ReactNode, useState } from "react";
+import { ReactNode, useState, useRef, useEffect, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
 import {
   AlarmCheckIcon,
@@ -17,6 +18,7 @@ import {
   FileCheck2,
   Grid2x2,
   House,
+  Loader2,
   Menu,
   Search,
   Settings,
@@ -30,6 +32,7 @@ import {
   getSessionProfileRole,
   useAuthSession,
 } from "@/lib/auth-session";
+import { apiRequest, endpoints } from "@/lib/endpoints";
 
 export type AppSection =
   | "dashboard"
@@ -86,6 +89,217 @@ const adminNav: NavItem[] = [
   { key: "support", label: "Support", icon: CircleHelp, href: "/support" },
   { key: "settings", label: "Settings", icon: Settings, href: "/settings" },
 ];
+
+// ─── Types ─────────────────────────────────────────────────────────────────
+
+interface GlobalSearchResult {
+  schools: Array<{ id: string; name: string; email: string; status: string; country: string }>;
+  students: Array<{ id: string; userId: string; user: { firstName: string; lastName: string; email: string } }>;
+  courses: Array<{ id: string; name: string; status: string }>;
+}
+
+// ─── Global Search Bar ─────────────────────────────────────────────────────
+
+function GlobalSearchBar({ authToken, placeholder }: { authToken: string; placeholder: string }) {
+  const router = useRouter();
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<GlobalSearchResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const search = useCallback(
+    async (q: string) => {
+      if (!q.trim() || q.trim().length < 2) {
+        setResults(null);
+        setOpen(false);
+        return;
+      }
+      setLoading(true);
+      try {
+        const url = endpoints.admin.globalSearch(q);
+        const res = await apiRequest<{ message: string; data: GlobalSearchResult }>(url, {
+          method: "GET",
+          authToken,
+        });
+        setResults(res.data);
+        setOpen(true);
+      } catch {
+        setResults(null);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [authToken]
+  );
+
+  function handleChange(value: string) {
+    setQuery(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => search(value), 380);
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter" && query.trim()) {
+      router.push(`/schools?search=${encodeURIComponent(query.trim())}`);
+      setOpen(false);
+    }
+    if (e.key === "Escape") {
+      setOpen(false);
+    }
+  }
+
+  // Close on outside click
+  useEffect(() => {
+    function handler(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const totalResults =
+    (results?.schools.length ?? 0) + (results?.students.length ?? 0) + (results?.courses.length ?? 0);
+
+  return (
+    <div ref={containerRef} className="relative w-full xl:max-w-[610px]">
+      <label className="flex h-[52px] w-full items-center gap-3 rounded-2xl bg-[#f3f6fb] px-5 sm:px-7 text-[#95a0b4]">
+        {loading ? (
+          <Loader2 className="h-5 w-5 animate-spin text-[#4b8a60]" strokeWidth={2} />
+        ) : (
+          <Search className="h-5 w-5" strokeWidth={2} />
+        )}
+        <input
+          className="w-full bg-transparent text-[15px] font-medium text-[#274267] outline-none placeholder:text-[#98a2b6]"
+          placeholder={placeholder}
+          value={query}
+          onChange={(e) => handleChange(e.target.value)}
+          onFocus={() => results && totalResults > 0 && setOpen(true)}
+          onKeyDown={handleKeyDown}
+          id="global-search-input"
+          autoComplete="off"
+        />
+        {query && (
+          <button
+            type="button"
+            aria-label="Clear search"
+            onClick={() => { setQuery(""); setResults(null); setOpen(false); }}
+            className="ml-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[#95a0b4] hover:text-[#274267]"
+          >
+            <X className="h-4 w-4" strokeWidth={2.2} />
+          </button>
+        )}
+      </label>
+
+      {/* ─── Dropdown ─────────────────────────────────────────────── */}
+      {open && results && (
+        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-[9999] overflow-hidden rounded-2xl border border-[#e4e8f4] bg-white shadow-[0_24px_60px_rgba(30,50,90,0.18)]">
+          {totalResults === 0 ? (
+            <p className="px-6 py-5 text-[14px] text-[#6e7c98]">No results for &ldquo;{query}&rdquo;</p>
+          ) : (
+            <div className="max-h-[440px] overflow-y-auto divide-y divide-[#f0f3f8]">
+              {/* Schools */}
+              {results.schools.length > 0 && (
+                <div>
+                  <p className="px-5 pt-4 pb-2 text-[11px] font-bold uppercase tracking-[0.16em] text-[#8896b0]">
+                    Schools
+                  </p>
+                  {results.schools.map((school) => (
+                    <Link
+                      key={school.id}
+                      href={`/schools/${school.id}`}
+                      onClick={() => setOpen(false)}
+                      className="flex items-center gap-3 px-5 py-3 hover:bg-[#f7fbf8] transition-colors"
+                    >
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#e8f0fd] text-[#3a62d0]">
+                        <Building2 className="h-4 w-4" strokeWidth={2} />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-[14px] font-semibold text-[#182c4e]">{school.name}</p>
+                        <p className="truncate text-[12px] text-[#7a87a0]">{school.email} · {school.country}</p>
+                      </div>
+                      <span className={`ml-auto shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold capitalize ${school.status === "active" ? "bg-[#e3f9e9] text-[#149a55]" : "bg-[#fef3c7] text-[#a16207]"}`}>
+                        {school.status}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+
+              {/* Students */}
+              {results.students.length > 0 && (
+                <div>
+                  <p className="px-5 pt-4 pb-2 text-[11px] font-bold uppercase tracking-[0.16em] text-[#8896b0]">
+                    Students
+                  </p>
+                  {results.students.map((student) => {
+                    const name = `${student.user?.firstName ?? ""} ${student.user?.lastName ?? ""}`.trim();
+                    const initials = name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+                    return (
+                      <Link
+                        key={student.id}
+                        href={`/students/${student.id}`}
+                        onClick={() => setOpen(false)}
+                        className="flex items-center gap-3 px-5 py-3 hover:bg-[#f7fbf8] transition-colors"
+                      >
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#1e1f29] text-[12px] font-bold text-white">
+                          {initials}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate text-[14px] font-semibold text-[#182c4e]">{name || "Unknown"}</p>
+                          <p className="truncate text-[12px] text-[#7a87a0]">{student.user?.email}</p>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Courses */}
+              {results.courses.length > 0 && (
+                <div>
+                  <p className="px-5 pt-4 pb-2 text-[11px] font-bold uppercase tracking-[0.16em] text-[#8896b0]">
+                    Courses
+                  </p>
+                  {results.courses.map((course) => (
+                    <Link
+                      key={course.id}
+                      href={`/courses?courseId=${course.id}`}
+                      onClick={() => setOpen(false)}
+                      className="flex items-center gap-3 px-5 py-3 hover:bg-[#f7fbf8] transition-colors"
+                    >
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#f3eeff] text-[#7c3aed]">
+                        <BookOpen className="h-4 w-4" strokeWidth={2} />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-[14px] font-semibold text-[#182c4e]">{course.name}</p>
+                        <p className="text-[12px] capitalize text-[#7a87a0]">{course.status}</p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+
+              {/* Footer */}
+              <div className="px-5 py-3 bg-[#f8faff]">
+                <button
+                  type="button"
+                  onClick={() => { router.push(`/schools?search=${encodeURIComponent(query)}`); setOpen(false); }}
+                  className="text-[13px] font-semibold text-[#4b8a60] hover:underline"
+                >
+                  View all results for &ldquo;{query}&rdquo; →
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function AvatarIllustration() {
   return (
@@ -162,7 +376,7 @@ export function AppShell({
   activeSection,
   children,
   contentClassName,
-  searchPlaceholder = "Search students, courses or reports...",
+  searchPlaceholder = "Search students, courses or schools...",
   profileName,
   profileRole,
   showHeaderHelp = false,
@@ -171,6 +385,7 @@ export function AppShell({
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const resolvedProfileName = profileName ?? getSessionProfileName(session);
   const resolvedProfileRole = profileRole ?? getSessionProfileRole(session);
+  const authToken = session?.token ?? "";
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#fafbff] text-[#173257] lg:h-screen lg:overflow-hidden">
@@ -270,13 +485,7 @@ export function AppShell({
               </div>
 
               <div className="flex flex-1 flex-col gap-4 xl:max-w-[980px] xl:flex-row xl:items-center xl:justify-end">
-                <label className="flex h-[52px] w-full max-w-full items-center gap-3 rounded-2xl bg-[#f3f6fb] px-5 sm:px-7 text-[#95a0b4] xl:max-w-[610px]">
-                  <Search className="h-5 w-5" strokeWidth={2} />
-                  <input
-                    className="w-full bg-transparent text-[15px] font-medium text-[#274267] outline-none placeholder:text-[#98a2b6]"
-                    placeholder={searchPlaceholder}
-                  />
-                </label>
+                <GlobalSearchBar authToken={authToken} placeholder={searchPlaceholder} />
 
                 <div className="flex items-center justify-between gap-4 sm:justify-end sm:gap-6">
                   <button
@@ -324,3 +533,4 @@ export function AppShell({
     </main>
   );
 }
+
