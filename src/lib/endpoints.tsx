@@ -115,6 +115,9 @@ courses: {
 // (place it after the existing `reactivateStudent` entry)
 // ─────────────────────────────────────────────────────────────────────────────
 
+    globalSearch: (q: string) =>
+      buildEndpoint(apiBaseUrl, `/admin/search?q=${encodeURIComponent(q)}`),
+
 
 support: {
   // GET  /admin/support/metrics
