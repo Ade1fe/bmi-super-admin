@@ -289,7 +289,11 @@ export default function EditCoursePage({
             name: courseName,
             description: courseDescription,
             status: courseStatus,
-            thumbnailUrl: courseThumbnailUrl,
+            // A blob:/data: value is a local preview that no other viewer can
+            // resolve — leave the stored thumbnail untouched instead.
+            thumbnailUrl: /^(blob|data):/.test(courseThumbnailUrl)
+              ? course.thumbnailUrl
+              : courseThumbnailUrl,
           },
         }
       );
@@ -676,14 +680,25 @@ export default function EditCoursePage({
                     const file = e.target.files?.[0];
                     if (!file) return;
                     setIsUploadingThumbnail(true);
+                    const local = URL.createObjectURL(file);
+                    const previous = courseThumbnailUrl;
                     try {
-                      const local = URL.createObjectURL(file);
                       setCourseThumbnailUrl(local);
                       const url = await uploadImageFile(file, session?.token);
                       setCourseThumbnailUrl(url);
                     } catch (err) {
                       console.error("Thumbnail upload failed:", err);
+                      // Restore the saved thumbnail. Keeping the blob: preview
+                      // would persist a URL only this tab can resolve, leaving
+                      // schools and students with a broken image.
+                      setCourseThumbnailUrl(previous);
+                      alert(
+                        err instanceof Error
+                          ? `Thumbnail upload failed: ${err.message}`
+                          : "Thumbnail upload failed. Please try again."
+                      );
                     } finally {
+                      URL.revokeObjectURL(local);
                       setIsUploadingThumbnail(false);
                     }
                   }}

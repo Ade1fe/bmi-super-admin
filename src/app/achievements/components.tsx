@@ -1,6 +1,8 @@
 'use client'
 
 import React, { useState } from 'react'
+import { useAuthSession } from '@/lib/auth-session'
+import { uploadBadgeIcon } from '@/lib/course-api'
 
 // ============= TYPES =============
 export interface Badge {
@@ -224,6 +226,96 @@ const BADGE_CRITERIA_OPTIONS = [
   { value: 'finish_10_courses', label: 'Finish 10 courses' },
 ]
 
+/**
+ * Badge artwork field, shared by the create and manage modals: uploads the file
+ * to Cloudinary via /achievements/badges/icon and keeps only the hosted URL. The
+ * preview is driven by that URL rather than a local `blob:` one, so nothing
+ * unresolvable can reach the database.
+ */
+const BadgeImageField: React.FC<{
+  value: string
+  onChange: (imageUrl: string) => void
+}> = ({ value, onChange }) => {
+  const { session } = useAuthSession()
+  const fileInputRef = React.useRef<HTMLInputElement>(null)
+  const [isUploading, setIsUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+
+  async function handleFileSelected(file: File) {
+    if (!file.type.startsWith('image/')) {
+      setUploadError('Please select an image file (JPG, PNG, WebP).')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError('Image size exceeds the 5MB limit.')
+      return
+    }
+
+    setUploadError(null)
+    setIsUploading(true)
+    try {
+      onChange(await uploadBadgeIcon(file, session?.token))
+    } catch (err) {
+      console.error('Badge image upload failed:', err)
+      setUploadError(
+        err instanceof Error ? err.message : 'Failed to upload badge image.'
+      )
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-2">Badge Image</label>
+
+      <div className="flex items-center gap-4">
+        <div className="w-16 h-16 shrink-0 rounded-lg border border-gray-300 bg-gray-50 overflow-hidden flex items-center justify-center">
+          {value ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={value} alt="Badge preview" className="w-full h-full object-cover" />
+          ) : (
+            <span className="text-xs text-gray-400">No image</span>
+          )}
+        </div>
+
+        <div className="flex-1 space-y-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/jpg,image/webp"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void handleFileSelected(file)
+              e.target.value = ''
+            }}
+          />
+          <button
+            type="button"
+            disabled={isUploading}
+            onClick={() => fileInputRef.current?.click()}
+            className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed transition-colors"
+          >
+            {isUploading ? 'Uploading...' : value ? 'Replace image' : 'Upload image'}
+          </button>
+
+          <input
+            type="url"
+            name="imageUrl"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder="…or paste an image URL"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent outline-none transition-colors"
+          />
+        </div>
+      </div>
+
+      {uploadError && <p className="mt-2 text-sm text-red-600">{uploadError}</p>}
+    </div>
+  )
+}
+
 export const CreateBadgeModal: React.FC<CreateBadgeModalProps> = ({
   isOpen,
   onClose,
@@ -362,17 +454,10 @@ export const CreateBadgeModal: React.FC<CreateBadgeModalProps> = ({
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Badge Image URL</label>
-              <input
-                type="url"
-                name="imageUrl"
-                value={formData.imageUrl}
-                onChange={handleInputChange}
-                placeholder="https://lms-assets.com/badges/sql-master.png"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent outline-none transition-colors"
-              />
-            </div>
+            <BadgeImageField
+              value={formData.imageUrl}
+              onChange={(imageUrl) => setFormData((prev) => ({ ...prev, imageUrl }))}
+            />
           </form>
 
           <div className="border-t border-gray-200 bg-gray-50 px-6 py-4 flex items-center justify-end gap-3 sticky bottom-0">
@@ -523,30 +608,22 @@ export const EditBadgeModal: React.FC<EditBadgeModalProps> = ({
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Badge Points</label>
-                <input
-                  type="number"
-                  name="points"
-                  min={0}
-                  value={formData.points}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent outline-none transition-colors"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Badge Image URL</label>
-                <input
-                  type="url"
-                  name="imageUrl"
-                  value={formData.imageUrl}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent outline-none transition-colors"
-                />
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Badge Points</label>
+              <input
+                type="number"
+                name="points"
+                min={0}
+                value={formData.points}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent outline-none transition-colors"
+              />
             </div>
+
+            <BadgeImageField
+              value={formData.imageUrl}
+              onChange={(imageUrl) => setFormData((prev) => ({ ...prev, imageUrl }))}
+            />
           </form>
 
           <div className="border-t border-gray-200 bg-gray-50 px-6 py-4 flex items-center justify-between gap-3 sticky bottom-0">

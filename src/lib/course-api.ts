@@ -1075,6 +1075,69 @@ export async function uploadImageFile(
   throw new Error("Unable to read uploaded file location from server response.");
 }
 
+/** Pulls the hosted file URL out of the several response shapes the API uses. */
+function readUploadedLocation(payload: unknown): string {
+  const root = isRecord(payload) ? payload : {};
+  const candidates = [root.data, root.file, root].filter(isRecord);
+
+  for (const candidate of candidates) {
+    const location =
+      readString(candidate.imageUrl) ||
+      readString(candidate.uploadedFileLocation) ||
+      readString(candidate.secureUrl) ||
+      readString(candidate.url);
+    if (location) return location;
+  }
+
+  throw new Error("Unable to read uploaded file location from server response.");
+}
+
+/**
+ * POST /achievements/badges/icon
+ * Uploads badge artwork through the achievements module, which is SUPER_ADMIN
+ * guarded and files the image under Cloudinary's badge folder. Returns the
+ * hosted URL that create/update badge expects as `imageUrl`.
+ *
+ * Falls back to the generic image upload on 404 so the Achievement screen keeps
+ * working against a backend that predates the badge-icon endpoint.
+ */
+export async function uploadBadgeIcon(
+  file: File,
+  authToken?: string
+): Promise<string> {
+  const url = endpoints.achievements.badges.icon;
+  if (!url) {
+    throw new Error("API URL is not configured.");
+  }
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const headers: HeadersInit = {};
+  if (authToken) {
+    headers["Authorization"] = `Bearer ${authToken}`;
+  }
+
+  const response = await fetch(url, { method: "POST", headers, body: formData });
+
+  if (response.status === 404) {
+    return uploadImageFile(file, authToken);
+  }
+
+  if (!response.ok) {
+    let message = `Badge icon upload failed with status ${response.status}`;
+    try {
+      const payload = await response.json();
+      message = payload.message || payload.error || message;
+    } catch {
+      // Ignore JSON parse error
+    }
+    throw new Error(message);
+  }
+
+  return readUploadedLocation(await response.json());
+}
+
 /**
  * POST /file-upload/file or /file-upload/image
  * Uploads any document/media file (e.g. PDF, DOCX, MP4) to backend storage.
