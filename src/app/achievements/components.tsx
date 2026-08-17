@@ -106,11 +106,17 @@ export const AchievementTabs: React.FC<AchievementTabsProps> = ({
 
 // ============= BADGE CARD =============
 export const BadgeCard: React.FC<BadgeCardProps> = ({ badge, onSelect }) => {
-  const [hasImageError, setHasImageError] = useState(false)
+  /**
+   * Track *which* URL failed rather than a bare boolean. Cards are keyed by
+   * badge id, so editing a badge's artwork reuses this component instance — a
+   * boolean would stay stuck on and keep hiding the new image until a reload.
+   * Comparing against the current URL makes the flag self-clearing.
+   */
+  const [erroredImageUrl, setErroredImageUrl] = useState<string | null>(null)
   const displayStatus = badge.status || 'NEW'
   const isLocked = displayStatus === 'Locked'
   const isNew = displayStatus.includes('NEW')
-  const showImage = Boolean(badge.imageUrl && !hasImageError)
+  const showImage = Boolean(badge.imageUrl && badge.imageUrl !== erroredImageUrl)
 
   return (
     <div
@@ -133,7 +139,7 @@ export const BadgeCard: React.FC<BadgeCardProps> = ({ badge, onSelect }) => {
             src={badge.imageUrl}
             alt={badge.name}
             className="h-full w-full object-cover"
-            onError={() => setHasImageError(true)}
+            onError={() => setErroredImageUrl(badge.imageUrl ?? null)}
           />
         ) : (
           <div className="text-6xl md:text-7xl">{badge.icon}</div>
@@ -232,6 +238,9 @@ const BADGE_CRITERIA_OPTIONS = [
  * preview is driven by that URL rather than a local `blob:` one, so nothing
  * unresolvable can reach the database.
  */
+const MAX_BADGE_IMAGE_BYTES = 5 * 1024 * 1024
+const ACCEPTED_BADGE_IMAGE_TYPES = 'image/png,image/jpeg,image/jpg,image/webp'
+
 const BadgeImageField: React.FC<{
   value: string
   onChange: (imageUrl: string) => void
@@ -240,13 +249,16 @@ const BadgeImageField: React.FC<{
   const fileInputRef = React.useRef<HTMLInputElement>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
+  const [fileName, setFileName] = useState<string | null>(null)
+  const [showUrlInput, setShowUrlInput] = useState(false)
 
   async function handleFileSelected(file: File) {
     if (!file.type.startsWith('image/')) {
-      setUploadError('Please select an image file (JPG, PNG, WebP).')
+      setUploadError('Please select an image file (PNG, JPG or WebP).')
       return
     }
-    if (file.size > 5 * 1024 * 1024) {
+    if (file.size > MAX_BADGE_IMAGE_BYTES) {
       setUploadError('Image size exceeds the 5MB limit.')
       return
     }
@@ -255,6 +267,7 @@ const BadgeImageField: React.FC<{
     setIsUploading(true)
     try {
       onChange(await uploadBadgeIcon(file, session?.token))
+      setFileName(file.name)
     } catch (err) {
       console.error('Badge image upload failed:', err)
       setUploadError(
@@ -265,51 +278,135 @@ const BadgeImageField: React.FC<{
     }
   }
 
+  function openFilePicker() {
+    if (!isUploading) fileInputRef.current?.click()
+  }
+
+  /** Dropping anywhere on the zone picks the first image the browser hands us. */
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault()
+    setIsDragging(false)
+    if (isUploading) return
+    const file = e.dataTransfer.files?.[0]
+    if (file) void handleFileSelected(file)
+  }
+
+  function handleRemove() {
+    onChange('')
+    setFileName(null)
+    setUploadError(null)
+  }
+
   return (
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-2">Badge Image</label>
 
-      <div className="flex items-center gap-4">
-        <div className="w-16 h-16 shrink-0 rounded-lg border border-gray-300 bg-gray-50 overflow-hidden flex items-center justify-center">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={ACCEPTED_BADGE_IMAGE_TYPES}
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (file) void handleFileSelected(file)
+          // Reset so re-picking the same file still fires a change event.
+          e.target.value = ''
+        }}
+      />
+
+      <div
+        role="button"
+        tabIndex={0}
+        aria-label="Upload badge image"
+        aria-busy={isUploading}
+        onClick={openFilePicker}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            openFilePicker()
+          }
+        }}
+        onDragOver={(e) => {
+          e.preventDefault()
+          if (!isUploading) setIsDragging(true)
+        }}
+        onDragLeave={() => setIsDragging(false)}
+        onDrop={handleDrop}
+        className={`flex items-center gap-4 w-full rounded-lg border-2 border-dashed px-4 py-4 text-left transition-colors outline-none focus:ring-2 focus:ring-green-600 ${
+          isUploading
+            ? 'cursor-wait border-gray-300 bg-gray-50'
+            : isDragging
+              ? 'cursor-pointer border-green-600 bg-green-50'
+              : 'cursor-pointer border-gray-300 bg-white hover:border-green-600 hover:bg-green-50/40'
+        }`}
+      >
+        <div className="w-16 h-16 shrink-0 rounded-lg border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center">
           {value ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={value} alt="Badge preview" className="w-full h-full object-cover" />
           ) : (
-            <span className="text-xs text-gray-400">No image</span>
+            <svg className="w-7 h-7 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M3 16.5l4.5-4.5a2 2 0 012.8 0l3.2 3.2 2.2-2.2a2 2 0 012.8 0L21 15.5M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"
+              />
+            </svg>
           )}
         </div>
 
-        <div className="flex-1 space-y-2">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/png,image/jpeg,image/jpg,image/webp"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0]
-              if (file) void handleFileSelected(file)
-              e.target.value = ''
-            }}
-          />
+        <div className="min-w-0 flex-1">
+          {isUploading ? (
+            <p className="text-sm font-medium text-gray-700">Uploading…</p>
+          ) : (
+            <>
+              <p className="text-sm font-medium text-gray-900">
+                {value ? 'Click or drop to replace the image' : 'Click to browse, or drag and drop'}
+              </p>
+              <p className="mt-0.5 text-xs text-gray-500">PNG, JPG or WebP · up to 5MB</p>
+              {fileName && (
+                <p className="mt-1 truncate text-xs text-gray-600" title={fileName}>
+                  {fileName}
+                </p>
+              )}
+            </>
+          )}
+        </div>
+
+        {value && !isUploading && (
           <button
             type="button"
-            disabled={isUploading}
-            onClick={() => fileInputRef.current?.click()}
-            className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed transition-colors"
+            // The zone itself opens the picker, so keep the click from bubbling.
+            onClick={(e) => {
+              e.stopPropagation()
+              handleRemove()
+            }}
+            className="shrink-0 px-3 py-1.5 text-xs font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
           >
-            {isUploading ? 'Uploading...' : value ? 'Replace image' : 'Upload image'}
+            Remove
           </button>
-
-          <input
-            type="url"
-            name="imageUrl"
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder="…or paste an image URL"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent outline-none transition-colors"
-          />
-        </div>
+        )}
       </div>
+
+      {showUrlInput ? (
+        <input
+          type="url"
+          name="imageUrl"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="https://…"
+          className="mt-2 w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent outline-none transition-colors"
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setShowUrlInput(true)}
+          className="mt-2 text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors"
+        >
+          or paste an image URL instead
+        </button>
+      )}
 
       {uploadError && <p className="mt-2 text-sm text-red-600">{uploadError}</p>}
     </div>
