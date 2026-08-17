@@ -260,6 +260,9 @@ payments: {
       // POST /achievements/badges
       create: buildEndpoint(apiBaseUrl, "/achievements/badges"),
 
+      // POST /achievements/badges/icon — multipart badge artwork upload
+      icon: buildEndpoint(apiBaseUrl, "/achievements/badges/icon"),
+
       // GET /achievements/badges/:badgeId
       byId: (badgeId: string) =>
         buildEndpoint(apiBaseUrl, `/achievements/badges/${badgeId}`),
