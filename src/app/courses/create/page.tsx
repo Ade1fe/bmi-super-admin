@@ -187,6 +187,7 @@ export default function CreateCoursePage() {
               {isSaving ? "Saving…" : "Save as Draft"}
             </button>
             <button
+            // dd
               type="button"
               onClick={() => handleSaveCourse(true)}
               disabled={isSaving}
