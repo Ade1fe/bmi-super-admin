@@ -215,6 +215,9 @@ const AchievementsPage = () => {
       const response = await apiRequest<unknown>(endpoints.achievements.badges.all(), {
         method: 'GET',
         authToken: session.token,
+        // This runs right after a create/update/delete, so a cached response
+        // would show the caller the very state they just changed.
+        cache: 'no-store',
       })
 
       const normalizedBadges = (() => {
