@@ -438,7 +438,7 @@ export default function SupportCenterPage() {
     try {
       await updateTicketStatus(
         ticketId,
-        { status: apiStatus, reason, notify },
+        { status: apiStatus, reason, notifyAgents: notify },
         authToken,
       );
       // Re-fetch to sync server state
@@ -576,7 +576,13 @@ export default function SupportCenterPage() {
                 className="grid gap-4 border-t border-[#edf1f7] px-5 py-5 sm:px-7 lg:grid-cols-[0.9fr_1.4fr_1fr_0.8fr_0.95fr_0.95fr_0.55fr] lg:items-center"
               >
                 <p className="text-[17px] font-medium text-[#118a62]">{ticket.ticketNumber}</p>
-                <p className="text-[17px] font-extrabold text-[#172f54]">{ticket.from}</p>
+                <div className="min-w-0">
+                  <p className="truncate text-[17px] font-extrabold text-[#172f54]">{ticket.from}</p>
+                  <p className="mt-0.5 truncate text-[13px] font-medium text-[#8391a8]">
+                    {ticket.requesterRole}
+                    {ticket.technicalDetails.orgCode !== "—" ? ` · ${ticket.technicalDetails.orgCode}` : ""}
+                  </p>
+                </div>
                 <span className="inline-flex w-fit rounded-[8px] bg-[#eef2f7] px-3 py-1.5 text-[13px] font-extrabold uppercase text-[#5e708c]">
                   {ticket.category}
                 </span>

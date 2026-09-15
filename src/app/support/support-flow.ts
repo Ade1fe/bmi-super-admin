@@ -10,6 +10,7 @@
 
 import type {
   SupportTicket as ApiTicket,
+  TicketActivityRecord as ApiTicketActivity,
   SupportAgent as ApiAgent,
   ChatThread as ApiChatThread,
   ChatMessage as ApiChatMessage,
@@ -20,7 +21,7 @@ import type {
 // Re-export API-level enums so pages can use a single import path
 // ─────────────────────────────────────────────────────────────────
 
-export type { ApiTicket, ApiAgent, ApiChatThread, ApiChatMessage };
+export type { ApiTicket, ApiTicketActivity, ApiAgent, ApiChatThread, ApiChatMessage };
 
 // ─────────────────────────────────────────────────────────────────
 // UI-side primitive types
@@ -226,11 +227,21 @@ export function mapApiTicketToUi(
   const displayName = apiTicket.requesterName;
   const category =
     CATEGORY_MAP[apiTicket.category?.toUpperCase?.()] ?? apiTicket.category;
+  const agentName = apiTicket.assignedAgent
+    ? `${apiTicket.assignedAgent.firstName} ${apiTicket.assignedAgent.lastName}`.trim()
+    : apiTicket.assignedAgentId
+      ? `Agent #${apiTicket.assignedAgentId.slice(0, 6)}`
+      : "Unassigned";
+  const activities = mapApiActivities(apiTicket.activities ?? []);
+  const attachments = (apiTicket.activities ?? []).flatMap((a) =>
+    (a.attachments ?? []).map((url, i) => attachmentFromUrl(url, `${a.id}-${i}`))
+  );
+  const resolved = apiTicket.status === "RESOLVED";
 
   return {
     // identity
     id: apiTicket.id,
-    ticketNumber: (apiTicket as ApiTicket & { ticketId?: string }).ticketId ?? `TK-${apiTicket.id.slice(0, 4).toUpperCase()}`,
+    ticketNumber: apiTicket.ticketId ?? `TK-${apiTicket.id.slice(0, 4).toUpperCase()}`,
     from: displayName,
     category,
 
@@ -243,30 +254,30 @@ export function mapApiTicketToUi(
     title: apiTicket.subject,
 
     // detail header
-    caseCode: (apiTicket as ApiTicket & { ticketId?: string }).ticketId ?? apiTicket.id.slice(0, 8).toUpperCase(),
+    caseCode: apiTicket.ticketId ?? apiTicket.id.slice(0, 8).toUpperCase(),
     summary: apiTicket.description.slice(0, 160),
-    assignedAgent: apiTicket.assignedAgentId
-      ? `Agent #${apiTicket.assignedAgentId.slice(0, 6)}`
-      : "Unassigned",
-    submittedBy: apiTicket.requesterEmail,
+    assignedAgent: agentName,
+    submittedBy: apiTicket.orgCode
+      ? `${apiTicket.requesterEmail} · ${apiTicket.orgCode}`
+      : apiTicket.requesterEmail,
 
     // requester display
     requesterName: displayName,
     requesterEmail: apiTicket.requesterEmail,
-    requesterRole: "School Admin",
+    requesterRole: requesterRole(apiTicket),
     requesterAvatar: initials(displayName),
     requesterTone: avatarTone(index),
 
-    // rich content — API doesn't yet return these; use description as first paragraph
-    description: [apiTicket.description],
-    attachments: [],
+    // rich content
+    description: apiTicket.description.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean),
+    attachments,
     executionTimeline: [
       {
         id: "step-1",
         state: "done",
         timestamp: relativeTime(apiTicket.createdAt),
         title: "Ticket Created",
-        description: "Support request submitted by requester.",
+        description: `Support request submitted by ${displayName}.`,
       },
       {
         id: "step-2",
@@ -276,32 +287,30 @@ export function mapApiTicketToUi(
           : "",
         title: "Agent Assignment",
         description: apiTicket.assignedAgentId
-          ? `Assigned to agent ${apiTicket.assignedAgentId.slice(0, 6)}.`
+          ? `Assigned to ${agentName}.`
           : "Awaiting agent assignment.",
       },
       {
         id: "step-3",
-        state: ["RESOLVED", "CLOSED"].includes(apiTicket.status) ? "done" : "pending",
-        timestamp: ["RESOLVED", "CLOSED"].includes(apiTicket.status)
-          ? relativeTime(apiTicket.updatedAt)
-          : "",
+        state: resolved ? "done" : "pending",
+        timestamp: resolved ? relativeTime(apiTicket.updatedAt) : "",
         title: "Resolution",
-        description: "Issue addressed and ticket closed.",
+        description: resolved ? "Issue addressed and ticket resolved." : "Issue not yet resolved.",
       },
     ],
-    activity: [],
+    activity: activities,
 
-    // metadata panels — API doesn't expose these yet
+    // metadata panels — only orgCode is real today
     environment: "Production",
-    environmentMeta: "LMS Web Client",
+    environmentMeta: apiTicket.studentId ? "Student App" : apiTicket.schoolId ? "School Portal" : "Support Desk",
     identity: displayName,
     identityMeta: apiTicket.requesterEmail,
     slaDeadline: "Within 24 hours",
-    tags: [category.toUpperCase(), apiTicket.priority],
+    tags: [category.toUpperCase(), apiTicket.priority, ...(apiTicket.ticketType ? [apiTicket.ticketType] : [])],
     technicalDetails: {
       ipAddress: "—",
       sessionId: "—",
-      orgCode: "—",
+      orgCode: apiTicket.orgCode ?? "—",
       language: "en-US",
     },
     requesterHealth: {
@@ -310,6 +319,59 @@ export function mapApiTicketToUi(
       relatedTo: category,
     },
   } as SupportTicket;
+}
+
+/** Who raised the ticket, from which owner column the backend set. */
+export function requesterRole(apiTicket: Pick<ApiTicket, "studentId" | "schoolId">): string {
+  if (apiTicket.studentId) return "Student";
+  if (apiTicket.schoolId) return "School Admin";
+  return "Requester";
+}
+
+function attachmentFromUrl(url: string, id: string): TicketAttachment {
+  let name = url;
+  try {
+    name = decodeURIComponent(new URL(url).pathname.split("/").pop() || url);
+  } catch {
+    /* not a URL — show as-is */
+  }
+  return {
+    id,
+    name,
+    type: /\.(csv|xlsx?|tsv)$/i.test(name) ? "sheet" : "image",
+  };
+}
+
+/**
+ * Maps the detail response's activities (oldest first) to the conversation
+ * shape. Internal notes keep their own tone so an agent can tell at a glance
+ * which lines the requester never saw.
+ */
+export function mapApiActivities(activities: ApiTicketActivity[]): TicketActivity[] {
+  return activities.map((a) => {
+    const tone: ActivityTone = a.isInternalNote
+      ? "internal"
+      : a.senderType === "SUPPORT_AGENT"
+        ? "agent"
+        : "requester";
+    const badge = a.isInternalNote
+      ? "Internal note"
+      : a.senderType === "SUPPORT_AGENT"
+        ? "Reply to requester"
+        : a.senderType === "SYSTEM"
+          ? "System"
+          : "Requester";
+    const firstAttachment = a.attachments?.[0];
+    return {
+      id: a.id,
+      author: a.senderName,
+      timestamp: relativeTime(a.createdAt),
+      badge,
+      tone,
+      body: a.content.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean),
+      attachment: firstAttachment ? { name: attachmentFromUrl(firstAttachment, a.id).name } : undefined,
+    };
+  });
 }
 
 /**
