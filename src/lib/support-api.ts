@@ -4,9 +4,12 @@ import { apiRequest, endpoints } from "./endpoints";
 // Types
 // ─────────────────────────────────────────────
 
-export type TicketCategory = "TECHNICAL" | "BILLING" | "GENERAL" | string;
+export type TicketCategory = "TECHNICAL" | "PAYMENT" | "COURSE_ACCESS" | "ONBOARDING" | string;
 export type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
-export type TicketStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
+export type TicketStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "ON_HOLD";
+/** What a requester raised from their Help & Support screen; null on tickets agents created. */
+export type TicketType = "COMPLAINT" | "REPORT";
+export type ActivitySenderType = "REQUESTER" | "SUPPORT_AGENT" | "SYSTEM";
 export type AgentWorkload = "OFFLINE" | "MINIMAL" | "MODERATE" | "HEAVY";
 
 export interface SupportMetricStat {
@@ -21,6 +24,28 @@ export interface SupportMetrics {
   satisfactionScore: SupportMetricStat;
 }
 
+export interface TicketActivityRecord {
+  id: string;
+  ticketId: string;
+  senderName: string;
+  senderType: ActivitySenderType;
+  content: string;
+  /** Internal notes never reach the requester's app. */
+  isInternalNote: boolean;
+  attachments: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AssignedAgent {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email?: string;
+  avatar?: string | null;
+  isActive?: boolean;
+}
+
 export interface SupportTicket {
   id: string;
   ticketId: string;
@@ -32,6 +57,17 @@ export interface SupportTicket {
   subject: string;
   description: string;
   assignedAgentId: string | null;
+  /** Populated on list and detail responses. */
+  assignedAgent?: AssignedAgent | null;
+  /** Exactly one of these is set on tickets raised from an app; both null on agent-created ones. */
+  studentId?: string | null;
+  schoolId?: string | null;
+  ticketType?: TicketType | null;
+  /** The requester's school name, for both student- and school-raised tickets. */
+  orgCode?: string | null;
+  tags?: string[];
+  /** Only on the detail response, oldest first, internal notes included. */
+  activities?: TicketActivityRecord[];
   createdAt: string;
   updatedAt: string;
 }
@@ -273,13 +309,16 @@ export async function getAvailableSupportAgents(authToken: string) {
 
 export interface UpdateTicketStatusPayload {
   status: TicketStatus;
-  reason?: string;
-  notify?: boolean;
+  /** Required by the backend — it is written into the ticket's activity log. */
+  reason: string;
+  notifyAgents?: boolean;
 }
 
 export interface AddTicketActivityPayload {
   content: string;
-  type?: "public" | "internal";
+  /** true = private note for agents only; false/omitted = reply the requester sees. */
+  isInternalNote?: boolean;
+  attachments?: string[];
 }
 
 export async function updateTicketStatus(
@@ -308,7 +347,7 @@ export async function addTicketActivity(
 ) {
   log("addTicketActivity() called", { ticketId, payload });
   try {
-    const res = await apiRequest<unknown>(
+    const res = await apiRequest<TicketActivityRecord>(
       endpoints.admin.support.addTicketActivity(ticketId),
       { method: "POST", authToken, body: payload }
     );
