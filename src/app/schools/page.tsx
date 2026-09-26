@@ -32,6 +32,29 @@ function formatCompactNumber(value: number) {
   }).format(value);
 }
 
+function formatRevenue(value: number, currency: string) {
+  return new Intl.NumberFormat("en-NG", {
+    style: "currency",
+    currency,
+    notation: value >= 100000 ? "compact" : "standard",
+    maximumFractionDigits: value >= 100000 ? 1 : 0,
+  }).format(value);
+}
+
+type SchoolStats = {
+  totalSchools: number;
+  activeSchools: number;
+  inactiveSchools: number;
+  totalSchoolsGrowthPct: number | null;
+  activeTrials: number;
+  trialsEndingSoon: number;
+  totalStudents: number;
+  newStudentsThisMonth: number;
+  countriesCovered: number;
+  monthlyRevenue: number;
+  currency: string;
+};
+
 function formatJoinedDate(value: string | undefined) {
   if (!value) {
     return "Not available";
@@ -275,6 +298,8 @@ function DeactivateSchoolModal({
 export default function SchoolsPage() {
   const { session } = useAuthSession();
   const [schools, setSchools] = useState<SchoolSummary[]>([]);
+  const [stats, setStats] = useState<SchoolStats | null>(null);
+  const [statsError, setStatsError] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -294,12 +319,25 @@ export default function SchoolsPage() {
     setIsLoading(true);
     setErrorMessage("");
 
-    const response = await apiRequest(endpoints.admin.schools, {
-      authToken: session.token,
-      cache: "no-store",
-    });
+    const [response, statsResponse] = await Promise.all([
+      apiRequest(endpoints.admin.schools, {
+        authToken: session.token,
+        cache: "no-store",
+      }),
+      apiRequest<{ data?: SchoolStats }>(endpoints.admin.schoolStats, {
+        authToken: session.token,
+        cache: "no-store",
+      }).catch((error: unknown) => {
+        setStatsError(error instanceof Error ? error.message : "Unable to load school stats.");
+        return null;
+      }),
+    ]);
 
     setSchools(parseSchoolList(response));
+    if (statsResponse?.data) {
+      setStats(statsResponse.data);
+      setStatsError("");
+    }
   } catch (error) {
     setErrorMessage(
       error instanceof Error
@@ -326,7 +364,7 @@ const handleSuspendSchool = async (schoolId: string) => {
     await apiRequest(
       endpoints.admin.suspendSchool(schoolId),
       {
-        method: "PATCH",
+        method: "PUT",
         authToken: session.token,
       }
     );
@@ -355,7 +393,7 @@ const handleDeactivateSchool = async (schoolId: string) => {
     await apiRequest(
       endpoints.admin.deactivateSchool(schoolId),
       {
-        method: "PATCH",
+        method: "PUT",
         authToken: session.token,
       }
     );
@@ -384,7 +422,7 @@ const handleActivateSchool = async (schoolId: string) => {
     await apiRequest(
       endpoints.admin.activateSchool(schoolId),
       {
-        method: "PATCH",
+        method: "PUT",
         authToken: session.token,
       }
     );
@@ -403,37 +441,63 @@ const handleActivateSchool = async (schoolId: string) => {
 
 
 
-  const activeSchools = schools.filter((school) => school.isActive).length;
-  const totalStudents = schools.reduce((sum, school) => sum + school.population, 0);
-  const countriesCovered = new Set(
-    schools.map((school) => school.country).filter((country): country is string => Boolean(country)),
-  ).size;
-  const newestSchool = [...schools]
-    .sort((first, second) => (second.createdAt ?? "").localeCompare(first.createdAt ?? ""))[0];
-  const totalSchoolAdmins = schools.reduce((sum, school) => sum + school.adminCount, 0);
+  const statValue = (value: number | undefined) =>
+    stats && value !== undefined ? formatCompactNumber(value) : isLoading ? "…" : "—";
+  const statsNote = (note: string) => statsError || (stats ? note : "Loading from admin/schools/stats…");
+
   const summaryCards = [
     {
       label: "Total Schools",
-      value: formatCompactNumber(schools.length),
-      note: isLoading ? "Loading from admin/schools..." : "Live count from the backend",
+      value: statValue(stats?.totalSchools),
+      note: statsNote("Customer schools on the platform"),
     },
     {
       label: "Active Schools",
-      value: formatCompactNumber(activeSchools),
-      note: `${Math.max(0, schools.length - activeSchools)} inactive records`,
+      value: statValue(stats?.activeSchools),
+      note: statsNote(`${stats?.inactiveSchools ?? 0} suspended or deactivated`),
     },
     {
       label: "Total Students",
-      value: formatCompactNumber(totalStudents),
-      note: "Summed from each school's population field",
+      value: statValue(stats?.totalStudents),
+      note: statsNote("Students enrolled across all schools"),
     },
     {
       label: "Countries Covered",
-      value: formatCompactNumber(countriesCovered),
-      note: "Unique countries represented in connected schools",
+      value: statValue(stats?.countriesCovered),
+      note: statsNote("Unique countries represented in connected schools"),
     },
   ];
 
+  const growthPct = stats?.totalSchoolsGrowthPct;
+  const highlightCards = [
+    {
+      label: "TOTAL SCHOOLS",
+      value: statValue(stats?.totalSchools),
+      detail:
+        growthPct === null || growthPct === undefined
+          ? "New this year"
+          : `${growthPct >= 0 ? "+" : ""}${growthPct}% vs LY`,
+      detailClassName: "text-[#22c55e]",
+    },
+    {
+      label: "ACTIVE TRIALS",
+      value: statValue(stats?.activeTrials),
+      detail: `${stats?.trialsEndingSoon ?? 0} ending soon`,
+      detailClassName: "text-[#3b82f6]",
+    },
+    {
+      label: "TOTAL STUDENTS",
+      value: statValue(stats?.totalStudents),
+      detail: `+${formatCompactNumber(stats?.newStudentsThisMonth ?? 0)} this month`,
+      detailClassName: "text-[#22c55e]",
+    },
+    {
+      label: "MONTHLY REVENUE",
+      value: stats ? formatRevenue(stats.monthlyRevenue, stats.currency || "NGN") : statValue(undefined),
+      detail: null,
+      detailClassName: "",
+    },
+  ];
 
   return (
     <AppShell title="Schools Management" activeSection="schools">
@@ -603,7 +667,7 @@ const handleActivateSchool = async (schoolId: string) => {
                             Students
                           </span>
                           <span className="text-[15px] font-extrabold text-[#121f33] sm:text-[16px] xl:text-[18px]">
-                            {formatCompactNumber(school.population)}
+                            {formatCompactNumber(school.studentCount)}
                           </span>
                         </div>
                       </td>
@@ -719,71 +783,34 @@ const handleActivateSchool = async (schoolId: string) => {
         </div>
       </section>
 
-     <section className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-  <article className="rounded-[18px] border border-[#e7eafb] bg-[#f8f8f8] px-8 py-7">
-    <p className="text-[14px] font-medium uppercase tracking-[0.02em] text-[#2f4365]">
-      TOTAL SCHOOLS
-    </p>
+      <section className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {highlightCards.map((card) => (
+          <article
+            key={card.label}
+            className="rounded-[18px] border border-[#e7eafb] bg-[#f8f8f8] px-8 py-7"
+          >
+            <p className="text-[14px] font-medium uppercase tracking-[0.02em] text-[#2f4365]">
+              {card.label}
+            </p>
 
-    <div className="mt-8 flex items-end justify-between gap-4">
-      <p className="text-[58px] font-extrabold leading-none tracking-[-0.05em] text-[#0b2b52]">
-        146
-      </p>
+            <div className="mt-8 flex items-end justify-between gap-4">
+              <p className="text-[58px] font-extrabold leading-none tracking-[-0.05em] text-[#0b2b52]">
+                {card.value}
+              </p>
 
-      <p className="pb-2 text-[16px] font-bold text-[#22c55e]">
-        +12% vs LY
-      </p>
-    </div>
-  </article>
-
-  <article className="rounded-[18px] border border-[#e7eafb] bg-[#f8f8f8] px-8 py-7">
-    <p className="text-[14px] font-medium uppercase tracking-[0.02em] text-[#2f4365]">
-      ACTIVE TRIALS
-    </p>
-
-    <div className="mt-8 flex items-end justify-between gap-4">
-      <p className="text-[58px] font-extrabold leading-none tracking-[-0.05em] text-[#0b2b52]">
-        18
-      </p>
-
-      <p className="pb-2 text-[16px] font-bold text-[#3b82f6]">
-        6 ending soon
-      </p>
-    </div>
-  </article>
-
-  <article className="rounded-[18px] border border-[#e7eafb] bg-[#f8f8f8] px-8 py-7">
-    <p className="text-[14px] font-medium uppercase tracking-[0.02em] text-[#2f4365]">
-      TOTAL STUDENTS
-    </p>
-
-    <div className="mt-8 flex items-end justify-between gap-4">
-      <p className="text-[58px] font-extrabold leading-none tracking-[-0.05em] text-[#0b2b52]">
-        84.2k
-      </p>
-
-      <p className="pb-2 text-[16px] font-bold text-[#22c55e]">
-        +2.4k this month
-      </p>
-    </div>
-  </article>
-
-  <article className="rounded-[18px] border border-[#e7eafb] bg-[#f8f8f8] px-8 py-7">
-    <p className="text-[14px] font-medium uppercase tracking-[0.02em] text-[#2f4365]">
-      MONTHLY REVENUE
-    </p>
-
-    <div className="mt-8 flex items-end justify-between gap-4">
-      <p className="text-[58px] font-extrabold leading-none tracking-[-0.05em] text-[#0b2b52]">
-        $128.5k
-      </p>
-
-      <span className="pb-2 text-[#0f8d4e]">
-        <TrendingUp className="h-10 w-10" strokeWidth={2.5} />
-      </span>
-    </div>
-  </article>
-</section>
+              {card.detail ? (
+                <p className={`pb-2 text-[16px] font-bold ${card.detailClassName}`}>
+                  {card.detail}
+                </p>
+              ) : (
+                <span className="pb-2 text-[#0f8d4e]">
+                  <TrendingUp className="h-10 w-10" strokeWidth={2.5} />
+                </span>
+              )}
+            </div>
+          </article>
+        ))}
+      </section>
     </AppShell>
   );
 }

@@ -51,11 +51,23 @@ export interface FetchBroadcastsResponse {
   meta: BroadcastMeta;
 }
 
+export interface BroadcastTrendPoint {
+  month: string;
+  year: number;
+  sent: number;
+  delivered: number;
+  opened: number;
+  /** Opened ÷ delivered for broadcasts sent that month, as a percentage. */
+  openRate: number;
+}
+
 export interface BroadcastStatsData {
   totalSent: number;
   avgOpenRate: number;
   scheduled: number;
   draft: number;
+  /** Last six months, oldest first, current month last. */
+  engagementTrend?: BroadcastTrendPoint[];
 }
 
 export interface BroadcastStatsResponse {

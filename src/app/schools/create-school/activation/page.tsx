@@ -15,7 +15,30 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { CreateSchoolStepper } from "@/components/create-school-stepper";
-import { loadSchoolOnboardingDraft } from "@/lib/school-onboarding";
+import { useAuthSession } from "@/lib/auth-session";
+import { apiRequest, endpoints } from "@/lib/endpoints";
+import {
+  clearSchoolOnboardingDraft,
+  loadSchoolOnboardingDraft,
+} from "@/lib/school-onboarding";
+
+type AssignPlanResponse = {
+  message?: string;
+  data?: {
+    status?: string;
+    trialEndsAt?: string | null;
+    currentPeriodEnd?: string | null;
+    plan?: { name?: string };
+  };
+};
+
+function formatDate(value?: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? null
+    : new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(date);
+}
 
 function ActivationCard({
   icon: Icon,
@@ -45,12 +68,16 @@ function ActivationCard({
 
 function WorkspaceActiveModal({
   onClose,
+  schoolId,
   schoolName,
   workspaceUrl,
+  summary,
 }: {
   onClose: () => void;
+  schoolId: string;
   schoolName: string;
   workspaceUrl: string;
+  summary: string;
 }) {
    function copyToClipboard() {
     navigator.clipboard.writeText(workspaceUrl);
@@ -86,7 +113,7 @@ function WorkspaceActiveModal({
               {schoolName} Workspace Active 
             </h2>
             <p className="mt-3 max-w-[430px] text-center text-[16px] leading-7 text-[#667792]">
-              Congratulations! Your school&apos;s digital environment is ready to use. You can now start adding teachers, students, and courses.
+              {summary} The school admin can now sign in and start adding teachers, students, and courses.
             </p>
           </div>
 
@@ -119,20 +146,20 @@ function WorkspaceActiveModal({
           </div>
 
           <div className="mt-8 grid gap-4 sm:grid-cols-2">
-            <button
-              type="button"
+            <Link
+              href="/schools"
               onClick={onClose}
               className="flex h-[62px] items-center justify-center rounded-[10px] border border-[#cadfd5] bg-[#edf5f1] text-[16px] font-semibold text-[#4a8a60]"
             >
-              Cancel
-            </button>
-            <button
-              type="button"
+              Back to Schools
+            </Link>
+            <Link
+              href={`/schools/${schoolId}`}
               onClick={onClose}
               className="button-primary flex h-[62px] items-center justify-center gap-3 rounded-[10px] bg-[#4b8a60] text-[16px] font-semibold text-white"
             >
-              Continue to Step 3
-            </button>
+              View School
+            </Link>
           </div>
         </div>
       </div>
@@ -141,35 +168,55 @@ function WorkspaceActiveModal({
 }
 
 export default function CreateSchoolActivationPage() {
-const [showSuccessModal, setShowSuccessModal] = useState(false); // ← CHANGE FROM true TO false
+  const { session } = useAuthSession();
+  const [draft] = useState(() => loadSchoolOnboardingDraft());
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [isActivating, setIsActivating] = useState(false);
   const [activationError, setActivationError] = useState<string | null>(null);
-  
-  const [selectedPlanLabel] = useState(
-    () => loadSchoolOnboardingDraft()?.planName ?? "Selected Plan"
-  );
-  const [schoolName] = useState(
-    () => loadSchoolOnboardingDraft()?.schoolName ?? "-"
-  );
-  const [adminEmail] = useState(
-    () => loadSchoolOnboardingDraft()?.adminEmail ?? "-"
-  );
+  const [activationSummary, setActivationSummary] = useState("");
+
+  const schoolId = draft?.schoolId ?? "";
+  const selectedPlanLabel = draft?.planName ?? "No plan selected";
+  const schoolName = draft?.schoolName ?? "-";
+  const adminEmail = draft?.adminEmail ?? "-";
+  const canActivate = Boolean(schoolId && draft?.planId && session?.token);
 
   const workspaceUrl = `${schoolName.toLowerCase().replace(/\s+/g, "-")}.lms.bmilms.ng`;
 
   async function handleActivateSchool() {
+    if (!schoolId || !draft?.planId) {
+      setActivationError("Pick a school and a plan in the previous steps before activating.");
+      return;
+    }
+    if (!session?.token) {
+      setActivationError("You must be logged in to activate a school.");
+      return;
+    }
+
     setIsActivating(true);
     setActivationError(null);
 
     try {
-      // TODO: Call your activation API endpoint here
-      // const response = await apiRequest(endpoints.schools.activate, {
-      //   body: { schoolId, planId: draft?.planId },
-      //   authToken: session?.token,
-      // });
+      const response = await apiRequest<AssignPlanResponse>(
+        endpoints.subscriptions.assignSchoolPlan(schoolId),
+        {
+          method: "POST",
+          authToken: session.token,
+          body: { planId: draft.planId },
+        },
+      );
 
-      // For now, simulate a delay and show the modal
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const planName = response?.data?.plan?.name ?? selectedPlanLabel;
+      const trialEnds = formatDate(response?.data?.trialEndsAt);
+      const renews = formatDate(response?.data?.currentPeriodEnd);
+      setActivationSummary(
+        response?.data?.status === "trial" && trialEnds
+          ? `${schoolName} is on a ${planName} trial until ${trialEnds}.`
+          : renews
+            ? `${schoolName} is on the ${planName} plan until ${renews}.`
+            : `${schoolName} is on the ${planName} plan.`,
+      );
+      clearSchoolOnboardingDraft();
       setShowSuccessModal(true);
     } catch (err) {
       setActivationError(
@@ -195,8 +242,10 @@ const [showSuccessModal, setShowSuccessModal] = useState(false); // ← CHANGE F
      {showSuccessModal ? (
         <WorkspaceActiveModal
           onClose={() => setShowSuccessModal(false)}
+          schoolId={schoolId}
           schoolName={schoolName}
           workspaceUrl={workspaceUrl}
+          summary={activationSummary}
         />
       ) : null}
 
@@ -253,23 +302,6 @@ const [showSuccessModal, setShowSuccessModal] = useState(false); // ← CHANGE F
             </div>
           </article>
 
-          <article className="rounded-[14px] bg-white shadow-[0_18px_42px_rgba(182,192,227,0.12)]">
-            <div className="border-b border-[#e4e8f4] px-6 py-6 text-[15px] font-extrabold uppercase tracking-[0.08em] text-[#4659d8] sm:px-8 sm:text-[16px]">
-              Activation Settings
-            </div>
-            <div className="space-y-4 p-6">
-              <ActivationCard
-                icon={Mail}
-                title="Auto-Generate Credentials"
-                detail="Administrator will receive login details immediately."
-              />
-              <ActivationCard
-                icon={KeyRound}
-                title="Send Welcome Email Instantly"
-                detail="System will create a secure initial password."
-              />
-            </div>
-          </article>
 
           <div className="rounded-[12px] border border-[#dfe4f4] bg-[#f6f8ff] px-6 py-5 text-[17px] text-[#4659d8]">
             <span className="mr-3">ⓘ</span>
@@ -288,8 +320,8 @@ const [showSuccessModal, setShowSuccessModal] = useState(false); // ← CHANGE F
           </Link>
   <button
             type="button"
-            onClick={handleActivateSchool}  
-            disabled={isActivating} 
+            onClick={handleActivateSchool}
+            disabled={isActivating || !canActivate}
             className="button-primary inline-flex h-[62px] w-full items-center justify-center gap-3 rounded-[10px] bg-[#4b8a60] px-10 text-[16px] font-semibold text-white disabled:opacity-50 sm:w-auto"
           >
             {isActivating ? "Activating..." : "Complete Setup & Activate"}

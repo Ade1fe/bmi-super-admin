@@ -1,11 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
   BookOpen,
+  Building2,
   CalendarDays,
   CheckCircle2,
   ChevronDown,
+  CreditCard,
   FileSpreadsheet,
   LineChart,
   Mail,
@@ -24,20 +27,51 @@ type KPICardData = {
 };
 
 type NotificationItem = {
-  id: number;
+  id: string;
   title: string;
   time: string;
   type: string;
 };
 
 type StudentAtRisk = {
-  id: number;
+  id: string;
   name: string;
+  email: string | null;
   avatar: string;
   course: string;
   progress: number;
   status: string;
 };
+
+type FeedState<T> = {
+  items: T[];
+  total: number;
+  isLoading: boolean;
+  error: string;
+};
+
+const FEED_LIMIT = 5;
+
+function emptyFeed<T>(): FeedState<T> {
+  return { items: [], total: 0, isLoading: true, error: "" };
+}
+
+function notificationIcon(type: string) {
+  switch (type) {
+    case "completion":
+      return { icon: <CheckCircle2 className="h-5 w-5 text-[#3295ff]" strokeWidth={2} />, bg: "bg-[#eaf4ff]" };
+    case "quiz":
+      return { icon: <FileSpreadsheet className="h-5 w-5 text-[#8855ff]" strokeWidth={2} />, bg: "bg-[#f2ecff]" };
+    case "update":
+      return { icon: <MailWarning className="h-5 w-5 text-[#d98218]" strokeWidth={2} />, bg: "bg-[#fff5e8]" };
+    case "school":
+      return { icon: <Building2 className="h-5 w-5 text-[#4055c5]" strokeWidth={2} />, bg: "bg-[#eef1ff]" };
+    case "subscription":
+      return { icon: <CreditCard className="h-5 w-5 text-[#0f8751]" strokeWidth={2} />, bg: "bg-[#e8f5ee]" };
+    default:
+      return { icon: <UserPlus className="h-5 w-5 text-[#2ca266]" strokeWidth={2} />, bg: "bg-[#eef8f2]" };
+  }
+}
 
 export default function DashboardPage() {
   const { session } = useAuthSession();
@@ -72,67 +106,8 @@ export default function DashboardPage() {
     inProgressPercentage: 45,
   });
 
-  const [notifications, setNotifications] = useState<NotificationItem[]>([
-    {
-      id: 1,
-      title: "New student registered for SS2 Science",
-      time: "2 minutes ago",
-      type: "register",
-    },
-    {
-      id: 2,
-      title: "James Wilson completed Entrepreneurship 101",
-      time: "25 minutes ago",
-      type: "completion",
-    },
-    {
-      id: 3,
-      title: "Quiz Submission: History of Modern Arts (12 students)",
-      time: "2 hours ago",
-      type: "quiz",
-    },
-    {
-      id: 4,
-      title: "Course Update: Advanced Physics content added",
-      time: "25 minutes ago",
-      type: "update",
-    },
-  ]);
-
-  const [studentsAtRisk, setStudentsAtRisk] = useState<StudentAtRisk[]>([
-    {
-      id: 1,
-      name: "Sarah Miller",
-      avatar: "SM",
-      course: "Calculus II",
-      progress: 12,
-      status: "12% Completed",
-    },
-    {
-      id: 2,
-      name: "David Kalu",
-      avatar: "DK",
-      course: "Bio-Chemistry",
-      progress: 18,
-      status: "18% Completed",
-    },
-    {
-      id: 3,
-      name: "Sandra Duke",
-      avatar: "SD",
-      course: "Fine Arts",
-      progress: 18,
-      status: "18% Completed",
-    },
-    {
-      id: 4,
-      name: "Sandra Duke",
-      avatar: "SD",
-      course: "World Literature",
-      progress: 28,
-      status: "28% Completed",
-    },
-  ]);
+  const [notifications, setNotifications] = useState<FeedState<NotificationItem>>(emptyFeed);
+  const [studentsAtRisk, setStudentsAtRisk] = useState<FeedState<StudentAtRisk>>(emptyFeed);
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
@@ -155,12 +130,6 @@ export default function DashboardPage() {
           if (res.data.courseCompletionRate) {
             setCompletionRate(res.data.courseCompletionRate);
           }
-          if (Array.isArray(res.data.notifications)) {
-            setNotifications(res.data.notifications);
-          }
-          if (Array.isArray(res.data.studentsAtRisk)) {
-            setStudentsAtRisk(res.data.studentsAtRisk);
-          }
         }
       } catch (err) {
         console.error("Failed to fetch dashboard overview analytics:", err);
@@ -175,6 +144,52 @@ export default function DashboardPage() {
       isSubscribed = false;
     };
   }, [period, token]);
+
+  useEffect(() => {
+    if (!token) return;
+    let isSubscribed = true;
+
+    const loadFeed = async <T,>(
+      url: string,
+      setFeed: (feed: FeedState<T>) => void,
+      fallbackError: string,
+    ) => {
+      try {
+        const res = await apiRequest<{ data?: T[]; meta?: { total?: number } }>(
+          `${url}?limit=${FEED_LIMIT}`,
+          { authToken: token, cache: "no-store" },
+        );
+        const items = Array.isArray(res?.data) ? res.data : [];
+        if (isSubscribed) {
+          setFeed({ items, total: res?.meta?.total ?? items.length, isLoading: false, error: "" });
+        }
+      } catch (err) {
+        if (isSubscribed) {
+          setFeed({
+            items: [],
+            total: 0,
+            isLoading: false,
+            error: err instanceof Error ? err.message : fallbackError,
+          });
+        }
+      }
+    };
+
+    void loadFeed<NotificationItem>(
+      endpoints.admin.dashboard.notifications,
+      setNotifications,
+      "Unable to load notifications.",
+    );
+    void loadFeed<StudentAtRisk>(
+      endpoints.admin.dashboard.studentsAtRisk,
+      setStudentsAtRisk,
+      "Unable to load students at risk.",
+    );
+
+    return () => {
+      isSubscribed = false;
+    };
+  }, [token]);
 
   return (
     <AppShell
@@ -452,37 +467,34 @@ export default function DashboardPage() {
             </div>
 
             <div className="mt-7 space-y-6">
-              {notifications.map((item) => {
-                let iconEl = <UserPlus className="h-5 w-5 text-[#2ca266]" strokeWidth={2} />;
-                let iconBoxBg = "bg-[#eef8f2]";
-
-                if (item.type === "completion") {
-                  iconEl = <CheckCircle2 className="h-5 w-5 text-[#3295ff]" strokeWidth={2} />;
-                  iconBoxBg = "bg-[#eaf4ff]";
-                } else if (item.type === "quiz") {
-                  iconEl = <FileSpreadsheet className="h-5 w-5 text-[#8855ff]" strokeWidth={2} />;
-                  iconBoxBg = "bg-[#f2ecff]";
-                } else if (item.type === "update") {
-                  iconEl = <MailWarning className="h-5 w-5 text-[#d98218]" strokeWidth={2} />;
-                  iconBoxBg = "bg-[#fff5e8]";
-                }
-
-                return (
-                  <div key={item.id} className="flex items-start gap-4">
-                    <div
-                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${iconBoxBg}`}
-                    >
-                      {iconEl}
+              {notifications.isLoading ? (
+                <p className="text-[14px] font-medium text-[#7f8da4]">Loading recent activity…</p>
+              ) : notifications.error ? (
+                <p className="text-[14px] font-medium text-[#e04545]">{notifications.error}</p>
+              ) : notifications.items.length === 0 ? (
+                <p className="text-[14px] font-medium text-[#7f8da4]">
+                  No activity in the last 30 days.
+                </p>
+              ) : (
+                notifications.items.map((item) => {
+                  const { icon, bg } = notificationIcon(item.type);
+                  return (
+                    <div key={item.id} className="flex items-start gap-4">
+                      <div
+                        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${bg}`}
+                      >
+                        {icon}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[15px] font-bold leading-5 text-[#1b3457]">
+                          {item.title}
+                        </p>
+                        <p className="mt-1 text-[13px] font-medium text-[#7f8da4]">{item.time}</p>
+                      </div>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[15px] font-bold leading-5 text-[#1b3457]">
-                        {item.title}
-                      </p>
-                      <p className="mt-1 text-[13px] font-medium text-[#7f8da4]">{item.time}</p>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </article>
 
@@ -491,10 +503,17 @@ export default function DashboardPage() {
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <h2 className="text-[19px] font-extrabold tracking-[-0.03em] text-[#16345d]">
                 Students At Risk
+                {studentsAtRisk.total > studentsAtRisk.items.length ? (
+                  <span className="ml-2 text-[14px] font-bold text-[#7a8aa3]">
+                    ({studentsAtRisk.items.length} of {studentsAtRisk.total})
+                  </span>
+                ) : null}
               </h2>
-              <span className="inline-flex items-center rounded-full bg-[#fde8e8] px-3.5 py-1.5 text-[12px] font-extrabold uppercase tracking-[0.06em] text-[#e04545]">
-                Immediate Action Required
-              </span>
+              {studentsAtRisk.total > 0 ? (
+                <span className="inline-flex items-center rounded-full bg-[#fde8e8] px-3.5 py-1.5 text-[12px] font-extrabold uppercase tracking-[0.06em] text-[#e04545]">
+                  Immediate Action Required
+                </span>
+              ) : null}
             </div>
 
             <div className="mt-6 overflow-x-auto">
@@ -508,40 +527,57 @@ export default function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {studentsAtRisk.map((student) => (
-                    <tr key={student.id} className="border-b border-[#f3f6fc] text-[14px]">
-                      <td className="py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#e8eef8] text-[13px] font-bold text-[#2d4366]">
-                            {student.avatar}
-                          </div>
-                          <span className="font-bold text-[#1b3457]">{student.name}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 font-medium text-[#465978]">{student.course}</td>
-                      <td className="px-4 py-4">
-                        <div className="w-36">
-                          <div className="h-2 w-full rounded-full bg-[#f0f4fa]">
-                            <div
-                              className="h-2 rounded-full bg-[#e54545]"
-                              style={{ width: `${student.progress}%` }}
-                            />
-                          </div>
-                          <span className="mt-1 block text-[12px] font-bold text-[#e54545]">
-                            {student.status}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="py-4 text-right">
-                        <button
-                          type="button"
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
-                        >
-                          <Mail className="h-4 w-4" strokeWidth={1.8} />
-                        </button>
+                  {studentsAtRisk.isLoading || studentsAtRisk.error || studentsAtRisk.items.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={4}
+                        className={`py-6 text-[14px] font-medium ${studentsAtRisk.error ? "text-[#e04545]" : "text-[#7f8da4]"}`}
+                      >
+                        {studentsAtRisk.isLoading
+                          ? "Loading students at risk…"
+                          : studentsAtRisk.error ||
+                            "No students are below 30% progress on their enrolled courses."}
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    studentsAtRisk.items.map((student) => (
+                      <tr key={student.id} className="border-b border-[#f3f6fc] text-[14px]">
+                        <td className="py-4">
+                          <Link href={`/students/${student.id}`} className="flex items-center gap-3">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#e8eef8] text-[13px] font-bold text-[#2d4366]">
+                              {student.avatar}
+                            </div>
+                            <span className="font-bold text-[#1b3457] hover:underline">{student.name}</span>
+                          </Link>
+                        </td>
+                        <td className="px-4 py-4 font-medium text-[#465978]">{student.course}</td>
+                        <td className="px-4 py-4">
+                          <div className="w-36">
+                            <div className="h-2 w-full rounded-full bg-[#f0f4fa]">
+                              <div
+                                className="h-2 rounded-full bg-[#e54545]"
+                                style={{ width: `${student.progress}%` }}
+                              />
+                            </div>
+                            <span className="mt-1 block text-[12px] font-bold text-[#e54545]">
+                              {student.status}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-4 text-right">
+                          {student.email ? (
+                            <a
+                              href={`mailto:${student.email}`}
+                              aria-label={`Email ${student.name}`}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                            >
+                              <Mail className="h-4 w-4" strokeWidth={1.8} />
+                            </a>
+                          ) : null}
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

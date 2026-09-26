@@ -345,18 +345,19 @@ export default function BroadcastHistoryPage() {
   }, [page, meta.totalPages]);
 
   // ---------------------------------------------------------------------------
-  // Engagement trend — derived from stats (visual only, bars are illustrative)
+  // Engagement trend — monthly open rate from /admin/broadcasts/stats
   // ---------------------------------------------------------------------------
 
-  const trendBars = [
-    { month: "Jan", value: 18 },
-    { month: "Feb", value: 58 },
-    { month: "Mar", value: 27 },
-    { month: "April", value: stats ? Math.min(100, stats.avgOpenRate) : 68, highlight: true },
-    { month: "May", value: 58 },
-    { month: "June", value: 33 },
-    { month: "July", value: 18 },
-  ];
+  const trendPoints = stats?.engagementTrend ?? [];
+  const trendBars = trendPoints.map((point, index) => ({
+    key: `${point.year}-${point.month}`,
+    month: point.month,
+    openRate: point.openRate,
+    sent: point.sent,
+    value: Math.min(100, Math.max(0, point.openRate)),
+    highlight: index === trendPoints.length - 1,
+  }));
+  const hasTrendData = trendBars.some((bar) => bar.sent > 0);
 
   // ---------------------------------------------------------------------------
   // Render
@@ -649,29 +650,47 @@ export default function BroadcastHistoryPage() {
             </button>
           </div>
 
-          <div className="mt-10 grid h-[280px] grid-cols-7 items-end gap-4 sm:h-[360px] sm:gap-7">
-            {trendBars.map((bar) => (
-              <div
-                key={bar.month}
-                className="flex h-full flex-col items-center justify-end gap-4"
-              >
-                <div className="flex h-full w-full items-end">
-                  <div
-                    className={[
-                      "w-full rounded-t-[10px]",
-                      bar.highlight
-                        ? "bg-[linear-gradient(180deg,#5ea68b_0%,#58a486_70%,#dfffee_100%)]"
-                        : "bg-[#cfe1da]",
-                    ].join(" ")}
-                    style={{ height: `${bar.value}%` }}
-                  />
+          {loading ? (
+            <div className="flex h-[280px] items-center justify-center sm:h-[360px]">
+              <Loader2 className="h-7 w-7 animate-spin text-[#0f8751]" />
+            </div>
+          ) : !hasTrendData ? (
+            <p className="flex h-[200px] items-center justify-center text-center text-[15px] text-[#8090a8]">
+              No broadcasts were sent in the last 6 months.
+            </p>
+          ) : (
+            <div
+              className="mt-10 grid h-[280px] items-end gap-4 sm:h-[360px] sm:gap-7"
+              style={{ gridTemplateColumns: `repeat(${trendBars.length}, minmax(0, 1fr))` }}
+            >
+              {trendBars.map((bar) => (
+                <div
+                  key={bar.key}
+                  className="flex h-full flex-col items-center justify-end gap-2"
+                  title={`${bar.sent} sent · ${bar.openRate}% opened`}
+                >
+                  <span className="text-[13px] font-bold text-[#536781]">
+                    {bar.sent > 0 ? `${bar.openRate}%` : "—"}
+                  </span>
+                  <div className="flex h-full w-full items-end">
+                    <div
+                      className={[
+                        "w-full rounded-t-[10px]",
+                        bar.highlight
+                          ? "bg-[linear-gradient(180deg,#5ea68b_0%,#58a486_70%,#dfffee_100%)]"
+                          : "bg-[#cfe1da]",
+                      ].join(" ")}
+                      // A sliver keeps months with sends visible at a 0% open rate.
+                      style={{ height: `${bar.sent > 0 ? Math.max(bar.value, 2) : 0}%` }}
+                    />
+                  </div>
+                  <span className="mt-2 text-[14px] font-medium text-[#7f88a0] sm:text-[16px]">
+                    {bar.month}
+                  </span>
                 </div>
-                <span className="text-[14px] font-medium text-[#7f88a0] sm:text-[16px]">
-                  {bar.month}
-                </span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </section>
       </div>
 

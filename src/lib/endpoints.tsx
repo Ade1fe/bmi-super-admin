@@ -78,6 +78,7 @@ export const endpoints = {
     login: buildEndpoint(apiBaseUrl, "/admin/login"),
 
     schools: buildEndpoint(apiBaseUrl, "/admin/schools"),
+    schoolStats: buildEndpoint(apiBaseUrl, "/admin/schools/stats"),
 
     schoolById: (schoolId: string) =>
       buildEndpoint(apiBaseUrl, `/admin/school/${schoolId}`),
@@ -205,6 +206,11 @@ certificates: {
     buildEndpoint(apiBaseUrl, `/admin/certificates/${certificateId}/revoke`),
   reissue: (certificateId: string) =>
     buildEndpoint(apiBaseUrl, `/admin/certificates/${certificateId}/reissue`),
+},
+
+dashboard: {
+  notifications: buildEndpoint(apiBaseUrl, "/admin/dashboard/notifications"),
+  studentsAtRisk: buildEndpoint(apiBaseUrl, "/admin/dashboard/students-at-risk"),
 },
 
 analytics: {
@@ -446,6 +452,10 @@ payments: {
         apiBaseUrl,
         `/subscriptions/plans/${planId}/features/${featureId}`
       ),
+
+    // POST { planId } — puts a school on a plan without a Paystack checkout
+    assignSchoolPlan: (schoolId: string) =>
+      buildEndpoint(apiBaseUrl, `/subscriptions/admin/schools/${schoolId}`),
   },
 
   managementTeam: {

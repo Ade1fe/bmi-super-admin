@@ -7,7 +7,7 @@ import { useState } from "react";
 import { ArrowLeft, ArrowRight, BadgeInfo, Cylinder, ShieldCheck } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { CreateSchoolStepper } from "@/components/create-school-stepper";
-import { persistSchoolOnboardingDraft } from "@/lib/school-onboarding";
+import { loadSchoolOnboardingDraft, persistSchoolOnboardingDraft } from "@/lib/school-onboarding";
 import { adminCreateSchool } from "@/lib/students-api";
 import { useAuthSession } from "@/lib/auth-session";
 
@@ -93,8 +93,19 @@ export default function CreateSchoolPage() {
     setIsSubmitting(true);
     setErrorMessage("");
 
+    const normalizedEmail = adminEmail.trim().toLowerCase();
+    const existingDraft = loadSchoolOnboardingDraft();
+
+    // Coming back to step 1 in the same tab must not try to create the school
+    // a second time — the backend would reject the duplicate admin email.
+    if (existingDraft?.schoolId && existingDraft.adminEmail === normalizedEmail) {
+      setIsSubmitting(false);
+      router.push("/schools/create-school/subscription");
+      return;
+    }
+
     try {
-      await adminCreateSchool(
+      const created = await adminCreateSchool(
         {
           school_name: schoolName.trim(),
           admin_first_name: adminFirstName.trim(),
@@ -108,6 +119,7 @@ export default function CreateSchoolPage() {
       );
 
       persistSchoolOnboardingDraft({
+        schoolId: created.school?.id,
         schoolName: schoolName.trim(),
         country: country.trim(),
         adminFirstName: adminFirstName.trim(),

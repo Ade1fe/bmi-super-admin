@@ -24,6 +24,8 @@ export type SubscriptionPlan = {
   maxCourses?: number;
   maxTeamMembers?: number;
   trialDurationDays?: number;
+  /** "school" or "student" — who the plan is sold to. */
+  audience?: string;
   isActive: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -183,6 +185,7 @@ export function parseSubscriptionPlan(value: unknown): SubscriptionPlan | null {
       maxCourses: readNumber(value.maxCourses),
       maxTeamMembers: readNumber(value.maxTeamMembers),
       trialDurationDays: readNumber(value.trialDurationDays),
+      audience: readOptionalString(value.audience),
       isActive: readBoolean(value.isActive),
       createdAt: readOptionalString(value.createdAt),
       updatedAt: readOptionalString(value.updatedAt),

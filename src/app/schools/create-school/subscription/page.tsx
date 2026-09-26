@@ -35,8 +35,13 @@ const infoCards = [
 
 function formatPlanPrice(plan: SubscriptionPlan) {
   return {
-    price: `$${plan.price}`,
-    suffix: plan.interval === "annually" ? "/year" : "/month",
+    price: new Intl.NumberFormat("en-NG", {
+      style: "currency",
+      currency: "NGN",
+      maximumFractionDigits: 0,
+    }).format(plan.price || 0),
+    suffix:
+      plan.interval === "annually" ? "/year" : plan.interval === "one_time" ? " once" : "/month",
   };
 }
 
@@ -46,7 +51,12 @@ function planFeatureLabels(plan: SubscriptionPlan) {
       ? `Up to ${plan.maxStudents} students`
       : "Unlimited students";
 
-  return [studentLine, ...plan.features.map((feature) => feature.name)];
+  const trialLine =
+    plan.trialDurationDays && plan.trialDurationDays > 0
+      ? [`${plan.trialDurationDays}-day free trial`]
+      : [];
+
+  return [studentLine, ...trialLine, ...plan.features.map((feature) => feature.name)];
 }
 
 function UpgradeModal({
@@ -166,7 +176,7 @@ function UpgradeModal({
 export default function CreateSchoolSubscriptionPage() {
   const { session } = useAuthSession();
   const [draft] = useState(() => loadSchoolOnboardingDraft());
-  const schoolName = draft?.schoolName ?? "Greenfield International Academy";
+  const schoolName = draft?.schoolName ?? "this school";
 
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -185,7 +195,10 @@ export default function CreateSchoolSubscriptionPage() {
 const payload = await apiRequest<unknown>(endpoints.subscriptions.adminPlans, {
   authToken: session?.token,
 });
-const parsedPlans = parseSubscriptionPlanList(payload).filter((plan) => plan.isActive);
+// Student tiers share the plan table, so keep only what is sold to schools.
+const parsedPlans = parseSubscriptionPlanList(payload).filter(
+  (plan) => plan.isActive && (plan.audience ?? "school") === "school",
+);
         if (isMounted) setPlans(parsedPlans);
       } catch (err) {
         if (isMounted) {
@@ -202,20 +215,15 @@ const parsedPlans = parseSubscriptionPlanList(payload).filter((plan) => plan.isA
     };
   }, [session?.token]);
 
-// In handleContinue() on the subscription page:
 function handleContinue() {
-  if (!selectedPlanId) return;
+  if (!selectedPlanId || !draft) return;
 
   const selectedPlan = plans.find((p) => p.id === selectedPlanId);
 
   persistSchoolOnboardingDraft({
-    schoolName: draft?.schoolName ?? "",
-    country: draft?.country ?? "",
-    adminFirstName: draft?.adminFirstName ?? "",
-    adminLastName: draft?.adminLastName ?? "",
-    adminEmail: draft?.adminEmail ?? "",
+    ...draft,
     planId: selectedPlanId,
-    planName: selectedPlan?.name,  // ← STORE PLAN NAME
+    planName: selectedPlan?.name,
   });
 }
 
@@ -244,7 +252,15 @@ function handleContinue() {
           </p>
         </section>
 
-        {isLoading ? (
+        {!draft?.schoolId ? (
+          <p className="mt-12 text-center text-[16px] text-[#d14343]">
+            No school is being set up in this tab.{" "}
+            <Link href="/schools/create-school" className="font-semibold underline">
+              Start from step 1
+            </Link>{" "}
+            to create the school first.
+          </p>
+        ) : isLoading ? (
           <p className="mt-12 text-center text-[16px] text-[#667792]">Loading available plans…</p>
         ) : loadError ? (
           <p className="mt-12 text-center text-[16px] text-[#d14343]">{loadError}</p>

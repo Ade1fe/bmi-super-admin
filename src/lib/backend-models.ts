@@ -5,6 +5,9 @@ export type SchoolSummary = {
   name: string;
   email: string;
   population: number;
+  /** Enrolled students, as counted by the backend; falls back to `population`. */
+  studentCount: number;
+  status?: string;
   isActive: boolean;
   country?: string;
   phone?: string;
@@ -48,10 +51,6 @@ function readNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
-function readBoolean(value: unknown) {
-  return typeof value === "boolean" ? value : false;
-}
-
 function unwrapCollection(payload: unknown): unknown[] {
   if (Array.isArray(payload)) {
     return payload;
@@ -88,6 +87,7 @@ export function parseSchoolSummary(value: unknown): SchoolSummary | null {
   }
 
   const schoolUsers = Array.isArray(value.schoolUsers) ? value.schoolUsers : [];
+  const status = readOptionalString(value.status);
   const id = readString(value.id);
   const name = readString(value.name);
   const email = readString(value.email);
@@ -101,7 +101,14 @@ export function parseSchoolSummary(value: unknown): SchoolSummary | null {
     name,
     email,
     population: readNumber(value.population),
-    isActive: readBoolean(value.isActive),
+    studentCount:
+      typeof value.studentCount === "number"
+        ? readNumber(value.studentCount)
+        : readNumber(value.population),
+    status,
+    // Schools carry a `status` column ('active' | 'suspended' | 'deactivated'),
+    // not an `isActive` flag; the flag is honoured if a payload ever sends it.
+    isActive: typeof value.isActive === "boolean" ? value.isActive : status === "active",
     country: readOptionalString(value.country),
     phone: readOptionalString(value.phone),
     address: readOptionalString(value.address),
