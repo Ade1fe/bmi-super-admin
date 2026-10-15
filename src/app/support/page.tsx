@@ -228,22 +228,27 @@ function StatusChangeModal({
         className="fixed inset-0 z-40 bg-black/55 backdrop-blur-[2px]"
         onClick={onClose}
       />
+      {/* Capped to the viewport: the body scrolls, the footer buttons stay visible. */}
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="relative w-full max-w-[610px]">
-          <button
-            type="button"
-            aria-label="Close modal"
-            onClick={onClose}
-            className="absolute right-3 top-3 z-10 inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#8d8d8d]/75 text-white shadow-[0_14px_30px_rgba(0,0,0,0.18)] backdrop-blur md:-right-16 md:-top-16"
+          <article
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="status-modal-title"
+            className="relative flex max-h-[calc(100dvh-2rem)] w-full max-w-[610px] flex-col overflow-hidden rounded-[26px] bg-white shadow-[0_40px_120px_rgba(20,28,48,0.26)]"
           >
-            <X className="h-5 w-5" strokeWidth={2.2} />
-          </button>
-          <article className="overflow-hidden rounded-[26px] bg-white shadow-[0_40px_120px_rgba(20,28,48,0.26)]">
-            <div className="px-8 py-8 sm:px-10">
+            <button
+              type="button"
+              aria-label="Close modal"
+              onClick={onClose}
+              className="absolute right-4 top-4 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full text-[#8391a8] transition hover:bg-[#f3f6fb] hover:text-[#172f54]"
+            >
+              <X className="h-5 w-5" strokeWidth={2.2} />
+            </button>
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6 sm:px-10 sm:py-8">
               <p className="text-[14px] font-extrabold uppercase tracking-[0.12em] text-[#5d47ff]">
                 Admin Action
               </p>
-              <h2 className="mt-2 text-[26px] font-extrabold tracking-[-0.05em] text-[#172f54]">
+              <h2 id="status-modal-title" className="mt-2 pr-10 text-[24px] font-extrabold tracking-[-0.05em] text-[#172f54] sm:text-[26px]">
                 Update Ticket Status
               </h2>
               <p className="mt-2 text-[16px] text-[#6b7d97]">
@@ -315,7 +320,7 @@ function StatusChangeModal({
               </label>
             </div>
 
-            <div className="flex flex-col gap-3 bg-[#fbfcff] px-8 py-6 sm:flex-row sm:justify-end sm:px-10">
+            <div className="flex shrink-0 flex-col gap-3 border-t border-[#eef2f8] bg-[#fbfcff] px-6 py-5 sm:flex-row sm:justify-end sm:px-10">
               <button
                 type="button"
                 onClick={onClose}
@@ -334,7 +339,6 @@ function StatusChangeModal({
               </button>
             </div>
           </article>
-        </div>
       </div>
     </>
   );
@@ -683,15 +687,20 @@ export default function SupportCenterPage() {
   ticket={assignModal}
   authToken={authToken}
   onClose={() => setAssignModal(null)}
-  onAssigned={(ticket, agentId) => {
-    // optimistically update the ticket's assignedAgent in state
+  onAssigned={(ticket, agent) => {
+    // Show the new agent straight away, then re-sync from the server.
     setTickets(prev =>
       prev.map(t => t.id === ticket.id
-        ? { ...t, assignedAgent: `Agent #${agentId.slice(0, 6)}` }
+        ? {
+            ...t,
+            assignedAgent: `${agent.firstName} ${agent.lastName}`.trim(),
+            assignedAgentId: agent.id,
+            lastUpdated: "Just now",
+          }
         : t
       )
     );
-    fetchTickets(); // re-sync from server
+    fetchTickets();
   }}
 />
     </AppShell>

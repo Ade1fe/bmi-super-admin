@@ -40,33 +40,6 @@ type SidebarCard = {
   description: string;
 };
 
-const defaultDetailMetrics: DetailMetric[] = [
-  {
-    label: "TOTAL ENROLLMENT",
-    value: "140",
-    delta: "12%",
-    tone: "positive",
-  },
-  {
-    label: "COURSE COMPLETION",
-    value: "88.4%",
-    delta: "4%",
-    tone: "positive",
-  },
-  {
-    label: "AVG. GRADE",
-    value: "3.8",
-    helper: "/ 4.0",
-    tone: "neutral",
-  },
-  {
-    label: "REVENUE IMPACT",
-    value: "$42.8k",
-    helper: "NET PERFORMANCE INDEX",
-    accent: true,
-  },
-];
-
 const defaultLessons: LessonRow[] = [
   {
     id: "01",
@@ -170,7 +143,9 @@ export default function CourseAnalyticsDetailPage() {
   const { session } = useAuthSession();
 
   const [courseName, setCourseName] = useState("Entrepreneurship Fundamentals");
-  const [detailMetrics, setDetailMetrics] = useState<DetailMetric[]>(defaultDetailMetrics);
+  // Start empty: the old defaults ("$42.8k", "140") showed as if real while loading or on error.
+  const [detailMetrics, setDetailMetrics] = useState<DetailMetric[]>([]);
+  const [metricsError, setMetricsError] = useState(false);
   const [lessons, setLessons] = useState<LessonRow[]>(defaultLessons);
   const [bottleneckAlerts, setBottleneckAlerts] = useState<SidebarCard[]>(defaultBottleneckAlerts);
   const [growthInsights, setGrowthInsights] = useState<string[]>(defaultGrowthInsights);
@@ -198,6 +173,7 @@ export default function CourseAnalyticsDetailPage() {
         }
       } catch (err) {
         console.error("Failed to load course details:", err);
+        if (isMounted) setMetricsError(true);
       } finally {
         if (isMounted) setIsLoading(false);
       }
@@ -254,6 +230,15 @@ export default function CourseAnalyticsDetailPage() {
               {detailMetrics.map((metric) => (
                 <DetailMetricCard key={metric.label} metric={metric} />
               ))}
+              {detailMetrics.length === 0 ? (
+                <p className="rounded-[20px] bg-white px-6 py-5 text-[15px] text-[#6b7d97] xl:col-span-4">
+                  {isLoading
+                    ? "Loading course metrics…"
+                    : metricsError
+                      ? "Couldn't load this course's metrics. Refresh to try again."
+                      : "No metrics available for this course yet."}
+                </p>
+              ) : null}
             </section>
 
             <section className="mt-8 grid gap-8 xl:grid-cols-[minmax(0,1.8fr)_380px]">

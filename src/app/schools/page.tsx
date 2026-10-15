@@ -109,12 +109,16 @@ function SummaryCard({
 
 function SchoolActionMenu({
   schoolId,
+  isActive,
   onDeactivate,
   onSuspend,
+  onReactivate,
 }: {
   schoolId: string;
+  isActive: boolean;
   onDeactivate: () => void;
   onSuspend: () => void;
+  onReactivate: () => void;
 }) {
   return (
     <div className="absolute right-4 top-[70px] z-10 hidden w-[258px] rounded-[12px] border border-[#e4e8f4] bg-white p-2.5 shadow-[0_24px_44px_rgba(166,178,214,0.22)] xl:block">
@@ -126,23 +130,36 @@ function SchoolActionMenu({
         View Details
       </Link>
 
-      <button
-        type="button"
-        onClick={onDeactivate}
-        className="flex w-full items-center gap-3 rounded-[10px] px-4 py-3 text-left text-[15px] font-medium text-[#38455f] hover:bg-[#f6f8fd]"
-      >
-        <TriangleAlert className="h-[18px] w-[18px] text-[#56657f]" strokeWidth={2} />
-        Deactivate School
-      </button>
+      {isActive ? (
+        <>
+          <button
+            type="button"
+            onClick={onDeactivate}
+            className="flex w-full items-center gap-3 rounded-[10px] px-4 py-3 text-left text-[15px] font-medium text-[#38455f] hover:bg-[#f6f8fd]"
+          >
+            <TriangleAlert className="h-[18px] w-[18px] text-[#56657f]" strokeWidth={2} />
+            Deactivate School
+          </button>
 
-      <button
-        type="button"
-        onClick={onSuspend}
-        className="flex w-full items-center gap-3 rounded-[10px] px-4 py-3 text-left text-[15px] font-medium text-[#38455f] hover:bg-[#f6f8fd]"
-      >
-        <PauseCircle className="h-[18px] w-[18px] text-[#56657f]" strokeWidth={2} />
-        Suspend School Access
-      </button>
+          <button
+            type="button"
+            onClick={onSuspend}
+            className="flex w-full items-center gap-3 rounded-[10px] px-4 py-3 text-left text-[15px] font-medium text-[#38455f] hover:bg-[#f6f8fd]"
+          >
+            <PauseCircle className="h-[18px] w-[18px] text-[#56657f]" strokeWidth={2} />
+            Suspend School Access
+          </button>
+        </>
+      ) : (
+        <button
+          type="button"
+          onClick={onReactivate}
+          className="flex w-full items-center gap-3 rounded-[10px] px-4 py-3 text-left text-[15px] font-medium text-[#1f7a46] hover:bg-[#f2fbf6]"
+        >
+          <PauseCircle className="h-[18px] w-[18px] text-[#1f7a46]" strokeWidth={2} />
+          Reactivate School
+        </button>
+      )}
     </div>
   );
 }
@@ -609,6 +626,13 @@ const handleActivateSchool = async (schoolId: string) => {
                 {schools.map((school) => {
                   const schoolCode = buildSchoolCode(school);
                   const isActive = school.isActive;
+                  const statusLabel = isActive
+                    ? "Active"
+                    : school.status === "suspended"
+                      ? "Suspended"
+                      : school.status === "deactivated"
+                        ? "Deactivated"
+                        : "Inactive";
 
                   return (
                     <tr
@@ -694,7 +718,7 @@ const handleActivateSchool = async (schoolId: string) => {
                             }`}
                           >
                             <span className="h-2.5 w-2.5 rounded-full bg-current" />
-                            {isActive ? "Active" : "Inactive"}
+                            {statusLabel}
                           </span>
                         </div>
                       </td>
@@ -719,27 +743,40 @@ const handleActivateSchool = async (schoolId: string) => {
     View Details
   </Link>
 
-  <button
-    type="button"
-    onClick={() => {
-      setSelectedSchool(school);
-      setActiveDialog("suspend");
-    }}
-    className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-[#dce3f2] bg-white px-4 py-3 text-center text-[13px] font-semibold text-[#5a6986] sm:h-12 sm:text-[14px]"
-  >
-    Suspend School Access
-  </button>
+  {isActive ? (
+    <>
+      <button
+        type="button"
+        onClick={() => {
+          setSelectedSchool(school);
+          setActiveDialog("suspend");
+        }}
+        className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-[#dce3f2] bg-white px-4 py-3 text-center text-[13px] font-semibold text-[#5a6986] sm:h-12 sm:text-[14px]"
+      >
+        Suspend School Access
+      </button>
 
-  <button
-    type="button"
-    onClick={() => {
-      setSelectedSchool(school);
-      setActiveDialog("deactivate");
-    }}
-    className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-[#ef1f4f] px-4 py-3 text-center text-[13px] font-semibold text-white sm:h-12 sm:text-[14px]"
-  >
-    Deactivate School
-  </button>
+      <button
+        type="button"
+        onClick={() => {
+          setSelectedSchool(school);
+          setActiveDialog("deactivate");
+        }}
+        className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-[#ef1f4f] px-4 py-3 text-center text-[13px] font-semibold text-white sm:h-12 sm:text-[14px]"
+      >
+        Deactivate School
+      </button>
+    </>
+  ) : (
+    <button
+      type="button"
+      disabled={actionLoading}
+      onClick={() => void handleActivateSchool(school.id)}
+      className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-[#1f7a46] px-4 py-3 text-center text-[13px] font-semibold text-white disabled:opacity-60 sm:col-span-2 sm:h-12 sm:text-[14px]"
+    >
+      Reactivate School
+    </button>
+  )}
 </div>
 
                         <button
@@ -755,6 +792,11 @@ const handleActivateSchool = async (schoolId: string) => {
                         {openMenuRowId === school.id ? (
                           <SchoolActionMenu
                             schoolId={school.id}
+                            isActive={isActive}
+                            onReactivate={() => {
+                              setOpenMenuRowId(null);
+                              void handleActivateSchool(school.id);
+                            }}
                             onDeactivate={() => {
                               setSelectedSchool(school);
                               setActiveDialog("deactivate");

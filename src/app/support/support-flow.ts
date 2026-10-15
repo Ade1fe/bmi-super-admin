@@ -113,6 +113,7 @@ export interface SupportTicket {
   caseCode: string;
   summary: string;
   assignedAgent: string;
+  assignedAgentId?: string | null;
   submittedBy: string;
 
   // ── requester display ─────────────────────────────────────────
@@ -257,6 +258,7 @@ export function mapApiTicketToUi(
     caseCode: apiTicket.ticketId ?? apiTicket.id.slice(0, 8).toUpperCase(),
     summary: apiTicket.description.slice(0, 160),
     assignedAgent: agentName,
+    assignedAgentId: apiTicket.assignedAgentId ?? null,
     submittedBy: apiTicket.orgCode
       ? `${apiTicket.requesterEmail} · ${apiTicket.orgCode}`
       : apiTicket.requesterEmail,

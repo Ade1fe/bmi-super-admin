@@ -10,7 +10,8 @@ export type TicketStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "ON_HOLD";
 /** What a requester raised from their Help & Support screen; null on tickets agents created. */
 export type TicketType = "COMPLAINT" | "REPORT";
 export type ActivitySenderType = "REQUESTER" | "SUPPORT_AGENT" | "SYSTEM";
-export type AgentWorkload = "OFFLINE" | "MINIMAL" | "MODERATE" | "HEAVY";
+/** Mirrors the API: by open + in-progress tickets (0-1, 2-4, 5-7, 8+). OFFLINE = deactivated account. */
+export type AgentWorkload = "MINIMAL" | "LOW" | "MODERATE" | "AT_CAPACITY" | "OFFLINE";
 
 export interface SupportMetricStat {
   value: number | string;
@@ -77,6 +78,8 @@ export interface SupportAgent {
   firstName: string;
   lastName: string;
   email: string;
+  role?: string;
+  avatar?: string | null;
   isActive: boolean;
   activeTicketsCount: number;
   workload: AgentWorkload;

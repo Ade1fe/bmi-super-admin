@@ -16,10 +16,11 @@ import type { SupportTicket } from "@/app/support/support-flow";
 function workloadColor(workload: SupportAgent["workload"]): string {
   switch (workload) {
     case "MINIMAL":
+    case "LOW":
       return "text-[#2d8c5c]";
     case "MODERATE":
       return "text-[#d97706]";
-    case "HEAVY":
+    case "AT_CAPACITY":
     case "OFFLINE":
       return "text-[#e53e3e]";
     default:
@@ -30,16 +31,27 @@ function workloadColor(workload: SupportAgent["workload"]): string {
 function workloadLabel(workload: SupportAgent["workload"]): string {
   switch (workload) {
     case "MINIMAL":
+      return "AVAILABLE";
+    case "LOW":
       return "LOW WORKLOAD";
     case "MODERATE":
       return "MODERATE";
-    case "HEAVY":
+    case "AT_CAPACITY":
       return "AT CAPACITY";
     case "OFFLINE":
-      return "OFFLINE";
+      return "DEACTIVATED";
     default:
-      return workload;
+      return String(workload);
   }
+}
+
+function roleLabel(role?: string): string {
+  if (!role) return "";
+  return role
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 function agentInitials(agent: SupportAgent): string {
@@ -62,7 +74,7 @@ interface AssignAgentModalProps {
   ticket: SupportTicket | null;
   authToken: string;
   onClose: () => void;
-  onAssigned?: (ticket: SupportTicket, agentId: string) => void;
+  onAssigned?: (ticket: SupportTicket, agent: SupportAgent) => void;
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -82,15 +94,18 @@ export function AssignAgentModal({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  // Fetch agents on open
+  const currentAgentId = ticket?.assignedAgentId ?? null;
+
+  // Fetch agents each time the modal opens for a ticket.
   useEffect(() => {
     if (!ticket || !authToken) return;
     setLoading(true);
     setError(null);
-    setSelectedAgentId(ticket.assignedAgent?.startsWith("Agent #") ? null : null);
+    setSaveError(null);
+    setSelectedAgentId(null);
 
     getAvailableSupportAgents(authToken)
-      .then(setAgents)
+      .then((list) => setAgents(Array.isArray(list) ? list : []))
       .catch((err) =>
         setError(err instanceof Error ? err.message : "Failed to load agents.")
       )
@@ -100,12 +115,13 @@ export function AssignAgentModal({
   if (!ticket) return null;
 
   const handleConfirm = async () => {
-    if (!selectedAgentId) return;
+    const agent = agents.find((item) => item.id === selectedAgentId);
+    if (!agent) return;
     setSaving(true);
     setSaveError(null);
     try {
-      await assignSupportAgent(ticket.id, { agentId: selectedAgentId }, authToken);
-      onAssigned?.(ticket, selectedAgentId);
+      await assignSupportAgent(ticket.id, { agentId: agent.id }, authToken);
+      onAssigned?.(ticket, agent);
       onClose();
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Failed to assign agent.");
@@ -124,149 +140,153 @@ export function AssignAgentModal({
         onClick={onClose}
       />
 
-      {/* Modal */}
+      {/* Modal — capped to the viewport; the agent list scrolls, header and footer stay put. */}
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="relative w-full max-w-[610px]">
-          {/* Close button */}
+        <article
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="assign-agent-title"
+          className="relative flex max-h-[calc(100dvh-2rem)] w-full max-w-[610px] flex-col overflow-hidden rounded-[26px] bg-white shadow-[0_40px_120px_rgba(20,28,48,0.26)]"
+        >
           <button
             type="button"
             aria-label="Close modal"
             onClick={onClose}
-            className="absolute right-3 top-3 z-10 inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#8d8d8d]/75 text-white shadow-[0_14px_30px_rgba(0,0,0,0.18)] backdrop-blur md:-right-16 md:-top-16"
+            className="absolute right-4 top-4 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full text-[#8391a8] transition hover:bg-[#f3f6fb] hover:text-[#172f54]"
           >
             <X className="h-5 w-5" strokeWidth={2.2} />
           </button>
 
-          <article className="overflow-hidden rounded-[26px] bg-white shadow-[0_40px_120px_rgba(20,28,48,0.26)]">
-            {/* Header */}
-            <div className="px-8 py-8 sm:px-10">
-              <p className="text-[14px] font-extrabold uppercase tracking-[0.12em] text-[#5d47ff]">
-                Admin Action
-              </p>
-              <h2 className="mt-2 text-[26px] font-extrabold tracking-[-0.05em] text-[#172f54]">
-                Assign Support Agent
-              </h2>
-              <p className="mt-2 text-[16px] text-[#6b7d97]">
-                Referencing Ticket ID:{" "}
-                <span className="font-bold text-[#172f54]">
-                  {ticket.ticketNumber}
-                </span>{" "}
-                &mdash;{" "}
-                <span className="font-semibold text-[#172f54]">{ticket.from}</span>
-              </p>
+          {/* Header */}
+          <div className="shrink-0 px-6 pt-6 sm:px-10 sm:pt-8">
+            <p className="text-[14px] font-extrabold uppercase tracking-[0.12em] text-[#5d47ff]">
+              Admin Action
+            </p>
+            <h2
+              id="assign-agent-title"
+              className="mt-2 pr-10 text-[24px] font-extrabold tracking-[-0.05em] text-[#172f54] sm:text-[26px]"
+            >
+              Assign Support Agent
+            </h2>
+            <p className="mt-2 text-[15px] text-[#6b7d97] sm:text-[16px]">
+              Referencing Ticket ID:{" "}
+              <span className="font-bold text-[#172f54]">{ticket.ticketNumber}</span>{" "}
+              &mdash; <span className="font-semibold text-[#172f54]">{ticket.from}</span>
+            </p>
+            <p className="mt-6 text-[12px] font-extrabold uppercase tracking-[0.12em] text-[#7081a1]">
+              Available Agents ({loading ? "…" : agents.length})
+            </p>
+          </div>
 
-              {/* Agent list */}
-              <div className="mt-8">
-                <p className="text-[12px] font-extrabold uppercase tracking-[0.12em] text-[#7081a1]">
-                  Available Agents ({loading ? "…" : agents.length})
-                </p>
+          {/* Agent list */}
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6 pt-4 sm:px-10">
+            <div className="flex flex-col gap-3">
+              {loading ? (
+                <div className="flex items-center justify-center gap-3 py-10 text-[#8391a8]">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <span className="text-[15px] font-medium">Loading agents…</span>
+                </div>
+              ) : error ? (
+                <div className="rounded-[14px] border border-[#f8d6d6] bg-[#fff1f1] px-5 py-4 text-[15px] text-[#a42f2f]">
+                  {error}
+                </div>
+              ) : agents.length === 0 ? (
+                <div className="py-8 text-center text-[15px] text-[#8391a8]">
+                  No active support agents. Add an admin with a support role to assign tickets.
+                </div>
+              ) : (
+                agents.map((agent, i) => {
+                  const active = selectedAgentId === agent.id;
+                  const isCurrent = currentAgentId === agent.id;
+                  const unavailable = agent.workload === "OFFLINE" || isCurrent;
+                  const avatarClass = AVATAR_COLORS[i % AVATAR_COLORS.length];
 
-                <div className="mt-4 flex flex-col gap-3">
-                  {loading ? (
-                    <div className="flex items-center justify-center gap-3 py-10 text-[#8391a8]">
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                      <span className="text-[15px] font-medium">Loading agents…</span>
-                    </div>
-                  ) : error ? (
-                    <div className="rounded-[14px] border border-[#f8d6d6] bg-[#fff1f1] px-5 py-4 text-[15px] text-[#a42f2f]">
-                      {error}
-                    </div>
-                  ) : agents.length === 0 ? (
-                    <div className="py-8 text-center text-[15px] text-[#8391a8]">
-                      No agents available at the moment.
-                    </div>
-                  ) : (
-                    agents.map((agent, i) => {
-                      const active = selectedAgentId === agent.id;
-                      const avatarClass = AVATAR_COLORS[i % AVATAR_COLORS.length];
+                  return (
+                    <button
+                      key={agent.id}
+                      type="button"
+                      disabled={unavailable}
+                      aria-pressed={active}
+                      onClick={() => setSelectedAgentId(agent.id)}
+                      className={`flex items-center gap-4 rounded-[16px] border px-4 py-4 text-left transition-colors disabled:cursor-not-allowed sm:px-5 ${
+                        active
+                          ? "border-[#4b8a60] bg-[#eaf8f0] shadow-[inset_0_0_0_1px_#4b8a60]"
+                          : isCurrent
+                            ? "border-[#dfe6f7] bg-[#f8faff]"
+                            : "border-[#dfe6f7] hover:bg-[#f8faff] disabled:opacity-50"
+                      }`}
+                    >
+                      <span
+                        className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[14px] font-extrabold ${avatarClass}`}
+                      >
+                        {agentInitials(agent)}
+                      </span>
 
-                      return (
-                        <button
-                          key={agent.id}
-                          type="button"
-                          disabled={agent.workload === "OFFLINE"}
-                          onClick={() => setSelectedAgentId(agent.id)}
-                          className={`flex items-center gap-4 rounded-[16px] border px-5 py-4 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                            active
-                              ? "border-[#4b8a60] bg-[#eaf8f0] shadow-[inset_0_0_0_1px_#4b8a60]"
-                              : "border-[#dfe6f7] hover:bg-[#f8faff]"
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[16px] font-extrabold text-[#172f54]">
+                          {agent.firstName} {agent.lastName}
+                        </p>
+                        <p className="mt-0.5 truncate text-[13px] text-[#6b7d97]">
+                          {[roleLabel(agent.role), agent.email].filter(Boolean).join(" · ")}
+                        </p>
+                      </div>
+
+                      <div className="shrink-0 text-right">
+                        <p className="text-[13px] font-bold text-[#172f54] sm:text-[14px]">
+                          {agent.activeTicketsCount} ACTIVE TICKET
+                          {agent.activeTicketsCount !== 1 ? "S" : ""}
+                        </p>
+                        <p
+                          className={`mt-0.5 text-[12px] font-extrabold ${
+                            isCurrent ? "text-[#5d47ff]" : workloadColor(agent.workload)
                           }`}
                         >
-                          {/* Avatar */}
-                          <span
-                            className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[14px] font-extrabold ${avatarClass}`}
-                          >
-                            {agentInitials(agent)}
-                          </span>
+                          {isCurrent ? "CURRENTLY ASSIGNED" : workloadLabel(agent.workload)}
+                        </p>
+                      </div>
 
-                          {/* Info */}
-                          <div className="min-w-0 flex-1">
-                            <p className="text-[16px] font-extrabold text-[#172f54]">
-                              {agent.firstName} {agent.lastName}
-                            </p>
-                            <p className="mt-0.5 text-[13px] text-[#6b7d97]">
-                              {/* role not in API; show email as subtitle */}
-                              {agent.email}
-                            </p>
-                          </div>
-
-                          {/* Workload badge */}
-                          <div className="shrink-0 text-right">
-                            <p className="text-[14px] font-bold text-[#172f54]">
-                              {agent.activeTicketsCount} ACTIVE TICKET
-                              {agent.activeTicketsCount !== 1 ? "S" : ""}
-                            </p>
-                            <p className={`mt-0.5 text-[12px] font-extrabold ${workloadColor(agent.workload)}`}>
-                              {workloadLabel(agent.workload)}
-                            </p>
-                          </div>
-
-                          {/* Selection indicator */}
-                          <span
-                            className={`ml-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
-                              active
-                                ? "border-[#4b8a60] bg-[#4b8a60] text-white"
-                                : "border-[#dbe3f1] bg-white"
-                            }`}
-                          >
-                            {active && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
-                          </span>
-                        </button>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-
-              {/* Save error */}
-              {saveError && (
-                <div className="mt-4 rounded-[14px] border border-[#f8d6d6] bg-[#fff1f1] px-5 py-3 text-[15px] text-[#a42f2f]">
-                  {saveError}
-                </div>
+                      <span
+                        className={`ml-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+                          active || isCurrent
+                            ? "border-[#4b8a60] bg-[#4b8a60] text-white"
+                            : "border-[#dbe3f1] bg-white"
+                        }`}
+                      >
+                        {(active || isCurrent) && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
+                      </span>
+                    </button>
+                  );
+                })
               )}
             </div>
 
-            {/* Footer */}
-            <div className="flex flex-col gap-3 bg-[#fbfcff] px-8 py-6 sm:flex-row sm:justify-end sm:px-10">
-              <button
-                type="button"
-                onClick={onClose}
-                className="inline-flex h-12 items-center justify-center rounded-[14px] border border-[#bfd9cb] bg-white px-6 text-[17px] font-semibold text-[#4b8a60]"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirm}
-                disabled={!selectedAgentId || saving}
-                className="inline-flex h-12 items-center justify-center gap-2 rounded-[14px] bg-[#4b8a60] px-6 text-[17px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                Confirm Assignment
-              </button>
-            </div>
-          </article>
-        </div>
+            {saveError && (
+              <div className="mt-4 rounded-[14px] border border-[#f8d6d6] bg-[#fff1f1] px-5 py-3 text-[15px] text-[#a42f2f]">
+                {saveError}
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="flex shrink-0 flex-col gap-3 border-t border-[#eef2f8] bg-[#fbfcff] px-6 py-5 sm:flex-row sm:justify-end sm:px-10">
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex h-12 items-center justify-center rounded-[14px] border border-[#bfd9cb] bg-white px-6 text-[17px] font-semibold text-[#4b8a60]"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirm}
+              disabled={!selectedAgentId || saving}
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-[14px] bg-[#4b8a60] px-6 text-[17px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {currentAgentId ? "Reassign Ticket" : "Confirm Assignment"}
+            </button>
+          </div>
+        </article>
       </div>
     </>
   );
