@@ -176,13 +176,20 @@ export function createSessionFromAuthResponse(payload: unknown, fallback: AuthSe
   const nestedData = isRecord(root.data) ? root.data : {};
   const role = readString(nestedData.role) || readString(root.role) || fallback.role || "admin";
   const token = readString(nestedData.token) || readString(root.token) || fallback.token || "";
-  const permissions = readStringArray(nestedData.permissions).length
+  const storedPermissions = readStringArray(nestedData.permissions).length
     ? readStringArray(nestedData.permissions)
-    : fallback.permissions ?? [];
+    : readStringArray(root.permissions);
+  const permissions = storedPermissions.length ? storedPermissions : fallback.permissions ?? [];
 
-  // ✅ Try data.user first, then treat data itself as the user object (your API shape)
-  const userSource = isRecord(nestedData.user) ? nestedData.user : nestedData;
-  const user = coerceUser(userSource ?? root.user, fallback.user);
+  // A login response nests the user under `data` (or `data` is the user); a
+  // session read back from storage keeps it at the top level as `user`. Without
+  // that middle case every reload lost the user and the header said "Admin User".
+  const userSource = isRecord(nestedData.user)
+    ? nestedData.user
+    : isRecord(root.user)
+      ? root.user
+      : nestedData;
+  const user = coerceUser(userSource, fallback.user);
   const school = coerceSchool(nestedData.school ?? root.school, fallback.school);
 
   if (!token && !user && !school) {
