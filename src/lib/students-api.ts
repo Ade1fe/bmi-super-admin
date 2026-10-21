@@ -16,6 +16,44 @@ export interface StudentSchool {
   name: string;
 }
 
+export interface StudentInsights {
+  coursesEnrolled: number;
+  lessonsCompleted: number;
+  totalLessons: number;
+  avgQuizScore: number | null;
+  lastActivityAt: string | null;
+  lastActivity: string | null;
+  courses: Array<{
+    courseId: string;
+    name: string;
+    completedLessons: number;
+    totalLessons: number;
+    progress: number;
+    quizAverage: number | null;
+    status: "completed" | "in_progress";
+  }>;
+  recentActivity: Array<{
+    activity: string;
+    course: string;
+    result: string;
+    passed: boolean;
+    at: string;
+  }>;
+  certificates: Array<{
+    id: string;
+    courseName: string;
+    status: string;
+    certificateUrl: string | null;
+    date: string;
+  }>;
+  badges: Array<{
+    id: string;
+    name: string;
+    imageUrl: string | null;
+    unlockedAt: string;
+  }>;
+}
+
 export interface Student {
   id: string;
   userId: string;
@@ -26,6 +64,8 @@ export interface Student {
   updatedAt: string;
   user: StudentUser;
   school: StudentSchool;
+  /** Present on the profile endpoint only. */
+  insights?: StudentInsights;
 }
 
 // ─── Payloads ──────────────────────────────────────────

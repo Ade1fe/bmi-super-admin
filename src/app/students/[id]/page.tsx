@@ -38,50 +38,18 @@ function formatDate(iso: string) {
   });
 }
 
-// ─── Mock data for UI sections not in API ────────────────────────────────────
-
-const MOCK_STATS = [
-  {
-    label: "Total Learning Time",
-    value: "124h 45m",
-    sub: "↑ 12% from last month",
-    subColor: "#0f8751",
-  },
-  {
-    label: "Lessons Completed",
-    value: "48",
-    sub: "of 62 total lessons",
-    subColor: "#6b7894",
-  },
-  {
-    label: "Last Login",
-    value: "Today, 09:12 AM",
-    sub: "IP: 192.168.1.45",
-    subColor: "#6b7894",
-  },
-];
-
-const MOCK_COURSES = [
-  { name: "Mastering UI/UX Design", path: "Design Professional Path", progress: 85, quiz: "92/100", status: "PENDING" },
-  { name: "Mastering UI/UX Design", path: "Design Professional Path", progress: 85, quiz: "92/100", status: "ACTIVE" },
-  { name: "Mastering UI/UX Design", path: "Design Professional Path", progress: 85, quiz: "92/100", status: "PENDING" },
-  { name: "Mastering UI/UX Design", path: "Design Professional Path", progress: 85, quiz: "92/100", status: "ACTIVE" },
-  { name: "Mastering UI/UX Design", path: "Design Professional Path", progress: 85, quiz: "92/100", status: "PENDING" },
-];
-
-const MOCK_CERTIFICATES = [
-  { title: "Advanced React", meta: "2.PDF • 2.4 MB4 MB" },
-  { title: "Advanced React", meta: "2.PDF • 2.4 MB4 MB" },
-];
-
-const MOCK_BADGES = [
-  { label: "Fast Learner", color: "#f4c542" },
-  { label: "7-Day Streak", color: "#c0392b" },
-  { label: "7-Day Streak", color: "#2c3e7a" },
-];
+function formatDateTime(iso: string) {
+  return new Date(iso).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
 
 function StatusBadge({ status }: { status: string }) {
-  const isActive = status === "ACTIVE";
+  const isActive = status === "completed";
+  const label = isActive ? "COMPLETED" : "IN PROGRESS";
   return (
     <span
       style={{
@@ -90,7 +58,7 @@ function StatusBadge({ status }: { status: string }) {
       }}
       className="inline-flex items-center rounded-full px-3 py-1 text-[12px] font-bold tracking-wide"
     >
-      {status}
+      {label}
     </span>
   );
 }
@@ -161,6 +129,33 @@ export default function StudentDetailPage() {
 
   const initials = getInitials(student.user.firstName, student.user.lastName);
   const fullName = `${student.user.firstName} ${student.user.lastName}`;
+  const insights = student.insights;
+  const courses = insights?.courses ?? [];
+  const certificates = insights?.certificates ?? [];
+  const badges = insights?.badges ?? [];
+  const stats = [
+    {
+      label: "Courses Enrolled",
+      value: String(insights?.coursesEnrolled ?? 0),
+      sub: "Active enrolments",
+      subColor: "#6b7894",
+    },
+    {
+      label: "Lessons Completed",
+      value: String(insights?.lessonsCompleted ?? 0),
+      sub: `of ${insights?.totalLessons ?? 0} total lessons`,
+      subColor: "#6b7894",
+    },
+    {
+      label: "Avg. Quiz Score",
+      value:
+        insights?.avgQuizScore != null ? `${insights.avgQuizScore}%` : "—",
+      sub: insights?.lastActivityAt
+        ? `Last activity ${formatDateTime(insights.lastActivityAt)}`
+        : "No activity yet",
+      subColor: "#6b7894",
+    },
+  ];
 
   return (
        <AppShell title="Individual Students" activeSection="student">
@@ -250,7 +245,7 @@ export default function StudentDetailPage() {
 
         {/* Stats row */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 mb-6">
-          {MOCK_STATS.map((stat) => (
+          {stats.map((stat) => (
             <div
               key={stat.label}
               className="rounded-[16px] bg-white p-6 shadow-[0_8px_30px_rgba(182,192,227,0.10)]"
@@ -288,32 +283,40 @@ export default function StudentDetailPage() {
                 <thead>
                   <tr className="bg-[#f5f7fb] text-left text-[12px] font-bold uppercase tracking-[0.07em] text-[#7f8cab]">
                     <th className="px-6 py-4">Course Name</th>
-                    <th className="px-6 py-4">Course Name</th>
+                    <th className="px-6 py-4">Lessons</th>
                     <th className="px-6 py-4">Progress</th>
                     <th className="px-6 py-4">Quiz Score</th>
                     <th className="px-6 py-4">Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {MOCK_COURSES.map((course, i) => (
-                    <tr key={i} className="border-b border-[#f0f3f9] last:border-0">
-                      <td className="px-6 py-4 text-[14px] font-semibold text-[#182c4e]">
-                        {course.name}
-                      </td>
-                      <td className="px-6 py-4 text-[14px] text-[#6b7894]">
-                        {course.path}
-                      </td>
-                      <td className="px-6 py-4">
-                        <ProgressBar value={course.progress} />
-                      </td>
-                      <td className="px-6 py-4 text-[14px] font-semibold text-[#182c4e]">
-                        {course.quiz}
-                      </td>
-                      <td className="px-6 py-4">
-                        <StatusBadge status={course.status} />
+                  {courses.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-10 text-center text-[14px] text-[#7f8cab]">
+                        This student is not enrolled in any courses yet.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    courses.map((course) => (
+                      <tr key={course.courseId} className="border-b border-[#f0f3f9] last:border-0">
+                        <td className="px-6 py-4 text-[14px] font-semibold text-[#182c4e]">
+                          {course.name}
+                        </td>
+                        <td className="px-6 py-4 text-[14px] text-[#6b7894]">
+                          {course.completedLessons}/{course.totalLessons}
+                        </td>
+                        <td className="px-6 py-4">
+                          <ProgressBar value={course.progress} />
+                        </td>
+                        <td className="px-6 py-4 text-[14px] font-semibold text-[#182c4e]">
+                          {course.quizAverage != null ? `${course.quizAverage}%` : "—"}
+                        </td>
+                        <td className="px-6 py-4">
+                          <StatusBadge status={course.status} />
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -328,54 +331,66 @@ export default function StudentDetailPage() {
                 Certificates
               </h2>
               <div className="flex flex-col gap-3">
-                {MOCK_CERTIFICATES.map((cert, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between rounded-[10px] bg-[#f5f7fb] px-4 py-3"
-                  >
-                    <div className="flex items-center gap-3">
-                      {/* PDF thumb */}
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] bg-[#e8edf5]">
-                        <BookOpen className="h-5 w-5 text-[#5a6986]" strokeWidth={1.8} />
-                      </div>
-                      <div>
-                        <p className="text-[14px] font-bold text-[#182c4e]">{cert.title}</p>
-                        <p className="text-[12px] text-[#8b97ad]">{cert.meta}</p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-[#7f8cab] shadow-[0_2px_6px_rgba(182,192,227,0.18)] hover:text-[#0f8751] transition-colors"
+                {certificates.length === 0 ? (
+                  <p className="text-[14px] text-[#7f8cab]">No certificates yet.</p>
+                ) : (
+                  certificates.map((cert) => (
+                    <div
+                      key={cert.id}
+                      className="flex items-center justify-between rounded-[10px] bg-[#f5f7fb] px-4 py-3"
                     >
-                      <Download className="h-4 w-4" strokeWidth={2} />
-                    </button>
-                  </div>
-                ))}
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] bg-[#e8edf5]">
+                          <BookOpen className="h-5 w-5 text-[#5a6986]" strokeWidth={1.8} />
+                        </div>
+                        <div>
+                          <p className="text-[14px] font-bold text-[#182c4e]">{cert.courseName}</p>
+                          <p className="text-[12px] capitalize text-[#8b97ad]">
+                            {cert.status} • {formatDate(cert.date)}
+                          </p>
+                        </div>
+                      </div>
+                      {cert.certificateUrl ? (
+                        <a
+                          href={cert.certificateUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-[#7f8cab] shadow-[0_2px_6px_rgba(182,192,227,0.18)] hover:text-[#0f8751] transition-colors"
+                        >
+                          <Download className="h-4 w-4" strokeWidth={2} />
+                        </a>
+                      ) : null}
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 
             {/* Badges */}
             <div className="rounded-[16px] bg-white shadow-[0_8px_30px_rgba(182,192,227,0.10)] p-6">
               <h2 className="mb-4 text-[18px] font-extrabold tracking-[-0.03em] text-[#182c4e]">
-                Certificates
+                Badges
               </h2>
               <div className="flex gap-4 flex-wrap">
-                {MOCK_BADGES.map((badge, i) => (
-                  <div key={i} className="flex flex-col items-center gap-2">
-                    <div
-                      className="flex h-16 w-16 items-center justify-center rounded-full shadow-[0_6px_20px_rgba(0,0,0,0.12)]"
-                      style={{ background: `radial-gradient(circle at 35% 35%, ${badge.color}cc, ${badge.color})` }}
-                    >
-                      {/* Trophy icon placeholder */}
-                      <span className="text-[28px]">
-                        {i === 0 ? "🏅" : "🏆"}
-                      </span>
+                {badges.length === 0 ? (
+                  <p className="text-[14px] text-[#7f8cab]">No badges earned yet.</p>
+                ) : (
+                  badges.map((badge) => (
+                    <div key={badge.id} className="flex flex-col items-center gap-2">
+                      <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-[#f5f7fb] shadow-[0_6px_20px_rgba(0,0,0,0.12)]">
+                        {badge.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={badge.imageUrl} alt={badge.name} className="h-full w-full object-cover" />
+                        ) : (
+                          <span className="text-[28px]">🏅</span>
+                        )}
+                      </div>
+                      <p className="text-[12px] font-semibold text-[#6b7894] text-center leading-tight">
+                        {badge.name}
+                      </p>
                     </div>
-                    <p className="text-[12px] font-semibold text-[#6b7894] text-center leading-tight">
-                      {badge.label}
-                    </p>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
 

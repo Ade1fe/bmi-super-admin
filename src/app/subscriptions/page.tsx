@@ -27,6 +27,48 @@ type SummaryMetric = {
   note: string;
 };
 
+type Audience = "school" | "student";
+
+const AUDIENCE_COPY: Record<
+  Audience,
+  {
+    tab: string;
+    plansNote: string;
+    tableTitle: string;
+    tableNote: string;
+    payerHeader: string;
+    countLabel: string;
+    empty: string;
+    createLabel: string;
+  }
+> = {
+  school: {
+    tab: "School plans",
+    plansNote: "Plans sold to schools, including inactive ones.",
+    tableTitle: "School Subscriptions",
+    tableNote: "Cross-school subscription records from the admin listing endpoint.",
+    payerHeader: "School",
+    countLabel: "schools billed",
+    empty: "No school subscriptions yet.",
+    createLabel: "Create School Plan",
+  },
+  student: {
+    tab: "Independent learner plans",
+    plansNote:
+      "Plans self-registered learners choose from, managed separately from school billing.",
+    tableTitle: "Independent Learner Subscriptions",
+    tableNote: "Subscriptions held by learners in their own right, outside any school.",
+    payerHeader: "Learner",
+    countLabel: "learners billed",
+    empty: "No independent learner subscriptions yet.",
+    createLabel: "Create Learner Plan",
+  },
+};
+
+function planAudience(plan: SubscriptionPlan): Audience {
+  return plan.audience === "student" ? "student" : "school";
+}
+
 type StatusTone =
   | "success"
   | "warning"
@@ -216,7 +258,17 @@ function SummaryCard({ metric }: { metric: SummaryMetric }) {
   );
 }
 
+function intervalSuffix(interval: string) {
+  if (interval === "one_time") {
+    return "one-time";
+  }
+
+  return interval === "annually" ? "/year" : "/month";
+}
+
 function PlanCard({ plan }: { plan: SubscriptionPlan }) {
+  const isLearnerPlan = planAudience(plan) === "student";
+
   return (
     <article className="rounded-[20px] border border-[#dfe6f2] bg-white p-7 shadow-[0_18px_38px_rgba(180,193,229,0.07)]">
       <div className="flex items-start justify-between gap-4">
@@ -245,29 +297,35 @@ function PlanCard({ plan }: { plan: SubscriptionPlan }) {
           {formatCurrency(plan.price)}
         </span>
         <span className="pb-2 text-[17px] text-[#6c7f9b]">
-          {plan.interval === "annually"
-            ? "/year"
-            : "/month"}
+          {plan.price > 0 ? intervalSuffix(plan.interval) : "free"}
         </span>
       </div>
 
       <div className="mt-7 grid gap-3 sm:grid-cols-2">
         {[
-          [
-            "Students",
-            plan.maxStudents?.toLocaleString() ??
-              "Not limited",
-          ],
+          ...(isLearnerPlan
+            ? []
+            : [
+                [
+                  "Students",
+                  plan.maxStudents?.toLocaleString() ??
+                    "Not limited",
+                ],
+              ]),
           [
             "Courses",
             plan.maxCourses?.toLocaleString() ??
               "Not limited",
           ],
-          [
-            "Team",
-            plan.maxTeamMembers?.toLocaleString() ??
-              "Not limited",
-          ],
+          ...(isLearnerPlan
+            ? []
+            : [
+                [
+                  "Team",
+                  plan.maxTeamMembers?.toLocaleString() ??
+                    "Not limited",
+                ],
+              ]),
           [
             "Trial",
             plan.trialDurationDays
@@ -400,6 +458,7 @@ export default function SubscriptionManagementPage() {
     string | null
   >(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [audience, setAudience] = useState<Audience>("school");
 
   useEffect(() => {
     const authToken = session?.token;
@@ -462,9 +521,16 @@ export default function SubscriptionManagementPage() {
     };
   }, [isHydrated, reloadKey, session?.token]);
 
+  const copy = AUDIENCE_COPY[audience];
+  const audiencePlans = plans.filter(
+    (plan) => planAudience(plan) === audience
+  );
+  const audienceSubscriptions = subscriptions.filter(
+    (subscription) => subscription.subscriberType === audience
+  );
   const summaryMetrics = computeMetrics(
-    subscriptions,
-    plans
+    audienceSubscriptions,
+    audiencePlans
   );
 
   return (
@@ -480,8 +546,8 @@ export default function SubscriptionManagementPage() {
               Subscription Management
             </h1>
             <p className="mt-3 max-w-[760px] text-[17px] leading-7 text-[#465b7d]">
-              Plans are loaded from `/subscriptions/admin/plans` and school
-              subscriptions from `/subscriptions/admin/list`.
+              Manage school plans and independent learner plans side by side. Each
+              audience has its own catalogue, subscriptions and metrics.
             </p>
           </div>
 
@@ -505,16 +571,56 @@ export default function SubscriptionManagementPage() {
               Refresh
             </button>
             <Link
-              href="/subscriptions/create-plan"
+              href={`/subscriptions/create-plan?audience=${audience}`}
               className="button-primary inline-flex h-12 items-center justify-center gap-3 rounded-[12px] bg-[#4b8a60] px-6 text-[15px] font-semibold text-white"
             >
               <CirclePlus
                 className="h-5 w-5"
                 strokeWidth={2.1}
               />
-              Create New Plan
+              {copy.createLabel}
             </Link>
           </div>
+        </div>
+
+        <div
+          role="tablist"
+          aria-label="Plan audience"
+          className="mt-8 inline-flex rounded-[14px] border border-[#dfe6f2] bg-white p-1.5"
+        >
+          {(Object.keys(AUDIENCE_COPY) as Audience[]).map((key) => {
+            const count = plans.filter(
+              (plan) => planAudience(plan) === key
+            ).length;
+
+            return (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={audience === key}
+                onClick={() => setAudience(key)}
+                className={[
+                  "inline-flex h-11 items-center gap-2 rounded-[10px] px-5 text-[15px] font-semibold",
+                  audience === key
+                    ? "bg-[#4b8a60] text-white"
+                    : "text-[#52637d]",
+                ].join(" ")}
+              >
+                {AUDIENCE_COPY[key].tab}
+                <span
+                  className={[
+                    "rounded-full px-2 py-0.5 text-[12px] font-bold",
+                    audience === key
+                      ? "bg-white/20 text-white"
+                      : "bg-[#eef2f8] text-[#52637d]",
+                  ].join(" ")}
+                >
+                  {count}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
         {!session?.token && isHydrated ? (
@@ -545,11 +651,11 @@ export default function SubscriptionManagementPage() {
                 Plans
               </h2>
               <p className="mt-2 text-[15px] text-[#5f7290]">
-                All plans including inactive ones.
+                {copy.plansNote}
               </p>
             </div>
             <div className="rounded-full bg-[#eef1ff] px-4 py-2 text-[14px] font-bold text-[#4057d8]">
-              {plans.length.toLocaleString()} plans
+              {audiencePlans.length.toLocaleString()} plans
             </div>
           </div>
 
@@ -558,14 +664,14 @@ export default function SubscriptionManagementPage() {
               <div className="flex min-h-[220px] items-center justify-center rounded-[22px] bg-white">
                 <LoaderCircle className="h-8 w-8 animate-spin text-[#4b8a60]" />
               </div>
-            ) : plans.length === 0 ? (
+            ) : audiencePlans.length === 0 ? (
               <EmptyState
                 title="No plans yet"
-                description="Create your first subscription plan to populate the admin plan catalogue."
+                description={`Create the first ${audience === "student" ? "independent learner" : "school"} plan to populate this catalogue.`}
               />
             ) : (
               <div className="grid gap-5 xl:grid-cols-3">
-                {plans.map((plan) => (
+                {audiencePlans.map((plan) => (
                   <PlanCard
                     key={plan.id}
                     plan={plan}
@@ -580,17 +686,17 @@ export default function SubscriptionManagementPage() {
           <div className="flex flex-col gap-4 border-b border-[#e8edf7] px-6 py-7 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h2 className="text-[18px] font-extrabold tracking-[-0.03em] text-[#16345d]">
-                School Subscriptions
+                {copy.tableTitle}
               </h2>
               <p className="mt-2 text-[15px] text-[#7c8ba3]">
-                Cross-school subscription records from the admin listing endpoint.
+                {copy.tableNote}
               </p>
             </div>
 
             <div className="flex items-center gap-3">
               <div className="inline-flex items-center gap-2 rounded-[12px] bg-[#f8fbff] px-4 py-3 text-[14px] font-semibold text-[#4e5d77]">
                 <Users className="h-4 w-4" strokeWidth={2} />
-                {subscriptions.length.toLocaleString()} schools billed
+                {audienceSubscriptions.length.toLocaleString()} {copy.countLabel}
               </div>
               <div className="inline-flex items-center gap-2 rounded-[12px] bg-[#f8fbff] px-4 py-3 text-[14px] font-semibold text-[#4e5d77]">
                 <CreditCard
@@ -598,7 +704,7 @@ export default function SubscriptionManagementPage() {
                   strokeWidth={2}
                 />
                 {formatCurrency(
-                  subscriptions.reduce(
+                  audienceSubscriptions.reduce(
                     (sum, subscription) =>
                       sum +
                       (subscription.plan?.price ?? 0),
@@ -613,7 +719,7 @@ export default function SubscriptionManagementPage() {
             <table className="min-w-full">
               <thead className="bg-[#f6f8fd]">
                 <tr className="text-left text-[12px] font-extrabold uppercase tracking-[0.14em] text-[#72829a]">
-                  <th className="px-6 py-5">School</th>
+                  <th className="px-6 py-5">{copy.payerHeader}</th>
                   <th className="px-4 py-5">Plan</th>
                   <th className="px-4 py-5">Status</th>
                   <th className="px-4 py-5">Billing Window</th>
@@ -631,17 +737,17 @@ export default function SubscriptionManagementPage() {
                       Loading subscriptions...
                     </td>
                   </tr>
-                ) : subscriptions.length === 0 ? (
+                ) : audienceSubscriptions.length === 0 ? (
                   <tr>
                     <td
                       colSpan={6}
                       className="px-6 py-10 text-center text-[15px] text-[#72829a]"
                     >
-                      No school subscriptions yet.
+                      {copy.empty}
                     </td>
                   </tr>
                 ) : (
-                  subscriptions.map((subscription) => (
+                  audienceSubscriptions.map((subscription) => (
                     <tr
                       key={subscription.id}
                       className="border-t border-[#edf1f7] text-[15px] text-[#4f5f7c]"
@@ -649,11 +755,17 @@ export default function SubscriptionManagementPage() {
                       <td className="px-6 py-5">
                         <div>
                           <p className="font-bold text-[#1d314f]">
-                            {subscription.school?.name ||
-                              "Unknown school"}
+                            {(audience === "student"
+                              ? subscription.student?.name
+                              : subscription.school?.name) ||
+                              (audience === "student"
+                                ? "Unknown learner"
+                                : "Unknown school")}
                           </p>
                           <p className="mt-1 text-[14px] text-[#7c8ba3]">
-                            {subscription.school?.email ||
+                            {(audience === "student"
+                              ? subscription.student?.email
+                              : subscription.school?.email) ||
                               "Email not available"}
                           </p>
                         </div>
@@ -668,10 +780,11 @@ export default function SubscriptionManagementPage() {
                             {formatCurrency(
                               subscription.plan?.price ?? 0
                             )}{" "}
-                            {subscription.plan?.interval ===
-                            "annually"
-                              ? "/year"
-                              : "/month"}
+                            {(subscription.plan?.price ?? 0) > 0
+                              ? intervalSuffix(
+                                  subscription.plan?.interval ?? ""
+                                )
+                              : "free"}
                           </p>
                         </div>
                       </td>
@@ -702,7 +815,18 @@ export default function SubscriptionManagementPage() {
                         </div>
                       </td>
                       <td className="px-4 py-5 text-right">
-                        {subscription.schoolId ? (
+                        {audience === "student" && subscription.studentId ? (
+                          <Link
+                            href={`/students/${subscription.studentId}`}
+                            className="inline-flex items-center justify-center gap-2 rounded-[12px] border border-[#dbe3f1] px-4 py-2 text-[14px] font-semibold text-[#4057d8]"
+                          >
+                            View Learner
+                            <ArrowUpRight
+                              className="h-4 w-4"
+                              strokeWidth={2}
+                            />
+                          </Link>
+                        ) : audience === "school" && subscription.schoolId ? (
                           <Link
                             href={`/schools/${subscription.schoolId}`}
                             className="inline-flex items-center justify-center gap-2 rounded-[12px] border border-[#dbe3f1] px-4 py-2 text-[14px] font-semibold text-[#4057d8]"

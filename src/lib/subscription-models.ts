@@ -2,7 +2,10 @@ type JsonRecord = Record<string, unknown>;
 
 export type SubscriptionPlanInterval =
   | "monthly"
-  | "annually";
+  | "annually"
+  | "one_time";
+
+export type SubscriberType = "school" | "student";
 
 export type SubscriptionPlanFeature = {
   id: string;
@@ -42,9 +45,18 @@ export type SubscriptionSchool = {
   country?: string;
 };
 
+export type SubscriptionStudent = {
+  id: string;
+  name: string;
+  email: string;
+};
+
 export type SubscriptionRecord = {
   id: string;
   schoolId: string;
+  studentId?: string;
+  /** Which of schoolId / studentId is set. Missing on older rows = school. */
+  subscriberType: SubscriberType;
   planId: string;
   status: string;
   isTrial: boolean;
@@ -57,6 +69,7 @@ export type SubscriptionRecord = {
   updatedAt?: string;
   plan: SubscriptionPlan | null;
   school: SubscriptionSchool | null;
+  student: SubscriptionStudent | null;
 };
 const DEBUG = true;
 
@@ -239,6 +252,25 @@ function parseSubscriptionSchool(value: unknown): SubscriptionSchool | null {
   return result;
 }
 
+function parseSubscriptionStudent(value: unknown): SubscriptionStudent | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const id = readString(value.id);
+  const user = isRecord(value.user) ? value.user : {};
+  const name = [readString(user.firstName), readString(user.lastName)]
+    .filter(Boolean)
+    .join(" ");
+  const email = readString(user.email);
+
+  if (!id && !name && !email) {
+    return null;
+  }
+
+  return { id, name, email };
+}
+
 function parseSubscriptionRecord(value: unknown): SubscriptionRecord | null {
   log("parseSubscriptionRecord() input", value);
 
@@ -253,7 +285,7 @@ function parseSubscriptionRecord(value: unknown): SubscriptionRecord | null {
     const planId = readString(value.planId);
     const status = readString(value.status);
 
-    if (!id && !schoolId && !planId && !status) {
+    if (!id && !schoolId && !readString(value.studentId) && !planId && !status) {
       log("parseSubscriptionRecord() skipped - missing required fields");
       return null;
     }
@@ -261,6 +293,9 @@ function parseSubscriptionRecord(value: unknown): SubscriptionRecord | null {
     const result: SubscriptionRecord = {
       id,
       schoolId,
+      studentId: readOptionalString(value.studentId),
+      subscriberType:
+        readString(value.subscriberType) === "student" ? "student" : "school",
       planId,
       status,
       isTrial: readBoolean(value.isTrial),
@@ -273,6 +308,7 @@ function parseSubscriptionRecord(value: unknown): SubscriptionRecord | null {
       updatedAt: readOptionalString(value.updatedAt),
       plan: parseSubscriptionPlan(value.plan),
       school: parseSubscriptionSchool(value.school),
+      student: parseSubscriptionStudent(value.student),
     };
 
     log("parseSubscriptionRecord() success", result);

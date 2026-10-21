@@ -30,9 +30,13 @@ type FeatureDraft = {
   originalDescription?: string;
 };
 
+type PlanAudience = "school" | "student";
+
 type SubscriptionPlanEditorProps = {
   mode: PlanEditorMode;
   planId?: string | null;
+  /** Preselects who the plan is sold to when creating. */
+  initialAudience?: PlanAudience;
 };
 
 type ApiEnvelope<TData> = {
@@ -86,6 +90,10 @@ function formatCurrency(value: number) {
 }
 
 function formatIntervalLabel(interval: string) {
+  if (interval === "one_time") {
+    return "one-time";
+  }
+
   return interval === "annually"
     ? "per year"
     : "per month";
@@ -96,6 +104,7 @@ function buildPlanPayload(formState: {
   description: string;
   price: string;
   interval: string;
+  audience: PlanAudience;
   maxStudents: string;
   maxCourses: string;
   maxTeamMembers: string;
@@ -119,9 +128,18 @@ function buildPlanPayload(formState: {
     throw new Error("Plan name is required.");
   }
 
-  if (price === undefined || price === null || price <= 0) {
+  // Learner tiers include a free plan; school plans are always paid.
+  const minimumPrice = formState.audience === "student" ? 0 : 1;
+
+  if (
+    price === undefined ||
+    price === null ||
+    price < minimumPrice
+  ) {
     throw new Error(
-      "Price must be a whole number greater than zero."
+      formState.audience === "student"
+        ? "Price must be a whole number, or 0 for a free plan."
+        : "Price must be a whole number greater than zero."
     );
   }
 
@@ -139,22 +157,24 @@ function buildPlanPayload(formState: {
   return {
     name: formState.name.trim(),
     price,
+    audience: formState.audience,
     interval:
-      formState.interval === "annually"
-        ? "annually"
+      formState.interval === "annually" ||
+      formState.interval === "one_time"
+        ? formState.interval
         : "monthly",
     ...(formState.description.trim()
       ? {
           description: formState.description.trim(),
         }
       : {}),
-    ...(maxStudents !== undefined
+    ...(formState.audience === "school" && maxStudents !== undefined
       ? { maxStudents }
       : {}),
     ...(maxCourses !== undefined
       ? { maxCourses }
       : {}),
-    ...(maxTeamMembers !== undefined
+    ...(formState.audience === "school" && maxTeamMembers !== undefined
       ? { maxTeamMembers }
       : {}),
     ...(trialDurationDays !== undefined
@@ -258,6 +278,7 @@ function FeatureRow({
 export function SubscriptionPlanEditor({
   mode,
   planId,
+  initialAudience = "school",
 }: SubscriptionPlanEditorProps) {
   const router = useRouter();
   const { session, isHydrated } = useAuthSession();
@@ -265,6 +286,8 @@ export function SubscriptionPlanEditor({
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
   const [interval, setInterval] = useState("monthly");
+  const [audience, setAudience] =
+    useState<PlanAudience>(initialAudience);
   const [maxStudents, setMaxStudents] = useState("");
   const [maxCourses, setMaxCourses] = useState("");
   const [maxTeamMembers, setMaxTeamMembers] =
@@ -343,9 +366,13 @@ export function SubscriptionPlanEditor({
         setDescription(plan.description ?? "");
         setPrice(String(plan.price || ""));
         setInterval(
-          plan.interval === "annually"
-            ? "annually"
+          plan.interval === "annually" ||
+            plan.interval === "one_time"
+            ? plan.interval
             : "monthly"
+        );
+        setAudience(
+          plan.audience === "student" ? "student" : "school"
         );
         setMaxStudents(toInputValue(plan.maxStudents));
         setMaxCourses(toInputValue(plan.maxCourses));
@@ -438,6 +465,7 @@ export function SubscriptionPlanEditor({
         description,
         price,
         interval,
+        audience,
         maxStudents,
         maxCourses,
         maxTeamMembers,
@@ -694,8 +722,9 @@ export function SubscriptionPlanEditor({
                 : "Edit Subscription Plan"}
             </h1>
             <p className="mt-3 max-w-[760px] text-[17px] leading-7 text-[#465b7d]">
-              Manage pricing, limits, trial days, and the feature bullets school owners see
-              during subscription checkout.
+              {audience === "student"
+                ? "Manage pricing, course limits, and the feature bullets independent learners see when choosing a plan. Learner plans are separate from school plans."
+                : "Manage pricing, limits, trial days, and the feature bullets school owners see during subscription checkout."}
             </p>
           </div>
 
@@ -810,6 +839,41 @@ export function SubscriptionPlanEditor({
                     <option value="annually">
                       Annually
                     </option>
+                    {audience === "student" ? (
+                      <option value="one_time">
+                        One-time (lifetime)
+                      </option>
+                    ) : null}
+                  </select>
+                </label>
+
+                <label className="block">
+                  <span className="mb-3 block text-[16px] font-bold text-[#19355d]">
+                    Sold to
+                  </span>
+                  <select
+                    value={audience}
+                    onChange={(event) => {
+                      const next =
+                        event.target.value === "student"
+                          ? "student"
+                          : "school";
+                      setAudience(next);
+                      if (
+                        next === "school" &&
+                        interval === "one_time"
+                      ) {
+                        setInterval("monthly");
+                      }
+                    }}
+                    className="h-[58px] w-full rounded-[16px] border border-[#d7deee] bg-white px-5 text-[16px] text-[#264267] outline-none"
+                  >
+                    <option value="school">
+                      Schools
+                    </option>
+                    <option value="student">
+                      Independent learners
+                    </option>
                   </select>
                 </label>
               </div>
@@ -821,6 +885,7 @@ export function SubscriptionPlanEditor({
               </h2>
 
               <div className="mt-8 grid gap-6 md:grid-cols-2">
+                {audience === "school" ? (
                 <label className="block">
                   <span className="mb-3 block text-[16px] font-bold text-[#19355d]">
                     Max students
@@ -837,6 +902,7 @@ export function SubscriptionPlanEditor({
                     className="h-[58px] w-full rounded-[16px] border border-[#d7deee] bg-white px-5 text-[16px] text-[#264267] outline-none placeholder:text-[#8d99b1]"
                   />
                 </label>
+                ) : null}
 
                 <label className="block">
                   <span className="mb-3 block text-[16px] font-bold text-[#19355d]">
@@ -850,11 +916,12 @@ export function SubscriptionPlanEditor({
                         event.target.value
                       )
                     }
-                    placeholder="10"
+                    placeholder={audience === "student" ? "Leave empty for unlimited" : "10"}
                     className="h-[58px] w-full rounded-[16px] border border-[#d7deee] bg-white px-5 text-[16px] text-[#264267] outline-none placeholder:text-[#8d99b1]"
                   />
                 </label>
 
+                {audience === "school" ? (
                 <label className="block">
                   <span className="mb-3 block text-[16px] font-bold text-[#19355d]">
                     Max team members
@@ -871,6 +938,7 @@ export function SubscriptionPlanEditor({
                     className="h-[58px] w-full rounded-[16px] border border-[#d7deee] bg-white px-5 text-[16px] text-[#264267] outline-none placeholder:text-[#8d99b1]"
                   />
                 </label>
+                ) : null}
 
                 <label className="block">
                   <span className="mb-3 block text-[16px] font-bold text-[#19355d]">
