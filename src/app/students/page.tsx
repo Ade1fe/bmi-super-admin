@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { useEffect, useState, useCallback, useRef } from "react";
 import {
-  ChevronDown,
+  CreditCard,
   CircleAlert,
   Download,
   Eye,
@@ -20,11 +20,11 @@ import {
   Loader2,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { AssignPlanModal } from "@/components/assign-plan-modal";
 import {
   getSchoolStudents,
   deactivateStudent,
   reactivateStudent,
-  grantPremiumAccess,
   getStudentStats,
   Student,
   FetchStudentsParams,
@@ -102,7 +102,7 @@ function StudentActionMenu({
   studentId,
   onDeactivate,
   onReactivate,
-  onGrantAccess,
+  onAssignPlan,
 }: {
   menuRef: React.RefObject<HTMLDivElement | null>;
   position: {
@@ -112,7 +112,8 @@ function StudentActionMenu({
   studentId: string;
   onDeactivate: () => void;
   onReactivate: () => void;
-  onGrantAccess: () => void;
+  /** Shown only for independent students, who hold their own plan. */
+  onAssignPlan?: () => void;
 }) {
   return (
     <div
@@ -149,14 +150,16 @@ function StudentActionMenu({
         <UserCheck className="h-[18px] w-[18px] text-[#56657f]" strokeWidth={2} />
         Reactivate Student
       </button>
-      <button
-        type="button"
-        onClick={onGrantAccess}
-        className="flex w-full items-center gap-3 rounded-[10px] px-4 py-3 text-left text-[15px] font-medium text-[#38455f] hover:bg-[#f6f8fd]"
-      >
-        <UserPlus className="h-[18px] w-[18px] text-[#56657f]" strokeWidth={2} />
-        Grant Premium Access
-      </button>
+      {onAssignPlan && (
+        <button
+          type="button"
+          onClick={onAssignPlan}
+          className="flex w-full items-center gap-3 rounded-[10px] px-4 py-3 text-left text-[15px] font-medium text-[#38455f] hover:bg-[#f6f8fd]"
+        >
+          <CreditCard className="h-[18px] w-[18px] text-[#56657f]" strokeWidth={2} />
+          Assign Plan
+        </button>
+      )}
     </div>
   );
 }
@@ -173,138 +176,6 @@ function ModalClose({ onClose, label }: { onClose: () => void; label: string }) 
     >
       <X className="h-5 w-5" strokeWidth={2.4} />
     </button>
-  );
-}
-
-// ─── Grant Access Modal ───────────────────────────────────────────────────
-
-function GrantAccessModal({
-  student,
-  onClose,
-  onSuccess,
-  authToken,
-}: {
-  student: Student | null;
-  onClose: () => void;
-  onSuccess: () => void;
-  authToken: string;
-}) {
-  const [plan, setPlan] = useState("");
-  const [duration, setDuration] = useState("");
-  const [reason, setReason] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function handleSubmit() {
-    if (!student || !plan || !duration) return;
-    setLoading(true);
-    setError(null);
-    try {
-      await grantPremiumAccess(
-        student.id,
-        { plan, durationMonths: Number(duration), reason },
-        authToken
-      );
-      onSuccess();
-      onClose();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <>
-      <div className="fixed inset-0 z-40 bg-[#1f2430]/55 backdrop-blur-[1.5px]" />
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="relative w-full max-w-[500px] overflow-hidden rounded-[16px] bg-white shadow-[0_34px_90px_rgba(15,25,51,0.24)]">
-          <ModalClose onClose={onClose} label="Close grant access modal" />
-          <div className="border-b border-[#edf0f7] px-6 py-6 pr-20">
-            <h2 className="text-[22px] font-extrabold tracking-[-0.04em] text-[#182c4e]">
-              Grant Premium Access
-            </h2>
-            {student && (
-              <p className="mt-1 text-[14px] text-[#6b7894]">
-                {student.user.firstName} {student.user.lastName}
-              </p>
-            )}
-          </div>
-
-          <div className="space-y-6 px-6 py-7">
-            {error && (
-              <p className="rounded-[10px] bg-[#fff0f3] px-4 py-3 text-[14px] text-[#c52c50]">
-                {error}
-              </p>
-            )}
-            <label className="block">
-              <span className="mb-2 block text-[15px] font-bold text-[#2f4365]">Select Plan</span>
-              <div className="relative">
-                <select
-                  value={plan}
-                  onChange={(e) => setPlan(e.target.value)}
-                  className="h-14 w-full appearance-none rounded-[10px] border border-[#dce3f2] bg-white px-4 text-[16px] text-[#51627f] outline-none"
-                >
-                  <option value="">Choose a plan...</option>
-                  <option value="Premium">Premium</option>
-                  <option value="Enterprise">Enterprise</option>
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#7c88a0]" />
-              </div>
-            </label>
-
-            <label className="block">
-              <span className="mb-2 block text-[15px] font-bold text-[#2f4365]">Select Duration</span>
-              <div className="relative">
-                <select
-                  value={duration}
-                  onChange={(e) => setDuration(e.target.value)}
-                  className="h-14 w-full appearance-none rounded-[10px] border border-[#dce3f2] bg-white px-4 text-[16px] text-[#51627f] outline-none"
-                >
-                  <option value="">Choose duration...</option>
-                  <option value="1">1 Month</option>
-                  <option value="3">3 Months</option>
-                  <option value="12">12 Months</option>
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#7c88a0]" />
-              </div>
-            </label>
-
-            <label className="block">
-              <span className="mb-2 block text-[15px] font-bold text-[#2f4365]">
-                Reason for Granting Access
-              </span>
-              <textarea
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="Internal audit note (e.g., Scholarship recipient, support resolution)"
-                className="min-h-[118px] w-full rounded-[10px] border border-[#dce3f2] px-4 py-4 text-[16px] text-[#6b7894] outline-none"
-              />
-            </label>
-          </div>
-
-          <div className="grid gap-4 border-t border-[#edf0f7] bg-[#f7fbff] px-4 py-4 sm:grid-cols-2 sm:px-5">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={loading}
-              className="inline-flex h-14 items-center justify-center rounded-[10px] border border-[#dce3f2] bg-white px-6 text-[16px] font-semibold text-[#3e5172]"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={loading || !plan || !duration}
-              className="button-primary inline-flex h-14 items-center justify-center gap-2 rounded-[10px] bg-[#0f8751] px-6 text-[16px] font-semibold text-white disabled:opacity-60"
-            >
-              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-              Grant Access
-            </button>
-          </div>
-        </div>
-      </div>
-    </>
   );
 }
 
@@ -512,7 +383,7 @@ function ReactivateStudentModal({
 // ─── Page ─────────────────────────────────────────────────────────────────
 
 type ActiveTab = "all" | "active" | "inactive";
-type ActiveDialog = "grant" | "deactivate" | "reactivate" | null;
+type ActiveDialog = "plan" | "deactivate" | "reactivate" | null;
 
 export default function StudentsPage() {
   const authToken = useAuthToken();
@@ -642,12 +513,15 @@ export default function StudentsPage() {
 
   return (
     <AppShell title="Individual Students" activeSection="student">
-      {activeDialog === "grant" && (
-        <GrantAccessModal
-          student={selectedStudent}
-          onClose={closeDialog}
-          onSuccess={fetchStudents}
+      {activeDialog === "plan" && selectedStudent && (
+        <AssignPlanModal
+          assignee={{
+            type: "student",
+            id: selectedStudent.id,
+            name: `${selectedStudent.user.firstName} ${selectedStudent.user.lastName}`,
+          }}
           authToken={authToken}
+          onClose={closeDialog}
         />
       )}
       {activeDialog === "deactivate" && (
@@ -832,13 +706,15 @@ export default function StudentsPage() {
                     View Student
                   </Link>
 
-                  <button
-                    type="button"
-                    onClick={() => openDialog("grant", row)}
-                    className="inline-flex h-12 items-center justify-center rounded-[10px] bg-[#4b8a60] px-4 text-[14px] font-semibold text-white"
-                  >
-                    Grant Premium Access
-                  </button>
+                  {row.studentType === "independent" && (
+                    <button
+                      type="button"
+                      onClick={() => openDialog("plan", row)}
+                      className="inline-flex h-12 items-center justify-center rounded-[10px] bg-[#4b8a60] px-4 text-[14px] font-semibold text-white"
+                    >
+                      Assign Plan
+                    </button>
+                  )}
 
                   <button
                     type="button"
@@ -968,7 +844,11 @@ export default function StudentsPage() {
                           studentId={row.id}
                           onDeactivate={() => openDialog("deactivate", row)}
                           onReactivate={() => openDialog("reactivate", row)}
-                          onGrantAccess={() => openDialog("grant", row)}
+                          onAssignPlan={
+                            row.studentType === "independent"
+                              ? () => openDialog("plan", row)
+                              : undefined
+                          }
                         />
                       )}
                     </td>

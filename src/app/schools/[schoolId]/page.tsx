@@ -445,6 +445,7 @@ import {
 } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
+import { AssignPlanModal } from "@/components/assign-plan-modal";
 import { apiRequest, endpoints } from "@/lib/endpoints";
 import { parseSchoolSummary, type SchoolSummary } from "@/lib/backend-models";
 import { useAuthSession } from "@/lib/auth-session";
@@ -452,6 +453,7 @@ import {
   adminCreateStudent,
   type AdminCreateStudentResponse,
 } from "@/lib/students-api";
+import { describeTerm, formatPlanPrice } from "@/lib/subscription-api";
 
 // ─── Stat card ──────────────────────────────────────────────────────────
 
@@ -698,11 +700,13 @@ export default function SchoolDetailsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("Loading school details...");
   const [showAddStudent, setShowAddStudent] = useState(false);
+  const [showAssignPlan, setShowAssignPlan] = useState(false);
 
-  async function loadSchool() {
+  /** `silent` refreshes in place instead of blanking the page to a loader. */
+  async function loadSchool(options: { silent?: boolean } = {}) {
     if (!schoolId || !session?.token) return;
     try {
-      setIsLoading(true);
+      if (!options.silent) setIsLoading(true);
 
       const response = await apiRequest(
         endpoints.admin.schoolById(schoolId),
@@ -765,6 +769,17 @@ export default function SchoolDetailsPage() {
       }
       activeSection="schools"
     >
+      {/* ── Assign Plan Modal ── */}
+      {showAssignPlan && schoolId && school && (
+        <AssignPlanModal
+          assignee={{ type: "school", id: schoolId, name: school.name }}
+          currentPlanId={schoolData?.currentPlan?.id ?? null}
+          authToken={authToken}
+          onClose={() => setShowAssignPlan(false)}
+          onAssigned={() => loadSchool({ silent: true })}
+        />
+      )}
+
       {/* ── Add Student Modal ── */}
       {showAddStudent && schoolId && (
         <AddStudentModal
@@ -885,20 +900,50 @@ export default function SchoolDetailsPage() {
               </div>
 
               {/* PLAN */}
-              <div className="rounded-[16px] border border-[#14985b] bg-[#14985b] p-6 text-white">
+              <div className="flex flex-col rounded-[16px] border border-[#14985b] bg-[#14985b] p-6 text-white">
                 <div className="flex items-center justify-between">
                   <h2 className="text-[15px] font-bold">CURRENT PLAN</h2>
                   <Building2 />
                 </div>
 
-                <div className="mt-6 space-y-4">
+                <div className="mt-6 flex-1 space-y-4">
                   <div>
                     <p className="text-sm text-white/70">Plan Name</p>
                     <p className="text-xl font-bold">
                       {schoolData?.currentPlan?.name ?? "No Plan"}
                     </p>
                   </div>
+
+                  {schoolData?.currentPlan && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm text-white/70">Price</p>
+                        <p className="font-semibold">
+                          {formatPlanPrice({
+                            price: Number(schoolData.currentPlan.price) || 0,
+                            interval: schoolData.currentPlan.interval,
+                          })}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-white/70">
+                          {schoolData.currentPlan.status === "trial" ? "Trial" : "Term"}
+                        </p>
+                        <p className="font-semibold">
+                          {describeTerm(schoolData.currentPlan)}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowAssignPlan(true)}
+                  className="mt-6 rounded-[8px] bg-white px-4 py-3 text-[14px] font-semibold text-[#14985b] hover:bg-[#f2fbf6]"
+                >
+                  {schoolData?.currentPlan ? "Change Plan" : "Assign Plan"}
+                </button>
               </div>
 
             </div>

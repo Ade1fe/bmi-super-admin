@@ -453,9 +453,15 @@ payments: {
         `/subscriptions/plans/${planId}/features/${featureId}`
       ),
 
-    // POST { planId } — puts a school on a plan without a Paystack checkout
+    // POST { planId, durationMonths? } — puts a school on a plan without a
+    // Paystack checkout
     assignSchoolPlan: (schoolId: string) =>
       buildEndpoint(apiBaseUrl, `/subscriptions/admin/schools/${schoolId}`),
+
+    // GET — the independent student's live plan
+    // POST { planId, durationMonths? } — puts them on a plan without checkout
+    studentPlan: (studentId: string) =>
+      buildEndpoint(apiBaseUrl, `/subscriptions/admin/students/${studentId}`),
   },
 
   managementTeam: {

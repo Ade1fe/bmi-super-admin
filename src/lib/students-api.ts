@@ -58,6 +58,11 @@ export interface Student {
   id: string;
   userId: string;
   schoolId: string;
+  /**
+   * "independent" learners signed themselves up and hold their own plan;
+   * "school" students are covered by their school's plan.
+   */
+  studentType?: "school" | "independent";
   admissionNumber: string | null;
   class: string | null;
   createdAt: string;
@@ -90,12 +95,6 @@ export interface DeactivateStudentPayload {
 
 export interface ReactivateStudentPayload {
   reason?: string;
-}
-
-export interface GrantPremiumAccessPayload {
-  plan: string;
-  durationMonths: number;
-  reason: string;
 }
 
 // ─── Query params ──────────────────────────────────────
@@ -165,15 +164,6 @@ export interface ReactivateStudentResponse {
   data: Student;
 }
 
-export interface GrantPremiumAccessResponse {
-  message: string;
-  data: {
-    studentId: string;
-    plan: string;
-    durationMonths: number;
-    grantedAt: string;
-  };
-}
 
 
 // ─── Create School (Admin) ─────────────────────────────────────
@@ -480,37 +470,6 @@ export async function getStudentStats(authToken: string) {
     return res;
   } catch (err) {
     logError("getStudentStats() failed", err);
-    throw err;
-  }
-}
-/**
- * Grant premium access to a student
- */
-export async function grantPremiumAccess(
-  studentId: string,
-  payload: GrantPremiumAccessPayload,
-  authToken: string
-) {
-  log("grantPremiumAccess() called", {
-    studentId,
-    plan: payload.plan,
-    durationMonths: payload.durationMonths,
-  });
-
-  try {
-    const res = await apiRequest<GrantPremiumAccessResponse>(
-      `${endpoints.admin.students}/${studentId}/grant-premium`,
-      {
-        method: "POST",
-        authToken,
-        body: payload,
-      }
-    );
-
-    log("grantPremiumAccess() response", res);
-    return res;
-  } catch (err) {
-    logError("grantPremiumAccess() failed", err);
     throw err;
   }
 }

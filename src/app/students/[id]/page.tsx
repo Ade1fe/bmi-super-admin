@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -15,11 +15,19 @@ import {
   MessageSquare,
   Loader2,
   ChevronRight,
+  CreditCard,
 } from "lucide-react";
 
 import { getStudentProfile, Student } from "@/lib/students-api";
 import { useAuthSession } from "@/lib/auth-session";
 import { AppShell } from "@/components/app-shell";
+import { AssignPlanModal } from "@/components/assign-plan-modal";
+import {
+  describeTerm,
+  fetchStudentSubscription,
+  formatPlanPrice,
+} from "@/lib/subscription-api";
+import type { SubscriptionRecord } from "@/lib/subscription-models";
 
 function useAuthToken(): string {
   const { session } = useAuthSession();
@@ -87,6 +95,31 @@ export default function StudentDetailPage() {
   const [student, setStudent] = useState<Student | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [subscription, setSubscription] = useState<SubscriptionRecord | null>(null);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<"loading" | "ready" | "error">(
+    "loading",
+  );
+  const [showAssignPlan, setShowAssignPlan] = useState(false);
+
+  // Only independent learners hold a plan of their own; a school's students
+  // are covered by the school's.
+  const isIndependent = student?.studentType === "independent";
+
+  const loadSubscription = useCallback(async () => {
+    if (!studentId || !authToken) return;
+    setSubscriptionStatus("loading");
+    try {
+      setSubscription(await fetchStudentSubscription(studentId, authToken));
+      setSubscriptionStatus("ready");
+    } catch {
+      setSubscriptionStatus("error");
+    }
+  }, [studentId, authToken]);
+
+  useEffect(() => {
+    if (isIndependent) loadSubscription();
+  }, [isIndependent, loadSubscription]);
 
   useEffect(() => {
     if (!studentId || !authToken) return;
@@ -159,6 +192,22 @@ export default function StudentDetailPage() {
 
   return (
        <AppShell title="Individual Students" activeSection="student">
+      {showAssignPlan && (
+        <AssignPlanModal
+          assignee={{ type: "student", id: student.id, name: fullName }}
+          currentPlanId={subscription?.planId ?? null}
+          authToken={authToken}
+          onClose={() => setShowAssignPlan(false)}
+          onAssigned={(result) => {
+            if (result.subscription) {
+              setSubscription(result.subscription);
+              setSubscriptionStatus("ready");
+            } else {
+              loadSubscription();
+            }
+          }}
+        />
+      )}
          <div className="min-h-screen bg-[#f5f7fb] p-6">
       <div className="mx-auto">
 
@@ -324,6 +373,64 @@ export default function StudentDetailPage() {
 
           {/* Right column */}
           <div className="flex flex-col gap-6">
+
+            {/* Subscription */}
+            <div className="rounded-[16px] bg-white shadow-[0_8px_30px_rgba(182,192,227,0.10)] p-6">
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-[18px] font-extrabold tracking-[-0.03em] text-[#182c4e]">
+                  Subscription
+                </h2>
+                <CreditCard className="h-5 w-5 text-[#7f8cab]" strokeWidth={1.8} />
+              </div>
+
+              {!isIndependent ? (
+                <p className="text-[14px] leading-6 text-[#7f8cab]">
+                  Covered by {student.school?.name ?? "their school"}&apos;s plan.{" "}
+                  {student.schoolId && (
+                    <Link
+                      href={`/schools/${student.schoolId}`}
+                      className="font-semibold text-[#0f8751] hover:underline"
+                    >
+                      Manage it on the school
+                    </Link>
+                  )}
+                </p>
+              ) : subscriptionStatus === "loading" ? (
+                <div className="flex items-center gap-2 text-[14px] text-[#7f8cab]">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading plan…
+                </div>
+              ) : subscriptionStatus === "error" ? (
+                <p className="text-[14px] text-[#c52c50]">
+                  Couldn&apos;t load this student&apos;s plan.{" "}
+                  <button
+                    type="button"
+                    onClick={loadSubscription}
+                    className="font-semibold text-[#0f8751] hover:underline"
+                  >
+                    Try again
+                  </button>
+                </p>
+              ) : (
+                <>
+                  <p className="text-[18px] font-bold text-[#182c4e]">
+                    {subscription?.plan?.name ?? "No plan"}
+                  </p>
+                  {subscription?.plan && (
+                    <p className="mt-1 text-[14px] text-[#6b7894]">
+                      {formatPlanPrice(subscription.plan)} · {describeTerm(subscription)}
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowAssignPlan(true)}
+                    className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-[10px] bg-[#0f8751] text-[14px] font-semibold text-white transition-colors hover:bg-[#0a7244]"
+                  >
+                    {subscription ? "Change Plan" : "Assign Plan"}
+                  </button>
+                </>
+              )}
+            </div>
 
             {/* Certificates (PDF list) */}
             <div className="rounded-[16px] bg-white shadow-[0_8px_30px_rgba(182,192,227,0.10)] p-6">

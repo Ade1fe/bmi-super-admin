@@ -271,7 +271,7 @@ function parseSubscriptionStudent(value: unknown): SubscriptionStudent | null {
   return { id, name, email };
 }
 
-function parseSubscriptionRecord(value: unknown): SubscriptionRecord | null {
+export function parseSubscriptionRecord(value: unknown): SubscriptionRecord | null {
   log("parseSubscriptionRecord() input", value);
 
   try {
