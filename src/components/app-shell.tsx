@@ -23,6 +23,7 @@ import {
   Search,
   Settings,
   ShieldCheck,
+  Sparkles,
   TicketCheck,
   Users,
   X,
@@ -49,7 +50,8 @@ export type AppSection =
   | "teams"
   | "support"
   | "settings"
-  | "achievements";
+  | "achievements"
+  | "ai";
 
 type NavItem = {
   key: AppSection;
@@ -74,6 +76,7 @@ const primaryNav: NavItem[] = [
   { key: "schools", label: "Schools", icon: Building2, href: "/schools" },
   { key: "student", label: "Student", icon: Users, href: "/students" },
   { key: "courses", label: "Courses", icon: BookOpen, href: "/courses" },
+  { key: "ai", label: "AI Learning", icon: Sparkles, href: "/ai" },
   { key: "catalog", label: "Catalog", icon: Grid2x2, href: "/catalog" },
   { key: "analytics", label: "Analytics", icon: ChartBar, href: "/analytics" },
   { key: "subscriptions", label: "Subscriptions", icon: TicketCheck, href: "/subscriptions" },
