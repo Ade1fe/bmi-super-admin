@@ -29,6 +29,10 @@ export interface AiCourseSettings {
   assessmentMandatory: boolean;
   progressionRule: ProgressionRule;
   practicalCourse: boolean;
+  imageGenerationEnabled: boolean;
+  webResourcesEnabled: boolean;
+  learnerDailyImageLimit: number | null;
+  learnerDailyWebSearchLimit: number | null;
   learnerDailyMessageLimit: number | null;
   learnerMonthlyTokenLimit: number | null;
   courseMonthlyTokenLimit: number | null;
@@ -48,6 +52,7 @@ export interface AiCourseRow {
   assessmentMandatory: boolean;
   progressionRule: ProgressionRule;
   practicalCourse: boolean;
+  media?: { pictures: boolean; webResources: boolean };
   documents: { indexed: number; failed: number; pending: number };
 }
 

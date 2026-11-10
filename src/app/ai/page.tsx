@@ -202,6 +202,8 @@ export default function AiLearningPage() {
                           {row.capabilities.tutoring ? <Pill tone="green">Tutor</Pill> : null}
                           {row.capabilities.assignmentGeneration ? <Pill tone="green">Assignments</Pill> : null}
                           {row.capabilities.assessment ? <Pill tone="green">Grading</Pill> : null}
+                          {row.media?.pictures ? <Pill tone="blue">Pictures</Pill> : null}
+                          {row.media?.webResources ? <Pill tone="blue">Web links</Pill> : null}
                         </div>
                       ) : <span className="text-[#cbd5e1]">—</span>}
                     </td>

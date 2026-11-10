@@ -287,6 +287,18 @@ export default function AiCourseSettingsPage() {
               </div>
             </Card>
 
+            <Card title="Pictures and resources" hint="Extras the tutor can add under its replies. The tutor offers them when they help, and learners can also ask with a button.">
+              <Toggle on={settings.imageGenerationEnabled} onChange={(v) => patch({ imageGenerationEnabled: v })} label="AI pictures and diagrams" hint="Draws a simple picture or labelled diagram for an explanation (about $0.034 each). Shown as an AI illustration; it may contain mistakes, so learners are told to follow the course material." />
+              <div className="border-t border-[#f1f5f9]">
+                <Toggle on={settings.webResourcesEnabled} onChange={(v) => patch({ webResourcesEnabled: v })} label="Resources from the web" hint="Searches Google for free videos and guides on the topic ($14 per 1,000 searches after 5,000 free a month). These come from outside your approved course material and are labelled that way." />
+              </div>
+              <p className="mt-2 text-xs text-[#94a3b8]">The lesson&apos;s own video and PDF are always linked when the tutor thinks they would help. That costs nothing.</p>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <LimitField label="Pictures per learner per day" value={settings.learnerDailyImageLimit} onChange={(v) => patch({ learnerDailyImageLimit: v })} hint="Platform default: 5." />
+                <LimitField label="Web searches per learner per day" value={settings.learnerDailyWebSearchLimit} onChange={(v) => patch({ learnerDailyWebSearchLimit: v })} hint="Platform default: 5." />
+              </div>
+            </Card>
+
             <Card title="Usage limits" hint="Empty uses the platform default. 0 means unlimited.">
               <div className="grid gap-4 sm:grid-cols-3">
                 <LimitField label="Messages per learner per day" value={settings.learnerDailyMessageLimit} onChange={(v) => patch({ learnerDailyMessageLimit: v })} hint="Tutor chat messages." />
